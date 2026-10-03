@@ -4,6 +4,7 @@ import com.electronwill.nightconfig.core.Config;
 import com.electronwill.nightconfig.core.file.CommentedFileConfig;
 import com.electronwill.nightconfig.toml.TomlFormat;
 import io.github.duckysmacky.combatdrones.CombatDrones;
+import io.github.duckysmacky.combatdrones.physics.RouteValidator;
 import io.github.duckysmacky.combatdrones.type.BatteryPack;
 import io.github.duckysmacky.combatdrones.type.BombType;
 import io.github.duckysmacky.combatdrones.type.DroneType;
@@ -39,12 +40,20 @@ public final class ModConfig {
     public static double racerShrapnelDamage = 6.0;
     public static double grenadeShrapnelDamage = 5.0;
     public static double shrapnelRadius = 7.0;
+    public static int maxWaypointsPerRoute = 16;
+    public static double maxRouteAltitude = 120.0;
+    public static double maxRouteLength = 3000.0;
+    public static double minLaunchFuel = 0.25;
 
     // [client]
     public static boolean invertMousePitch = false;
     public static double staticIntensity = 1.0;
 
     private ModConfig() {
+    }
+
+    public static RouteValidator.Limits routeLimits() {
+        return new RouteValidator.Limits(maxWaypointsPerRoute, maxRouteAltitude, maxRouteLength);
     }
 
     /** Must run after {@link DroneTypes#load}, since the drone tables default to the bundled types. */
@@ -62,6 +71,14 @@ public final class ModConfig {
             grenadeShrapnelDamage = defaults.number("general.grenadeShrapnelDamage", grenadeShrapnelDamage, 0, 40,
                     "Extra shrapnel damage per Fragmentation Grenade the racer carries.");
             shrapnelRadius = defaults.number("general.shrapnelRadius", shrapnelRadius, 0, 20, "Reach of racer shrapnel, in blocks.");
+            maxWaypointsPerRoute = (int) defaults.number("general.maxWaypointsPerRoute", maxWaypointsPerRoute, 1, 64,
+                    "Most waypoints a Mission Planner route may have.");
+            maxRouteAltitude = defaults.number("general.maxRouteAltitude", maxRouteAltitude, 10, 250,
+                    "Highest waypoint altitude, in blocks above the launch ramp.");
+            maxRouteLength = defaults.number("general.maxRouteLength", maxRouteLength, 100, 20000,
+                    "Longest total route (from the ramp through every waypoint), in blocks.");
+            minLaunchFuel = defaults.number("general.minLaunchFuel", minLaunchFuel, 0, 1,
+                    "Share of a full tank a ramp unit needs before it may launch.");
             droneDamageTakenMultiplier = defaults.number("general.droneDamageTakenMultiplier", droneDamageTakenMultiplier, 0, 10,
                     "Multiplies all damage drones take from attacks (weapons, arrows, melee). Lower = harder to shoot down.");
 

@@ -29,7 +29,6 @@ import net.minecraft.network.datasync.DataSerializers;
 import net.minecraft.network.datasync.EntityDataManager;
 import net.minecraft.util.DamageSource;
 import net.minecraft.util.EnumHand;
-import net.minecraft.util.EnumParticleTypes;
 import net.minecraft.util.SoundCategory;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.math.AxisAlignedBB;
@@ -68,8 +67,6 @@ public class EntityHandFlownDrone extends Entity {
     private static final DataParameter<Integer> BATTERY_PACK = EntityDataManager.createKey(EntityHandFlownDrone.class, DataSerializers.VARINT);
     /** Health as a fraction of max, for damage smoke on every client and the pilot's HUD. */
     private static final DataParameter<Float> HEALTH_FRACTION = EntityDataManager.createKey(EntityHandFlownDrone.class, DataSerializers.FLOAT);
-    /** Entity status byte telling clients the drone was hit (red flash). */
-    private static final byte HIT_STATUS = 2;
     /**
      * Loaded payload, synced to every client (HUD and the bombs drawn under the drone): low byte = count, next byte =
      * {@link BombType} ordinal + 1 for bomb bays (0 for grenades or empty).
@@ -162,22 +159,13 @@ public class EntityHandFlownDrone extends Entity {
 
     @Override
     public void handleStatusUpdate(byte id) {
-        if (id == HIT_STATUS) {
-            hitFlashTicks = 6;
+        if (id == DamageEffects.HIT_STATUS) {
+            hitFlashTicks = DamageEffects.HIT_FLASH_TICKS;
         } else {
             super.handleStatusUpdate(id);
         }
     }
 
-    /** Client: smoke trail once the airframe is badly damaged, so everyone can see it's been hit. */
-    private void spawnDamageSmoke() {
-        float fraction = getHealthFraction();
-        if (fraction >= 0.5F || rand.nextFloat() > (fraction < 0.25F ? 0.8F : 0.35F)) {
-            return;
-        }
-        EnumParticleTypes smoke = fraction < 0.25F ? EnumParticleTypes.SMOKE_LARGE : EnumParticleTypes.SMOKE_NORMAL;
-        world.spawnParticle(smoke, posX + (rand.nextDouble() - 0.5) * width, posY + height / 2, posZ + (rand.nextDouble() - 0.5) * width, 0, 0.02, 0);
-    }
 
     public float getThrust() {
         return dataManager.get(THRUST);
@@ -266,7 +254,7 @@ public class EntityHandFlownDrone extends Entity {
             if (hitFlashTicks > 0) {
                 hitFlashTicks--;
             }
-            spawnDamageSmoke();
+            DamageEffects.damageSmoke(this, getHealthFraction());
             return;
         }
         DroneType type = getDroneType();
@@ -681,8 +669,7 @@ public class EntityHandFlownDrone extends Entity {
     private void damage(float amount) {
         setHealth(health - amount);
         if (health > 0) {
-            world.setEntityState(this, HIT_STATUS);
-            world.playSound(null, posX, posY, posZ, ModSounds.DRONE_HIT, SoundCategory.NEUTRAL, 1.0F, 0.9F + rand.nextFloat() * 0.2F);
+            DamageEffects.hit(this);
             return;
         }
         DroneType type = getDroneType();
@@ -725,8 +712,7 @@ public class EntityHandFlownDrone extends Entity {
             DroneExplosion.detonate((WorldServer) world, this, getBlameTarget(), posX, posY + height / 2, posZ, power);
             return;
         }
-        ((WorldServer) world).spawnParticle(EnumParticleTypes.EXPLOSION_NORMAL, posX, posY + height / 2, posZ, 10, 0.2, 0.2, 0.2, 0.03);
-        world.playSound(null, posX, posY, posZ, ModSounds.DRONE_HIT, SoundCategory.NEUTRAL, 1.2F, 0.6F);
+        DamageEffects.wreck(this);
     }
 
     @Nullable
