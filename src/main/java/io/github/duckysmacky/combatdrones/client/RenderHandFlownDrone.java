@@ -38,7 +38,11 @@ public class RenderHandFlownDrone extends Render<EntityHandFlownDrone> {
         // Entity models are authored upside down (y grows downward)
         GlStateManager.scale(-1.0F, -1.0F, 1.0F);
         bindEntityTexture(drone);
+        if (drone.hitFlashTicks > 0) {
+            GlStateManager.color(1.0F, 0.35F, 0.35F); // hit flash, like mobs turning red
+        }
         model.render(drone, 0, 0, 0, 0, 0, PIXEL);
+        GlStateManager.color(1.0F, 1.0F, 1.0F);
         GlStateManager.popMatrix();
         super.doRender(drone, x, y, z, entityYaw, partialTicks);
     }

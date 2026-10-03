@@ -29,7 +29,7 @@ public class ItemDrone extends Item {
 
     public ItemDrone(String typeId) {
         this.typeId = typeId;
-        setMaxStackSize(1);
+        setMaxStackSize(4);
     }
 
     /** Looked up on use rather than cached, so server-synced type stats are always the ones applied. */
@@ -58,6 +58,8 @@ public class ItemDrone extends Item {
         }
         if (handFlown) {
             tooltip.add(TextFormatting.YELLOW + I18n.format("tooltip.combat_drones.drone.range", Math.round(type.getSignalRange())));
+            tooltip.add(TextFormatting.YELLOW + I18n.format("tooltip.combat_drones.drone.default_battery",
+                    I18n.format("item.combat_drones." + type.getDefaultBattery().itemName() + ".name")));
         }
         if (type.isImpactDetonates()) {
             tooltip.add(TextFormatting.GRAY + I18n.format("tooltip.combat_drones.drone.kamikaze"));

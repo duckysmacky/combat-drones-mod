@@ -27,6 +27,7 @@ import net.minecraft.network.datasync.DataSerializers;
 import net.minecraft.network.datasync.EntityDataManager;
 import net.minecraft.util.DamageSource;
 import net.minecraft.util.EnumHand;
+import net.minecraft.util.EnumParticleTypes;
 import net.minecraft.util.SoundCategory;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.math.AxisAlignedBB;
@@ -63,8 +64,13 @@ public class EntityHandFlownDrone extends Entity {
     private static final DataParameter<Boolean> MOTORS_ON = EntityDataManager.createKey(EntityHandFlownDrone.class, DataSerializers.BOOLEAN);
     /** Installed {@link BatteryPack} ordinal, or -1. Synced because the pack's weight changes flight prediction. */
     private static final DataParameter<Integer> BATTERY_PACK = EntityDataManager.createKey(EntityHandFlownDrone.class, DataSerializers.VARINT);
+    /** Health as a fraction of max, for damage smoke on every client and the pilot's HUD. */
+    private static final DataParameter<Float> HEALTH_FRACTION = EntityDataManager.createKey(EntityHandFlownDrone.class, DataSerializers.FLOAT);
+    /** Entity status byte telling clients the drone was hit (red flash). */
+    private static final byte HIT_STATUS = 2;
     /** Thrust as a fraction of maximum, for motor sound pitch on every client. */
     private static final DataParameter<Float> THRUST = EntityDataManager.createKey(EntityHandFlownDrone.class, DataSerializers.FLOAT);
+    private static final String OUT_OF_RANGE = "message.combat_drones.out_of_range";
     /** Inputs the server holds ahead of simulation; anything beyond this is dropped (per-drone rate limit). */
     private static final int MAX_QUEUED_INPUTS = 3;
 
@@ -82,6 +88,13 @@ public class EntityHandFlownDrone extends Entity {
     private final ArrayDeque<InputFrame> inputQueue = new ArrayDeque<>();
     private HandFlownFlight.Input lastInput = HandFlownFlight.Input.MOTORS_OFF;
     private int lastQueuedSequence = Integer.MIN_VALUE;
+    /**
+     * Set when the link dropped because the drone flew out of range: it keeps flying on the pilot's last input
+     * instead of hovering, so losing signal is a real risk (a racer just carries on until it hits something).
+     * ponytail: not saved to NBT; a drifting drone that gets unloaded resumes as a normal unattended drone.
+     */
+    @Nullable
+    private HandFlownFlight.Input driftInput;
     protected int lastProcessedSequence;
 
     public float prevRoll;
@@ -107,7 +120,7 @@ public class EntityHandFlownDrone extends Entity {
     public EntityHandFlownDrone(World world, DroneType type, double x, double y, double z, float yaw) {
         this(world);
         dataManager.set(TYPE_ID, type.getId());
-        health = type.getMaxHP();
+        setHealth(type.getMaxHP());
         setPosition(x, y, z);
         flightState.position.set(x, y, z);
         flightState.orientation.set(HandFlownFlight.fromEuler(yaw, 0, 0));
@@ -122,6 +135,39 @@ public class EntityHandFlownDrone extends Entity {
         dataManager.register(MOTORS_ON, false);
         dataManager.register(BATTERY_PACK, -1);
         dataManager.register(THRUST, 0.0F);
+        dataManager.register(HEALTH_FRACTION, 1.0F);
+    }
+
+    public float getHealthFraction() {
+        return dataManager.get(HEALTH_FRACTION);
+    }
+
+    private void setHealth(float value) {
+        health = value;
+        DroneType type = getDroneType();
+        dataManager.set(HEALTH_FRACTION, type == null ? 1.0F : Math.max(0, Math.min(1, value / type.getMaxHP())));
+    }
+
+    /** Client: ticks left of the red hit flash. */
+    public int hitFlashTicks;
+
+    @Override
+    public void handleStatusUpdate(byte id) {
+        if (id == HIT_STATUS) {
+            hitFlashTicks = 6;
+        } else {
+            super.handleStatusUpdate(id);
+        }
+    }
+
+    /** Client: smoke trail once the airframe is badly damaged, so everyone can see it's been hit. */
+    private void spawnDamageSmoke() {
+        float fraction = getHealthFraction();
+        if (fraction >= 0.5F || rand.nextFloat() > (fraction < 0.25F ? 0.8F : 0.35F)) {
+            return;
+        }
+        EnumParticleTypes smoke = fraction < 0.25F ? EnumParticleTypes.SMOKE_LARGE : EnumParticleTypes.SMOKE_NORMAL;
+        world.spawnParticle(smoke, posX + (rand.nextDouble() - 0.5) * width, posY + height / 2, posZ + (rand.nextDouble() - 0.5) * width, 0, 0.02, 0);
     }
 
     public float getThrust() {
@@ -180,6 +226,10 @@ public class EntityHandFlownDrone extends Entity {
             if (locallyPiloted) {
                 predictStep();
             }
+            if (hitFlashTicks > 0) {
+                hitFlashTicks--;
+            }
+            spawnDamageSmoke();
             return;
         }
         DroneType type = getDroneType();
@@ -188,8 +238,11 @@ public class EntityHandFlownDrone extends Entity {
             setDead();
             return;
         }
-        if (pilot != null && checkPilot(pilot) != null) {
-            clearPilot(true);
+        if (pilot != null) {
+            String problem = checkPilot(pilot);
+            if (problem != null) {
+                clearPilot(problem.equals(OUT_OF_RANGE) ? LinkLoss.SIGNAL : LinkLoss.OTHER);
+            }
         }
         HandFlownFlight.Input input = nextInput();
         if (input.motorsOn && !hasPower()) {
@@ -229,7 +282,11 @@ public class EntityHandFlownDrone extends Entity {
     }
 
     private HandFlownFlight.Input unattendedInput() {
-        return areMotorsOn() ? HandFlownFlight.Input.HOLD_POSITION : HandFlownFlight.Input.MOTORS_OFF;
+        if (!areMotorsOn()) {
+            driftInput = null;
+            return HandFlownFlight.Input.MOTORS_OFF;
+        }
+        return driftInput != null ? driftInput : HandFlownFlight.Input.HOLD_POSITION;
     }
 
     /** Server: accept a control input from the network. Only the current pilot's inputs count. */
@@ -264,13 +321,14 @@ public class EntityHandFlownDrone extends Entity {
             return "message.combat_drones.need_remote";
         }
         if (getDistanceSq(player) > type.getSignalRange() * type.getSignalRange()) {
-            return "message.combat_drones.out_of_range";
+            return OUT_OF_RANGE;
         }
         return null;
     }
 
     private void setPilot(EntityPlayerMP player) {
         pilot = player;
+        driftInput = null;
         inputQueue.clear();
         // Until the pilot's first input arrives, keep doing what the drone was already doing
         lastInput = unattendedInput();
@@ -278,9 +336,22 @@ public class EntityHandFlownDrone extends Entity {
         dataManager.set(PILOT_ID, player.getEntityId());
     }
 
-    private void clearPilot(boolean linkLost) {
-        if (pilot != null && linkLost) {
-            pilot.sendStatusMessage(new TextComponentTranslation("message.combat_drones.link_lost"), true);
+    private enum LinkLoss {
+        /** The pilot left on purpose (G): hover in place. */
+        NONE,
+        /** Flew out of range: keep flying on the last input. */
+        SIGNAL,
+        /** Goggles off, remote put away, death, logout: hover in place. */
+        OTHER
+    }
+
+    private void clearPilot(LinkLoss reason) {
+        if (pilot != null && reason != LinkLoss.NONE) {
+            pilot.sendStatusMessage(new TextComponentTranslation(reason == LinkLoss.SIGNAL
+                    ? "message.combat_drones.signal_lost" : "message.combat_drones.link_lost"), true);
+        }
+        if (reason == LinkLoss.SIGNAL) {
+            driftInput = lastInput;
         }
         pilot = null;
         inputQueue.clear();
@@ -301,7 +372,7 @@ public class EntityHandFlownDrone extends Entity {
         }
         EntityHandFlownDrone drone = (EntityHandFlownDrone) entity;
         if (drone.pilot == player) {
-            drone.clearPilot(false);
+            drone.clearPilot(LinkLoss.NONE);
             return;
         }
         String problem = drone.checkPilot(player);
@@ -514,8 +585,10 @@ public class EntityHandFlownDrone extends Entity {
     }
 
     private void damage(float amount) {
-        health -= amount;
+        setHealth(health - amount);
         if (health > 0) {
+            world.setEntityState(this, HIT_STATUS);
+            world.playSound(null, posX, posY, posZ, ModSounds.DRONE_HIT, SoundCategory.NEUTRAL, 1.0F, 0.9F + rand.nextFloat() * 0.2F);
             return;
         }
         DroneType type = getDroneType();
@@ -589,7 +662,7 @@ public class EntityHandFlownDrone extends Entity {
             return true;
         }
         if (stack.getItem() instanceof ItemBattery) {
-            swapBattery(player, hand, stack);
+            swapBattery(player, stack);
             return true;
         }
         if (stack.isEmpty() && player.isSneaking()) {
@@ -599,16 +672,23 @@ public class EntityHandFlownDrone extends Entity {
         return false;
     }
 
-    /** Puts the held pack in; the pack that was installed (if any) goes back into the player's hand. */
-    private void swapBattery(EntityPlayer player, EnumHand hand, ItemStack stack) {
-        ItemStack removed = removeBattery();
+    /** Puts one pack from the held stack in; the pack that was installed (if any) goes to the player's inventory. */
+    private void swapBattery(EntityPlayer player, ItemStack stack) {
         BatteryPack pack = ((ItemBattery) stack.getItem()).getPack();
         double fraction = ItemBattery.getCharge(stack);
+        String nameKey = stack.getItem().getTranslationKey() + ".name";
+        ItemStack removed = removeBattery();
         dataManager.set(BATTERY_PACK, pack.ordinal());
         charge = fraction * getCapacity();
-        player.setHeldItem(hand, removed);
+        if (!player.capabilities.isCreativeMode) {
+            stack.shrink(1);
+        }
+        if (!removed.isEmpty()) {
+            ItemHandlerHelper.giveItemToPlayer(player, removed);
+        }
+        world.playSound(null, posX, posY, posZ, ModSounds.DRONE_BATTERY, SoundCategory.PLAYERS, 1.0F, 1.0F);
         player.sendStatusMessage(new TextComponentTranslation("message.combat_drones.battery_installed",
-                new TextComponentTranslation(stack.getItem().getTranslationKey() + ".name"), Math.round(fraction * 100)), true);
+                new TextComponentTranslation(nameKey), Math.round(fraction * 100)), true);
     }
 
     /** Takes the installed pack out as an item carrying its remaining charge (empty stack if none). */
@@ -635,6 +715,7 @@ public class EntityHandFlownDrone extends Entity {
             return;
         }
         grenades++;
+        world.playSound(null, posX, posY, posZ, ModSounds.DRONE_ATTACH, SoundCategory.PLAYERS, 1.0F, 1.0F);
         if (!player.capabilities.isCreativeMode) {
             stack.shrink(1);
         }
@@ -709,7 +790,7 @@ public class EntityHandFlownDrone extends Entity {
     protected void readEntityFromNBT(NBTTagCompound compound) {
         dataManager.set(TYPE_ID, compound.getString("Type"));
         owner = compound.hasUniqueId("Owner") ? compound.getUniqueId("Owner") : null;
-        health = compound.getFloat("Health");
+        setHealth(compound.getFloat("Health"));
         grenades = compound.getInteger("Grenades");
         BatteryPack pack = compound.hasKey("Battery") ? BatteryPack.byIndex(compound.getInteger("Battery")) : null;
         dataManager.set(BATTERY_PACK, pack == null ? -1 : pack.ordinal());

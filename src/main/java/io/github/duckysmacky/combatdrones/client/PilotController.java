@@ -146,6 +146,7 @@ public final class PilotController {
     private static void start(Minecraft minecraft, EntityPlayerSP player, EntityHandFlownDrone newDrone) {
         drone = newDrone;
         drone.startLocalPiloting();
+        Minecraft.getMinecraft().getSoundHandler().playSound(PositionedSoundRecord.getMasterRecord(ModSounds.DRONE_CONNECT, 1.0F));
         minecraft.setRenderViewEntity(drone);
         // Level the body's pitch so mouse deltas never hit vanilla's ±90° clamp
         player.rotationPitch = 0;

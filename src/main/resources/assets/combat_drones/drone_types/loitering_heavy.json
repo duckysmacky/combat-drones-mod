@@ -11,5 +11,5 @@
   "maxHP": 30,
   "defaultCruiseAltitude": 50,
   "controlScheme": "CLICK_DESIGNATE",
-  "motorSoundRange": 128
+  "motorSoundRange": 64
 }

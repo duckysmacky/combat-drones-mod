@@ -1,6 +1,6 @@
 {
   // Long-Range Racer: slower, bigger battery and signal range. One grenade slot.
-  // Keep signalRange under server view distance (blocks) until remote view lands in M6.
+  // signalRange must stay <= 160 (entity tracking range) until remote view lands in M6.
   "category": "HAND_FLOWN",
   "maxSpeed": 1.1,
   "acceleration": 0.10,
@@ -9,8 +9,8 @@
   "blastPower": 3.5,
   "payloadCapacity": 1,
   "maxHP": 10,
-  "signalRange": 144,
+  "signalRange": 160,
   "impactDetonates": true,
-  "motorSoundRange": 96,
+  "motorSoundRange": 40,
   "defaultBattery": "LIGHT"
 }

@@ -8,8 +8,8 @@
   "blastPower": 3.5,
   "payloadCapacity": 1,
   "maxHP": 10,
-  "signalRange": 112,
+  "signalRange": 128,
   "impactDetonates": true,
-  "motorSoundRange": 96,
+  "motorSoundRange": 40,
   "defaultBattery": "LIGHT"
 }

@@ -4,6 +4,11 @@
     "subtitle": "subtitles.combat_drones.drone.motor",
     "sounds": ["combat_drones:drone/motor"]
   },
+  "drone.motor_far": {
+    "category": "neutral",
+    "subtitle": "subtitles.combat_drones.drone.motor",
+    "sounds": ["combat_drones:drone/motor_far"]
+  },
   "drone.link": {
     "category": "player",
     "subtitle": "subtitles.combat_drones.drone.link",
@@ -12,5 +17,24 @@
   "drone.beep": {
     "category": "player",
     "sounds": ["combat_drones:drone/beep"]
+  },
+  "drone.battery": {
+    "category": "player",
+    "subtitle": "subtitles.combat_drones.drone.battery",
+    "sounds": ["combat_drones:drone/click"]
+  },
+  "drone.attach": {
+    "category": "player",
+    "subtitle": "subtitles.combat_drones.drone.attach",
+    "sounds": ["combat_drones:drone/clink"]
+  },
+  "drone.connect": {
+    "category": "player",
+    "sounds": ["combat_drones:drone/connect"]
+  },
+  "drone.hit": {
+    "category": "neutral",
+    "subtitle": "subtitles.combat_drones.drone.hit",
+    "sounds": ["combat_drones:drone/hit"]
   }
 }

@@ -23,7 +23,8 @@ public class ItemBattery extends Item {
 
     public ItemBattery(BatteryPack pack) {
         this.pack = pack;
-        setMaxStackSize(1);
+        // Fresh (tag-less) packs stack for easy kit handouts; partly used packs carry a charge tag and don't merge
+        setMaxStackSize(16);
     }
 
     public BatteryPack getPack() {

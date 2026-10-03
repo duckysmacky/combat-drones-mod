@@ -11,5 +11,5 @@
   "maxHP": 12,
   "defaultCruiseAltitude": 40,
   "controlScheme": "STICK",
-  "motorSoundRange": 128
+  "motorSoundRange": 64
 }

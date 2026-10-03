@@ -12,5 +12,5 @@
   "defaultCruiseAltitude": 60,
   "controlScheme": "GIMBAL_OBSERVE",
   "armed": false,
-  "motorSoundRange": 96
+  "motorSoundRange": 48
 }

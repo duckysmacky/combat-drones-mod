@@ -9,8 +9,8 @@
   "drainRatePerTick": 1.0,
   "blastPower": 0,
   "payloadCapacity": 1,
-  "maxHP": 24,
-  "signalRange": 128,
-  "motorSoundRange": 80,
+  "maxHP": 16,
+  "signalRange": 144,
+  "motorSoundRange": 32,
   "defaultBattery": "STANDARD"
 }

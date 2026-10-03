@@ -22,8 +22,8 @@ import java.util.Random;
 public final class StaticOverlay {
     private static final int NOISE_WIDTH = 128;
     private static final int NOISE_HEIGHT = 72;
-    private static final double BASE_ALPHA = 0.03;
-    private static final double MAX_EXTRA_ALPHA = 0.85;
+    private static final double BASE_ALPHA = 0.02;
+    private static final double MAX_EXTRA_ALPHA = 0.9;
 
     private static final Random RANDOM = new Random();
     private static DynamicTexture noise;
@@ -37,7 +37,8 @@ public final class StaticOverlay {
         if (event.getType() != RenderGameOverlayEvent.ElementType.ALL || PilotController.getPilotedDrone() == null) {
             return;
         }
-        double alpha = (BASE_ALPHA + Math.pow(1 - PilotController.getSignalQuality(), 1.5) * MAX_EXTRA_ALPHA) * ModConfig.staticIntensity;
+        // Quadratic: faint on a decent link, clearly building from mid-signal (70% -> 8%, 50% -> 22%, 30% -> 44%)
+        double alpha = (BASE_ALPHA + Math.pow(1 - PilotController.getSignalQuality(), 2) * MAX_EXTRA_ALPHA) * ModConfig.staticIntensity;
         if (alpha <= 0.001) {
             return;
         }
