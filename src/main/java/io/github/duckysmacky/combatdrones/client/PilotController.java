@@ -1,14 +1,17 @@
 package io.github.duckysmacky.combatdrones.client;
 
 import io.github.duckysmacky.combatdrones.CombatDrones;
+import io.github.duckysmacky.combatdrones.ModSounds;
 import io.github.duckysmacky.combatdrones.config.ModConfig;
 import io.github.duckysmacky.combatdrones.entity.EntityHandFlownDrone;
 import io.github.duckysmacky.combatdrones.network.ControlInputPacket;
 import io.github.duckysmacky.combatdrones.network.ModNetwork;
 import io.github.duckysmacky.combatdrones.network.TogglePilotPacket;
+import io.github.duckysmacky.combatdrones.physics.DroneSystems;
 import io.github.duckysmacky.combatdrones.physics.HandFlownFlight;
 import io.github.duckysmacky.combatdrones.type.DroneType;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.audio.PositionedSoundRecord;
 import net.minecraft.client.entity.EntityPlayerSP;
 import net.minecraft.client.settings.GameSettings;
 import net.minecraft.entity.Entity;
@@ -37,6 +40,8 @@ public final class PilotController {
     /** ANGLE/HOVER: mouse pushes a virtual stick (degrees -> stick units) that springs back to centre. */
     private static final double ANGLE_MOUSE_GAIN = 1.0 / 30.0;
     private static final double STICK_SPRING = 0.1;
+    private static final double LOW_SIGNAL_BEEP = 0.3;
+    private static final double LOW_BATTERY_BEEP = 0.2;
 
     @Nullable
     private static EntityHandFlownDrone drone;
@@ -48,6 +53,10 @@ public final class PilotController {
     private static HandFlownFlight.Mode mode = HandFlownFlight.Mode.ACRO;
     private static boolean motorsOn;
     private static int sequence;
+    private static double signalDistance;
+    private static double signalQuality = 1;
+    private static int beepTimer;
+    private static int batteryBeepTimer;
 
     private PilotController() {
     }
@@ -55,6 +64,24 @@ public final class PilotController {
     @Nullable
     public static EntityHandFlownDrone getPilotedDrone() {
         return drone;
+    }
+
+    public static HandFlownFlight.Mode getMode() {
+        return mode;
+    }
+
+    public static double getThrottle() {
+        return throttle;
+    }
+
+    /** Distance from the pilot's body to the drone, in blocks. */
+    public static double getSignalDistance() {
+        return signalDistance;
+    }
+
+    /** 0..1 link quality as the pilot sees it (the server makes the real link-loss call). */
+    public static double getSignalQuality() {
+        return signalQuality;
     }
 
     @SubscribeEvent
@@ -92,6 +119,10 @@ public final class PilotController {
             return;
         }
         HandFlownFlight.Input input = readInput(minecraft, player);
+        DroneType type = drone.getDroneType();
+        signalDistance = player.getDistance(drone);
+        signalQuality = type == null ? 0 : DroneSystems.signalQuality(signalDistance, type.getSignalRange());
+        warningBeeps();
         sequence++;
         // Predicted in the drone's own update later this tick, after vanilla saves prevPos for interpolation
         drone.setPredictionInput(sequence, input);
@@ -160,6 +191,7 @@ public final class PilotController {
                 throttle = hoverThrottle(); // leaving altitude hold: start from a throttle that keeps it level
             }
             mode = modes[(mode.ordinal() + 1) % modes.length];
+            beep(1.2F);
             status(player, "message.combat_drones.mode_" + mode.name().toLowerCase(Locale.ROOT));
         }
         if (DroneKeys.CAMERA.isPressed()) {
@@ -167,6 +199,7 @@ public final class PilotController {
         }
         if (DroneKeys.MOTORS.isPressed()) {
             motorsOn = !motorsOn;
+            beep(motorsOn ? 1.5F : 0.8F);
             status(player, motorsOn ? "message.combat_drones.motors_on" : "message.combat_drones.motors_off");
         }
 
@@ -197,6 +230,30 @@ public final class PilotController {
         double vertical = axis(up, down);
         double yaw = axis(settings.keyBindRight.isKeyDown(), settings.keyBindLeft.isKeyDown());
         return new HandFlownFlight.Input(throttle, vertical, pitchInput, rollInput, yaw, mode, motorsOn);
+    }
+
+    /** Goggle warning tones: faster beeps as signal fades, a double low-battery beep every 2 s. */
+    private static void warningBeeps() {
+        if (signalQuality < LOW_SIGNAL_BEEP) {
+            // From every 20 ticks at the threshold down to every 4 ticks at the edge of range
+            int interval = 4 + (int) (signalQuality / LOW_SIGNAL_BEEP * 16);
+            if (++beepTimer >= interval) {
+                beepTimer = 0;
+                beep(1.0F);
+            }
+        }
+        double battery = drone.getKnownBatteryFraction();
+        if (battery > 0 && battery < LOW_BATTERY_BEEP) {
+            batteryBeepTimer = (batteryBeepTimer + 1) % 40;
+            if (batteryBeepTimer == 0 || batteryBeepTimer == 4) {
+                beep(0.7F);
+            }
+        }
+    }
+
+    /** Non-positional beep in the pilot's ears only. */
+    private static void beep(float pitch) {
+        Minecraft.getMinecraft().getSoundHandler().playSound(PositionedSoundRecord.getMasterRecord(ModSounds.DRONE_BEEP, pitch));
     }
 
     private static double axis(boolean positive, boolean negative) {

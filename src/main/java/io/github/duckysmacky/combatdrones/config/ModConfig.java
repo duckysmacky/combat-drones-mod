@@ -34,6 +34,7 @@ public final class ModConfig {
 
     // [client]
     public static boolean invertMousePitch = false;
+    public static double staticIntensity = 1.0;
 
     private ModConfig() {
     }
@@ -52,6 +53,8 @@ public final class ModConfig {
                     "Multiplies all damage drones take from attacks (weapons, arrows, melee). Lower = harder to shoot down.");
 
             invertMousePitch = defaults.get("client.invertMousePitch", invertMousePitch, "Invert vertical mouse movement when flying a drone in FPV.");
+            staticIntensity = defaults.number("client.staticIntensity", staticIntensity, 0, 1,
+                    "Strength of the analog-goggle static while flying (0 = off). It grows as the signal weakens.");
 
             for (BatteryPack pack : BatteryPack.values()) {
                 String table = "batteries." + pack.key();

@@ -2,6 +2,7 @@ package io.github.duckysmacky.combatdrones.entity;
 
 import io.github.duckysmacky.combatdrones.CombatDrones;
 import io.github.duckysmacky.combatdrones.ModContent;
+import io.github.duckysmacky.combatdrones.ModSounds;
 import io.github.duckysmacky.combatdrones.config.ModConfig;
 import io.github.duckysmacky.combatdrones.item.ItemBattery;
 import io.github.duckysmacky.combatdrones.item.ItemRemote;
@@ -26,6 +27,7 @@ import net.minecraft.network.datasync.DataSerializers;
 import net.minecraft.network.datasync.EntityDataManager;
 import net.minecraft.util.DamageSource;
 import net.minecraft.util.EnumHand;
+import net.minecraft.util.SoundCategory;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraft.util.text.TextComponentTranslation;
@@ -578,6 +580,7 @@ public class EntityHandFlownDrone extends Entity {
             owner = player.getUniqueID();
             String nameKey = getDroneItemTranslationKey();
             ItemRemote.link(stack, getUniqueID(), nameKey);
+            world.playSound(null, posX, posY, posZ, ModSounds.DRONE_LINK, SoundCategory.PLAYERS, 1.0F, 1.0F);
             player.sendStatusMessage(new TextComponentTranslation("message.combat_drones.linked", new TextComponentTranslation(nameKey)), true);
             return true;
         }

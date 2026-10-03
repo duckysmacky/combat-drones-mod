@@ -9,7 +9,6 @@ import net.minecraft.client.renderer.RenderHelper;
 import net.minecraft.client.renderer.entity.RenderManager;
 import net.minecraft.entity.Entity;
 import net.minecraftforge.client.event.EntityViewRenderEvent;
-import net.minecraftforge.client.event.RenderGameOverlayEvent;
 import net.minecraftforge.client.event.RenderHandEvent;
 import net.minecraftforge.client.event.RenderWorldLastEvent;
 import net.minecraftforge.fml.common.Mod;
@@ -18,7 +17,7 @@ import net.minecraftforge.fml.relauncher.Side;
 
 import javax.vecmath.Quat4d;
 
-/** FPV view: full drone attitude (including roll) on the camera, no hand or crosshair, pilot body still drawn. */
+/** FPV view: full drone attitude (including roll) on the camera, no hand, pilot body still drawn. */
 @Mod.EventBusSubscriber(modid = CombatDrones.MOD_ID, value = Side.CLIENT)
 public final class CameraHandler {
     /** Racing quads tilt the camera up so it looks ahead while the drone pitches forward to fly. */
@@ -34,6 +33,10 @@ public final class CameraHandler {
     private static CameraMode cameraMode = CameraMode.FORWARD;
 
     private CameraHandler() {
+    }
+
+    public static CameraMode getCameraMode() {
+        return cameraMode;
     }
 
     /** Switches to the next camera mode and returns it. The choice sticks across flights. */
@@ -88,13 +91,6 @@ public final class CameraHandler {
     @SubscribeEvent
     public static void onRenderHand(RenderHandEvent event) {
         if (PilotController.getPilotedDrone() != null) {
-            event.setCanceled(true);
-        }
-    }
-
-    @SubscribeEvent
-    public static void onRenderOverlay(RenderGameOverlayEvent.Pre event) {
-        if (event.getType() == RenderGameOverlayEvent.ElementType.CROSSHAIRS && PilotController.getPilotedDrone() != null) {
             event.setCanceled(true);
         }
     }
