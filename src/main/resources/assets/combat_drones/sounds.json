@@ -46,5 +46,15 @@
     "category": "neutral",
     "subtitle": "subtitles.combat_drones.unit.launch",
     "sounds": ["combat_drones:drone/launch"]
+  },
+  "gunship.rocket": {
+    "category": "neutral",
+    "subtitle": "subtitles.combat_drones.gunship.rocket",
+    "sounds": ["combat_drones:drone/rocket"]
+  },
+  "gunship.gun": {
+    "category": "neutral",
+    "subtitle": "subtitles.combat_drones.gunship.gun",
+    "sounds": ["combat_drones:drone/gun"]
   }
 }

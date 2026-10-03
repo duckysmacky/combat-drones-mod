@@ -45,6 +45,7 @@ public final class PlannerServer {
         view.z = ramp.posZ;
         view.heading = ramp.rotationYaw;
         view.fuelFraction = ramp.getFuelFraction();
+        view.ammo = ramp.getAmmo();
         view.originY = view.y;
         view.route = ramp.getRoute();
         view.allowedTerminals = allowedTerminals(type);
@@ -72,6 +73,7 @@ public final class PlannerServer {
             view.z = unit.posZ;
             view.heading = unit.rotationYaw;
             view.fuelFraction = unit.getFuelFraction();
+            view.ammo = unit.getAmmo();
             view.waypointIndex = unit.getWaypointIndex();
             view.originY = unit.getLaunchY();
             view.route = unit.getRoute();

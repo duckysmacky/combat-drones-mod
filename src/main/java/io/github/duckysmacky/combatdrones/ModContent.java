@@ -3,7 +3,9 @@ package io.github.duckysmacky.combatdrones;
 import io.github.duckysmacky.combatdrones.entity.EntityBomb;
 import io.github.duckysmacky.combatdrones.entity.EntityHandFlownDrone;
 import io.github.duckysmacky.combatdrones.entity.EntityLaunchRamp;
+import io.github.duckysmacky.combatdrones.entity.EntityPilotBody;
 import io.github.duckysmacky.combatdrones.entity.EntityRampUnit;
+import io.github.duckysmacky.combatdrones.entity.EntityRocket;
 import io.github.duckysmacky.combatdrones.item.ItemBattery;
 import io.github.duckysmacky.combatdrones.item.ItemBlockWithTooltip;
 import io.github.duckysmacky.combatdrones.item.ItemBomb;
@@ -139,6 +141,19 @@ public final class ModContent {
                 .id(new ResourceLocation(CombatDrones.MOD_ID, "launch_ramp"), 3)
                 .name(CombatDrones.MOD_ID + ".launch_ramp")
                 .tracker(128, 20, false)
+                .build());
+        // Stands still; equipment changes go out with the regular living-entity updates
+        event.getRegistry().register(EntityEntryBuilder.create()
+                .entity(EntityPilotBody.class)
+                .id(new ResourceLocation(CombatDrones.MOD_ID, "pilot_body"), 4)
+                .name(CombatDrones.MOD_ID + ".pilot_body")
+                .tracker(128, 3, false)
+                .build());
+        event.getRegistry().register(EntityEntryBuilder.create()
+                .entity(EntityRocket.class)
+                .id(new ResourceLocation(CombatDrones.MOD_ID, "rocket"), 5)
+                .name(CombatDrones.MOD_ID + ".rocket")
+                .tracker(160, 1, true)
                 .build());
     }
 

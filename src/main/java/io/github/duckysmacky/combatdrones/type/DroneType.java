@@ -27,6 +27,11 @@ public final class DroneType {
         public boolean isHandFlown() {
             return this == FPV || this == DJI;
         }
+
+        /** Ramp-launched schemes that allow "Take control" (the recon gimbal is view-only). */
+        public boolean isFlyable() {
+            return this == STICK || this == CLICK_DESIGNATE;
+        }
     }
 
     public enum WeaponType { NONE, ROCKET_POD, GUN_MOUNT }

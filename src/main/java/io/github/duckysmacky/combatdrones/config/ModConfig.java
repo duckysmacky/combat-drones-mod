@@ -47,6 +47,16 @@ public final class ModConfig {
     public static double lowFuelFraction = 0.15;
     public static double maxMarkDistance = 256.0;
 
+    // [weapons]
+    public static int roundsPerRifleItem = 16;
+    public static double rocketBlastPower = 2.5;
+    public static double rocketSpeed = 3.0;
+    public static int rocketCooldownTicks = 20;
+    public static double gunDamagePerRound = 3.0;
+    public static int gunCooldownTicks = 2;
+    public static double gunSpread = 1.5;
+    public static double gunRange = 96.0;
+
     // [client]
     public static boolean invertMousePitch = false;
     public static double staticIntensity = 1.0;
@@ -88,6 +98,16 @@ public final class ModConfig {
             droneDamageTakenMultiplier = defaults.number("general.droneDamageTakenMultiplier", droneDamageTakenMultiplier, 0, 10,
                     "Multiplies all damage drones take from attacks (weapons, arrows, melee). Lower = harder to shoot down.");
 
+            roundsPerRifleItem = (int) defaults.number("weapons.roundsPerRifleItem", roundsPerRifleItem, 1, 256,
+                    "Gun rounds one Rifle Rounds item loads into a Gunship Plane's belt.");
+            rocketBlastPower = defaults.number("weapons.rocketBlastPower", rocketBlastPower, 0, 20, "Rocket explosion power (vanilla TNT = 4).");
+            rocketSpeed = defaults.number("weapons.rocketSpeed", rocketSpeed, 0.5, 10, "Rocket speed on top of the plane's own, in blocks/tick.");
+            rocketCooldownTicks = (int) defaults.number("weapons.rocketCooldownTicks", rocketCooldownTicks, 1, 200, "Ticks between rockets while the trigger is held.");
+            gunDamagePerRound = defaults.number("weapons.gunDamagePerRound", gunDamagePerRound, 0, 40, "Damage per gun round (half-hearts).");
+            gunCooldownTicks = (int) defaults.number("weapons.gunCooldownTicks", gunCooldownTicks, 1, 40, "Ticks between gun rounds while the trigger is held.");
+            gunSpread = defaults.number("weapons.gunSpread", gunSpread, 0, 10, "Gun spread: random aim error per round, in degrees.");
+            gunRange = defaults.number("weapons.gunRange", gunRange, 8, 256, "Gun range in blocks.");
+
             invertMousePitch = defaults.get("client.invertMousePitch", invertMousePitch, "Invert vertical mouse movement when flying a drone in FPV.");
             staticIntensity = defaults.number("client.staticIntensity", staticIntensity, 0, 1,
                     "Strength of the analog-goggle static while flying (0 = off). It grows as the signal weakens.");
@@ -113,6 +133,7 @@ public final class ModConfig {
 
             // Table comments last: a comment can only attach to a table that exists
             defaults.comment("general", "Global balance settings. On a server these apply to everyone.");
+            defaults.comment("weapons", "Gunship Plane weapons, fired only under manual control.");
             defaults.comment("client", "Options for your own client only.");
             defaults.comment("batteries", "Battery pack sizes for hand-flown drones. capacityMultiplier scales a drone's base capacity "
                     + "(defined for a Light pack); performanceMultiplier scales its top speed and acceleration (pack weight).");

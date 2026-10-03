@@ -3,6 +3,9 @@ package io.github.duckysmacky.combatdrones.entity;
 import io.github.duckysmacky.combatdrones.CombatDrones;
 import io.github.duckysmacky.combatdrones.config.ModConfig;
 import io.github.duckysmacky.combatdrones.item.ItemDrone;
+import io.github.duckysmacky.combatdrones.ModSounds;
+import io.github.duckysmacky.combatdrones.network.GunFirePacket;
+import io.github.duckysmacky.combatdrones.network.ModNetwork;
 import io.github.duckysmacky.combatdrones.network.RouteCodec;
 import io.github.duckysmacky.combatdrones.physics.DroneSystems;
 import io.github.duckysmacky.combatdrones.physics.FixedWingFlight;
@@ -12,6 +15,7 @@ import io.github.duckysmacky.combatdrones.type.DroneType;
 import io.github.duckysmacky.combatdrones.type.DroneTypes;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLivingBase;
+import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.entity.MoverType;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
@@ -20,14 +24,20 @@ import net.minecraft.network.datasync.DataParameter;
 import net.minecraft.network.datasync.DataSerializers;
 import net.minecraft.network.datasync.EntityDataManager;
 import net.minecraft.util.DamageSource;
+import net.minecraft.util.EntityDamageSourceIndirect;
+import net.minecraft.util.SoundCategory;
+import net.minecraft.util.math.RayTraceResult;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
 import net.minecraft.util.math.ChunkPos;
 import net.minecraft.util.math.MathHelper;
+import net.minecraft.util.math.Vec3d;
+import net.minecraft.util.text.TextComponentTranslation;
 import net.minecraft.world.WorldServer;
 import net.minecraftforge.common.ForgeChunkManager;
+import net.minecraftforge.fml.common.network.NetworkRegistry;
 import net.minecraftforge.fml.common.registry.ForgeRegistries;
 import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.fml.relauncher.SideOnly;
@@ -52,10 +62,15 @@ public class EntityRampUnit extends Entity {
     private static final double RENDER_DISTANCE = 160.0;
     /** Non-explosive units touching down slower than this share of top speed land instead of crashing. */
     private static final double LANDING_SPEED_FRACTION = 0.75;
+    /** Manual input older than this (ticks) is treated as a centred stick. */
+    private static final int STALE_INPUT_TICKS = 10;
+    private static final int DESIGNATE_COOLDOWN_TICKS = 10;
 
     private static final DataParameter<String> TYPE_ID = EntityDataManager.createKey(EntityRampUnit.class, DataSerializers.STRING);
     private static final DataParameter<Float> BANK = EntityDataManager.createKey(EntityRampUnit.class, DataSerializers.FLOAT);
     private static final DataParameter<Float> FUEL_FRACTION = EntityDataManager.createKey(EntityRampUnit.class, DataSerializers.FLOAT);
+    private static final DataParameter<Boolean> STRIKING = EntityDataManager.createKey(EntityRampUnit.class, DataSerializers.BOOLEAN);
+    private static final DataParameter<Integer> AMMO = EntityDataManager.createKey(EntityRampUnit.class, DataSerializers.VARINT);
     private static final DataParameter<Float> HEALTH_FRACTION = EntityDataManager.createKey(EntityRampUnit.class, DataSerializers.FLOAT);
 
     private final FixedWingFlight.State flight = new FixedWingFlight.State();
@@ -69,6 +84,17 @@ public class EntityRampUnit extends Entity {
     private double homeZ = Double.NaN;
     private double fuel;
     private float health;
+    // Manual control ("Take control"): the controller's latest input, and when it arrived
+    private double manualPitch;
+    private double manualRoll;
+    private double manualThrottle;
+    private boolean manualTrigger;
+    private long manualInputTick = Long.MIN_VALUE;
+    /** A point picked from the camera (click-designate scheme): overrides the route with a strike. */
+    @Nullable
+    private Vec3d designatedTarget;
+    private int designateCooldown;
+    private int weaponCooldown;
     /** Keeps the unit's chunk (and the next one ahead) loaded, so it keeps flying far from any player. */
     @Nullable
     private ForgeChunkManager.Ticket chunkTicket;
@@ -83,8 +109,9 @@ public class EntityRampUnit extends Entity {
     }
 
     /** A unit leaving its ramp: launched along {@code heading} at cruise speed with a slight climb. */
-    public EntityRampUnit(World world, DroneType type, @Nullable UUID owner, Route route, double fuel, double x, double y, double z, float heading) {
+    public EntityRampUnit(World world, DroneType type, @Nullable UUID owner, Route route, double fuel, int ammo, double x, double y, double z, float heading) {
         this(world);
+        dataManager.set(AMMO, ammo);
         dataManager.set(TYPE_ID, type.getId());
         this.owner = owner;
         this.route = route;
@@ -108,6 +135,8 @@ public class EntityRampUnit extends Entity {
         dataManager.register(BANK, 0.0F);
         dataManager.register(FUEL_FRACTION, 1.0F);
         dataManager.register(HEALTH_FRACTION, 1.0F);
+        dataManager.register(AMMO, 0);
+        dataManager.register(STRIKING, false);
     }
 
     @Nullable
@@ -138,6 +167,16 @@ public class EntityRampUnit extends Entity {
 
     public float getFuelFraction() {
         return dataManager.get(FUEL_FRACTION);
+    }
+
+    /** Diving on a designated point (synced for the HUD). */
+    public boolean isStrikingDesignated() {
+        return dataManager.get(STRIKING);
+    }
+
+    /** Rockets or rounds left (synced for the HUD). */
+    public int getAmmo() {
+        return dataManager.get(AMMO);
     }
 
     public float getHealthFraction() {
@@ -178,15 +217,23 @@ public class EntityRampUnit extends Entity {
             return;
         }
         FixedWingFlight.Params params = paramsOf(type);
+        if (designateCooldown > 0) {
+            designateCooldown--;
+        }
+        if (weaponCooldown > 0) {
+            weaponCooldown--;
+        }
         // The entity position is the truth (picks up /tp and positions set after NBT load)
         flight.position.set(posX, posY, posZ);
-        RouteAutopilot.Situation situation = new RouteAutopilot.Situation(launchY, terrainFloor(), fuel > 0,
-                fuel / type.getBatteryOrFuelCapacity(), ModConfig.lowFuelFraction, type.isArmed() && type.isImpactDetonates(),
-                strikeGroundY(), homeX, launchY - 1, homeZ);
-        RouteAutopilot.Command command = RouteAutopilot.guide(flight, route, waypointIndex, situation, params);
-        waypointIndex = command.waypointIndex;
-        double thrust = FixedWingFlight.step(flight, command.controls, params);
-        if (command.controls.engineOn) {
+        FixedWingFlight.Controls controls = manualControls(type);
+        if (controls == null && designatedTarget != null) {
+            controls = RouteAutopilot.strike(flight, designatedTarget.x, designatedTarget.y, designatedTarget.z, terrainFloor(), params, fuel > 0);
+        }
+        if (controls == null) {
+            controls = autopilotControls(type, params);
+        }
+        double thrust = FixedWingFlight.step(flight, controls, params);
+        if (controls.engineOn) {
             fuel = Math.max(0, fuel - DroneSystems.drainPerTick(type.getDrainRatePerTick(), thrust));
         }
 
@@ -207,6 +254,110 @@ public class EntityRampUnit extends Entity {
             return;
         }
         updateChunkLoading();
+    }
+
+    /** The route (and its terminal action) on autopilot. */
+    private FixedWingFlight.Controls autopilotControls(DroneType type, FixedWingFlight.Params params) {
+        RouteAutopilot.Situation situation = new RouteAutopilot.Situation(launchY, terrainFloor(), fuel > 0,
+                fuel / type.getBatteryOrFuelCapacity(), ModConfig.lowFuelFraction, type.isArmed() && type.isImpactDetonates(),
+                strikeGroundY(), homeX, launchY - 1, homeZ);
+        RouteAutopilot.Command command = RouteAutopilot.guide(flight, route, waypointIndex, situation, params);
+        waypointIndex = command.waypointIndex;
+        return command.controls;
+    }
+
+    /** Stick input while a controller flies it by hand (stick scheme), or null when the autopilot should fly. */
+    @Nullable
+    private FixedWingFlight.Controls manualControls(DroneType type) {
+        if (type.getControlScheme() != DroneType.ControlScheme.STICK || RemoteSessions.controllerOf(this) == null) {
+            return null;
+        }
+        // Input stopped arriving (lag spike): centre the stick, keep the throttle
+        if (world.getTotalWorldTime() - manualInputTick > STALE_INPUT_TICKS) {
+            manualPitch = 0;
+            manualRoll = 0;
+            manualTrigger = false;
+        }
+        if (manualTrigger) {
+            fireWeapon(type);
+        }
+        return FixedWingFlight.fromStick(manualPitch, manualRoll, manualThrottle, fuel > 0);
+    }
+
+    /** Fires one rocket or round along the nose, if the weapon is ready and there's ammo. Manual control only. */
+    private void fireWeapon(DroneType type) {
+        int ammo = getAmmo();
+        if (type.getWeaponType() == DroneType.WeaponType.NONE || weaponCooldown > 0 || ammo <= 0) {
+            return;
+        }
+        dataManager.set(AMMO, ammo - 1);
+        Vec3d nose = Vec3d.fromPitchYaw(rotationPitch, rotationYaw);
+        Vec3d muzzle = new Vec3d(posX, posY + height / 2, posZ).add(nose.scale(1.2));
+        if (type.getWeaponType() == DroneType.WeaponType.ROCKET_POD) {
+            weaponCooldown = ModConfig.rocketCooldownTicks;
+            Vec3d velocity = nose.scale(ModConfig.rocketSpeed).add(flight.velocity.x, flight.velocity.y, flight.velocity.z);
+            world.spawnEntity(new EntityRocket(world, this, owner, muzzle, velocity));
+            world.playSound(null, posX, posY, posZ, ModSounds.GUNSHIP_ROCKET, SoundCategory.NEUTRAL, 3.0F, 1.0F);
+        } else {
+            weaponCooldown = ModConfig.gunCooldownTicks;
+            fireRound(muzzle);
+        }
+    }
+
+    /** Gun mount: hitscan along the nose with a little spread; nearby players see a tracer. */
+    private void fireRound(Vec3d muzzle) {
+        float spread = (float) ModConfig.gunSpread;
+        Vec3d direction = Vec3d.fromPitchYaw(rotationPitch + (float) rand.nextGaussian() * spread / 2,
+                rotationYaw + (float) rand.nextGaussian() * spread / 2);
+        Vec3d end = muzzle.add(direction.scale(ModConfig.gunRange));
+        RayTraceResult hit = Raytrace.firstResult(world, muzzle, end, this);
+        if (hit != null && hit.entityHit != null) {
+            if (hit.entityHit instanceof EntityLivingBase) {
+                // 10 rounds a second would otherwise mostly land inside vanilla's hurt cooldown and do nothing
+                hit.entityHit.hurtResistantTime = 0;
+            }
+            hit.entityHit.attackEntityFrom(new EntityDamageSourceIndirect("combat_drones.gunfire", this, getBlameTarget()).setProjectile(),
+                    (float) ModConfig.gunDamagePerRound);
+        }
+        Vec3d impact = hit != null ? hit.hitVec : end;
+        ModNetwork.CHANNEL.sendToAllAround(new GunFirePacket(muzzle, impact),
+                new NetworkRegistry.TargetPoint(world.provider.getDimension(), posX, posY, posZ, 128));
+        world.playSound(null, posX, posY, posZ, ModSounds.GUNSHIP_GUN, SoundCategory.NEUTRAL, 3.0F, 0.9F + rand.nextFloat() * 0.2F);
+    }
+
+    /** Server: latest manual input from the network. Only the current controller's input counts; values arrive clamped. */
+    public void acceptManualInput(EntityPlayerMP sender, double pitch, double roll, double throttle, boolean trigger) {
+        if (RemoteSessions.controllerOf(this) != sender) {
+            return;
+        }
+        manualPitch = pitch;
+        manualRoll = roll;
+        manualThrottle = throttle;
+        manualTrigger = trigger;
+        manualInputTick = world.getTotalWorldTime();
+    }
+
+    /**
+     * Server: click-designate. Raytraces from the unit along the controller's camera direction (up to
+     * maxMarkDistance) and strikes whatever block or entity it hits first; the point is fixed once picked.
+     */
+    public void designate(EntityPlayerMP sender, Vec3d direction) {
+        DroneType type = getDroneType();
+        if (RemoteSessions.controllerOf(this) != sender || type == null || type.getControlScheme() != DroneType.ControlScheme.CLICK_DESIGNATE
+                || designateCooldown > 0 || !(direction.lengthSquared() > 1e-6) || !Double.isFinite(direction.lengthSquared())) {
+            return;
+        }
+        designateCooldown = DESIGNATE_COOLDOWN_TICKS;
+        Vec3d start = new Vec3d(posX, posY + height / 2, posZ);
+        Vec3d end = start.add(direction.normalize().scale(ModConfig.maxMarkDistance));
+        Vec3d hit = Raytrace.firstHit(world, start, end, this);
+        if (hit == null) {
+            sender.sendStatusMessage(new TextComponentTranslation("message.combat_drones.remote.nothing_there"), true);
+            return;
+        }
+        designatedTarget = hit;
+        dataManager.set(STRIKING, true);
+        sender.sendStatusMessage(new TextComponentTranslation("message.combat_drones.remote.designated", Math.round(hit.distanceTo(start))), true);
     }
 
     /** Server: forces the current chunk and the one a second ahead; releases chunks it has left behind. */
@@ -242,6 +393,9 @@ public class EntityRampUnit extends Entity {
 
     @Override
     public void setDead() {
+        if (!world.isRemote) {
+            RemoteSessions.onUnitRemoved(this); // rider home before any explosion
+        }
         super.setDead();
         if (!world.isRemote && chunkTicket != null) {
             ForgeChunkManager.releaseTicket(chunkTicket);
@@ -325,12 +479,12 @@ public class EntityRampUnit extends Entity {
         }
     }
 
-    /** Comes down intact: drops back as its item, remaining fuel and all. */
+    /** Comes down intact: drops back as its item, remaining fuel and ammo and all. */
     private void land(DroneType type) {
         setDead();
         Item item = ForgeRegistries.ITEMS.getValue(new ResourceLocation(CombatDrones.MOD_ID, type.getId()));
         if (item != null) {
-            entityDropItem(ItemDrone.withFuel(new ItemStack(item), fuel), 0.2F);
+            entityDropItem(ItemDrone.withAmmo(ItemDrone.withFuel(new ItemStack(item), fuel), getAmmo()), 0.2F);
         }
     }
 
@@ -378,6 +532,12 @@ public class EntityRampUnit extends Entity {
         return false;
     }
 
+    /** A remote pilot rides along invisibly; centre their hitbox on the airframe. */
+    @Override
+    public double getMountedYOffset() {
+        return height / 2 - 0.55;
+    }
+
     @Override
     @SideOnly(Side.CLIENT)
     public boolean isInRangeToRenderDist(double distanceSq) {
@@ -397,6 +557,12 @@ public class EntityRampUnit extends Entity {
         compound.setDouble("HomeZ", homeZ);
         compound.setDouble("Fuel", fuel);
         compound.setFloat("Health", health);
+        compound.setInteger("Ammo", getAmmo());
+        if (designatedTarget != null) {
+            compound.setDouble("DesignatedX", designatedTarget.x);
+            compound.setDouble("DesignatedY", designatedTarget.y);
+            compound.setDouble("DesignatedZ", designatedTarget.z);
+        }
         compound.setDouble("Heading", flight.heading);
         compound.setDouble("Pitch", flight.pitch);
         compound.setDouble("Bank", flight.bank);
@@ -414,6 +580,10 @@ public class EntityRampUnit extends Entity {
         homeZ = compound.hasKey("HomeZ") ? compound.getDouble("HomeZ") : Double.NaN;
         fuel = compound.getDouble("Fuel");
         setHealth(compound.getFloat("Health"));
+        dataManager.set(AMMO, compound.getInteger("Ammo"));
+        designatedTarget = compound.hasKey("DesignatedX")
+                ? new Vec3d(compound.getDouble("DesignatedX"), compound.getDouble("DesignatedY"), compound.getDouble("DesignatedZ")) : null;
+        dataManager.set(STRIKING, designatedTarget != null);
         flight.heading = compound.getDouble("Heading");
         flight.pitch = compound.getDouble("Pitch");
         flight.bank = compound.getDouble("Bank");

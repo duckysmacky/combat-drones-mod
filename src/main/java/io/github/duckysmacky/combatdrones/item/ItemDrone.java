@@ -36,6 +36,7 @@ public class ItemDrone extends Item {
     }
 
     private static final String TAG_FUEL = "Fuel";
+    private static final String TAG_AMMO = "Ammo";
 
     /** Fuel stored in a ramp-launched unit's item (kept when it's taken off a ramp or lands). */
     public static double getFuel(ItemStack stack) {
@@ -47,6 +48,21 @@ public class ItemDrone extends Item {
         if (fuel > 0) {
             NBTTagCompound tag = stack.hasTagCompound() ? stack.getTagCompound() : new NBTTagCompound();
             tag.setDouble(TAG_FUEL, fuel);
+            stack.setTagCompound(tag);
+        }
+        return stack;
+    }
+
+    /** Rockets or rounds loaded in a gunship's item (kept when it's taken off a ramp or lands). */
+    public static int getAmmo(ItemStack stack) {
+        NBTTagCompound tag = stack.getTagCompound();
+        return tag != null ? Math.max(0, tag.getInteger(TAG_AMMO)) : 0;
+    }
+
+    public static ItemStack withAmmo(ItemStack stack, int ammo) {
+        if (ammo > 0) {
+            NBTTagCompound tag = stack.hasTagCompound() ? stack.getTagCompound() : new NBTTagCompound();
+            tag.setInteger(TAG_AMMO, ammo);
             stack.setTagCompound(tag);
         }
         return stack;
@@ -107,6 +123,10 @@ public class ItemDrone extends Item {
             double fuel = getFuel(stack);
             tooltip.add(TextFormatting.YELLOW + I18n.format("tooltip.combat_drones.drone.fuel",
                     Math.round(Math.min(1, fuel / type.getBatteryOrFuelCapacity()) * 100)));
+            if (type.getWeaponType() != DroneType.WeaponType.NONE) {
+                tooltip.add(TextFormatting.YELLOW + I18n.format("tooltip.combat_drones.drone.ammo." + type.getWeaponType().name().toLowerCase(Locale.ROOT),
+                        getAmmo(stack), type.getPayloadCapacity()));
+            }
             Tooltips.addDetails("tooltip.combat_drones.drone.setup_ramp", tooltip);
         }
     }

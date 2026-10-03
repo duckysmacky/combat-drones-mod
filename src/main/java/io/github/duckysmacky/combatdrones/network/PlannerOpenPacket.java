@@ -29,6 +29,7 @@ public class PlannerOpenPacket implements IMessage {
         public double z;
         public float heading;
         public float fuelFraction;
+        public int ammo;
         public int waypointIndex;
         /** Altitudes in the route are relative to this. */
         public double originY;
@@ -43,6 +44,7 @@ public class PlannerOpenPacket implements IMessage {
             buf.writeDouble(z);
             buf.writeFloat(heading);
             buf.writeFloat(fuelFraction);
+            buf.writeShort(ammo);
             buf.writeInt(waypointIndex);
             buf.writeDouble(originY);
             RouteCodec.write(buf, route);
@@ -62,6 +64,7 @@ public class PlannerOpenPacket implements IMessage {
             view.z = buf.readDouble();
             view.heading = buf.readFloat();
             view.fuelFraction = buf.readFloat();
+            view.ammo = buf.readUnsignedShort();
             view.waypointIndex = buf.readInt();
             view.originY = buf.readDouble();
             view.route = RouteCodec.read(buf);

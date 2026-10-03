@@ -6,6 +6,7 @@ import io.github.duckysmacky.combatdrones.network.ModNetwork;
 import io.github.duckysmacky.combatdrones.network.PlannerOpenPacket;
 import io.github.duckysmacky.combatdrones.network.PlannerRequestPacket;
 import io.github.duckysmacky.combatdrones.network.PlannerSubmitPacket;
+import io.github.duckysmacky.combatdrones.network.RemoteRequestPacket;
 import io.github.duckysmacky.combatdrones.physics.Route;
 import io.github.duckysmacky.combatdrones.physics.RouteValidator;
 import io.github.duckysmacky.combatdrones.type.DroneType;
@@ -66,6 +67,8 @@ public class GuiMissionPlanner extends GuiScreen {
     private static final int BUTTON_ALT_DOWN = 7;
     private static final int BUTTON_ALT_UP = 8;
     private static final int BUTTON_DELETE = 9;
+    private static final int BUTTON_VIEW = 10;
+    private static final int BUTTON_CONTROL = 11;
 
     private PlannerOpenPacket view;
     /** Index into view.units of the unit being edited (always 0 in ramp mode). */
@@ -99,6 +102,8 @@ public class GuiMissionPlanner extends GuiScreen {
 
     private GuiButton terminalButton;
     private GuiButton launchButton;
+    private GuiButton viewButton;
+    private GuiButton controlButton;
 
     public GuiMissionPlanner(PlannerOpenPacket view) {
         this.view = view;
@@ -187,6 +192,11 @@ public class GuiMissionPlanner extends GuiScreen {
         if (view.isRampMode()) {
             launchButton = addButton(new GuiButton(BUTTON_LAUNCH, x, y, 60, 20, I18n.format("gui.combat_drones.planner.launch")));
             x += 64;
+        } else {
+            viewButton = addButton(new GuiButton(BUTTON_VIEW, x, y, 50, 20, I18n.format("gui.combat_drones.planner.view")));
+            x += 54;
+            controlButton = addButton(new GuiButton(BUTTON_CONTROL, x, y, 80, 20, I18n.format("gui.combat_drones.planner.take_control")));
+            x += 84;
         }
         addButton(new GuiButton(BUTTON_CLOSE, Math.max(x, width - MARGIN - 50), y, 50, 20, I18n.format("gui.done")));
 
@@ -207,11 +217,16 @@ public class GuiMissionPlanner extends GuiScreen {
         terminalButton.enabled = unit != null && unit.allowedTerminals.size() > 1;
         boolean editable = unit != null;
         for (GuiButton button : buttonList) {
-            if (button.id >= BUTTON_UP) {
+            if (button.id >= BUTTON_UP && button.id <= BUTTON_DELETE) {
                 button.enabled = editable && selectedWaypoint >= 0;
             } else if (button.id == BUTTON_SEND || button.id == BUTTON_CLEAR) {
                 button.enabled = editable;
             }
+        }
+        if (viewButton != null) {
+            DroneType type = unit == null ? null : DroneTypes.get(unit.typeId);
+            viewButton.enabled = unit != null && unit.entityId >= 0;
+            controlButton.enabled = viewButton.enabled && type != null && type.getControlScheme() != null && type.getControlScheme().isFlyable();
         }
         if (launchButton != null) {
             launchButton.enabled = unit != null && !waypoints.isEmpty() && unit.fuelFraction >= view.minLaunchFuel;
@@ -295,6 +310,12 @@ public class GuiMissionPlanner extends GuiScreen {
             PlannerOpenPacket.UnitView unit = currentUnit();
             fontRenderer.drawString(I18n.format("gui.combat_drones.planner.fuel", percent(unit.fuelFraction)), MARGIN, y,
                     unit.fuelFraction < view.minLaunchFuel ? WARNING : 0xFFFFFF);
+            DroneType unitType = DroneTypes.get(unit.typeId);
+            if (unitType != null && unitType.getWeaponType() != DroneType.WeaponType.NONE) {
+                y += ROW;
+                fontRenderer.drawString(I18n.format("gui.combat_drones.planner.ammo", unit.ammo, unitType.getPayloadCapacity()), MARGIN, y,
+                        unit.ammo == 0 ? WARNING : 0xFFFFFF);
+            }
             y += ROW + 4;
         }
         fontRenderer.drawString(I18n.format("gui.combat_drones.planner.waypoints", waypoints.size(), view.maxWaypoints), MARGIN, y, 0xAAAAAA);
@@ -742,6 +763,13 @@ public class GuiMissionPlanner extends GuiScreen {
                 mc.displayGuiScreen(null);
                 return;
             case BUTTON_CLOSE:
+                mc.displayGuiScreen(null);
+                return;
+            case BUTTON_VIEW:
+            case BUTTON_CONTROL:
+                if (currentUnit() != null) {
+                    ModNetwork.CHANNEL.sendToServer(new RemoteRequestPacket(currentUnit().entityId, button.id == BUTTON_CONTROL));
+                }
                 mc.displayGuiScreen(null);
                 return;
             case BUTTON_UP:

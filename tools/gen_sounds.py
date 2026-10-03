@@ -90,6 +90,27 @@ def launch():
     return normalize(whoosh * envelope * 1.5 + thump, 0.8)
 
 
+def rocket():
+    """Rocket leaving the pod: an ignition pop, then a hissing rush that fades as it flies off."""
+    rng = np.random.default_rng(31)
+    t = time(1.1)
+    noise = rng.standard_normal(len(t))
+    smoothing = 6
+    hiss = np.convolve(np.concatenate([np.zeros(smoothing), noise]), np.ones(smoothing) / smoothing, mode='valid')[:len(t)]
+    envelope = np.minimum(1, t / 0.03) * np.exp(-t * 3)
+    pop = np.sin(2 * np.pi * 90 * t) * np.exp(-t * 40)
+    return normalize(hiss * envelope + 0.8 * pop, 0.8)
+
+
+def gun():
+    """One round from the gun mount: a short, hard crack with a little low-end thump."""
+    rng = np.random.default_rng(37)
+    t = time(0.12)
+    crack = rng.standard_normal(len(t)) * np.exp(-t * 70)
+    thump = np.sin(2 * np.pi * 110 * t) * np.exp(-t * 45)
+    return normalize(crack + 0.7 * thump, 0.8)
+
+
 def tone(frequency, seconds, square=0.0):
     t = time(seconds)
     sine = np.sin(2 * np.pi * frequency * t)
@@ -157,6 +178,8 @@ SOUNDS = {
     'hit': hit,
     'engine': engine,
     'launch': launch,
+    'rocket': rocket,
+    'gun': gun,
 }
 
 if __name__ == '__main__':

@@ -3,6 +3,7 @@ package io.github.duckysmacky.combatdrones.entity;
 import io.github.duckysmacky.combatdrones.CombatDrones;
 import io.github.duckysmacky.combatdrones.ModContent;
 import io.github.duckysmacky.combatdrones.ModSounds;
+import io.github.duckysmacky.combatdrones.config.ModConfig;
 import io.github.duckysmacky.combatdrones.item.ItemDrone;
 import io.github.duckysmacky.combatdrones.network.PlannerServer;
 import io.github.duckysmacky.combatdrones.network.RouteCodec;
@@ -46,6 +47,7 @@ public class EntityLaunchRamp extends Entity {
     @Nullable
     private UUID owner;
     private double fuel;
+    private int ammo;
     private Route route = Route.empty(Route.TerminalAction.LOITER);
 
     public EntityLaunchRamp(World world) {
@@ -88,6 +90,10 @@ public class EntityLaunchRamp extends Entity {
         return dataManager.get(FUEL_FRACTION);
     }
 
+    public int getAmmo() {
+        return ammo;
+    }
+
     public Route getRoute() {
         return route;
     }
@@ -106,13 +112,15 @@ public class EntityLaunchRamp extends Entity {
     public boolean processInitialInteract(EntityPlayer player, EnumHand hand) {
         ItemStack stack = player.getHeldItem(hand);
         if (world.isRemote) {
-            return stack.getItem() instanceof ItemDrone || stack.getItem() == ModContent.fuelCan
+            return stack.getItem() instanceof ItemDrone || stack.getItem() == ModContent.fuelCan || ammoPerItem(stack) > 0
                     || stack.getItem() == ModContent.missionPlanner || (stack.isEmpty() && player.isSneaking());
         }
         if (stack.getItem() instanceof ItemDrone) {
             install(player, stack);
         } else if (stack.getItem() == ModContent.fuelCan) {
             refuel(player, stack);
+        } else if (ammoPerItem(stack) > 0) {
+            loadAmmo(player, stack);
         } else if (stack.getItem() == ModContent.missionPlanner) {
             PlannerServer.openRamp(player, this);
         } else if (stack.isEmpty() && player.isSneaking() && isLoaded()) {
@@ -140,6 +148,7 @@ public class EntityLaunchRamp extends Entity {
         dataManager.set(UNIT_TYPE, type.getId());
         owner = player.getUniqueID();
         setFuel(Math.min(ItemDrone.getFuel(stack), type.getBatteryOrFuelCapacity()));
+        ammo = Math.min(ItemDrone.getAmmo(stack), type.getPayloadCapacity());
         route = Route.empty(type.isArmed() ? Route.TerminalAction.LOITER : Route.TerminalAction.LOOP);
         if (!player.capabilities.isCreativeMode) {
             stack.shrink(1);
@@ -167,6 +176,42 @@ public class EntityLaunchRamp extends Entity {
         status(player, "message.combat_drones.ramp.refuelled");
     }
 
+    /** Rockets or rounds one item of {@code stack} loads, or 0 if it isn't gunship ammo. */
+    private static int ammoPerItem(ItemStack stack) {
+        if (stack.getItem() == ModContent.rocket) {
+            return 1;
+        }
+        return stack.getItem() == ModContent.rifleRounds ? ModConfig.roundsPerRifleItem : 0;
+    }
+
+    /** Loads as much of the held ammo as fits; rockets go in a rocket pod, rifle rounds on a gun mount's belt. */
+    private void loadAmmo(EntityPlayer player, ItemStack stack) {
+        DroneType type = getUnitType();
+        if (type == null) {
+            status(player, "message.combat_drones.ramp.empty");
+            return;
+        }
+        DroneType.WeaponType wanted = stack.getItem() == ModContent.rocket ? DroneType.WeaponType.ROCKET_POD : DroneType.WeaponType.GUN_MOUNT;
+        if (type.getWeaponType() != wanted) {
+            status(player, "message.combat_drones.ramp.wrong_ammo");
+            return;
+        }
+        int perItem = ammoPerItem(stack);
+        int space = type.getPayloadCapacity() - ammo;
+        if (space <= 0) {
+            status(player, "message.combat_drones.ramp.ammo_full");
+            return;
+        }
+        // Round up so a part-filled belt can still be topped off; the extra rounds are lost
+        int items = Math.min(stack.getCount(), (space + perItem - 1) / perItem);
+        ammo = Math.min(type.getPayloadCapacity(), ammo + items * perItem);
+        if (!player.capabilities.isCreativeMode) {
+            stack.shrink(items);
+        }
+        world.playSound(null, posX, posY, posZ, ModSounds.DRONE_ATTACH, SoundCategory.BLOCKS, 1.0F, 1.0F);
+        player.sendStatusMessage(new TextComponentTranslation("message.combat_drones.ramp.ammo_loaded", ammo, type.getPayloadCapacity()), true);
+    }
+
     /** Takes the unit off as its item (fuel kept on the item), emptying the ramp. */
     public ItemStack takeUnit() {
         DroneType type = getUnitType();
@@ -174,7 +219,7 @@ public class EntityLaunchRamp extends Entity {
             return ItemStack.EMPTY;
         }
         Item item = ForgeRegistries.ITEMS.getValue(new ResourceLocation(CombatDrones.MOD_ID, type.getId()));
-        ItemStack stack = item == null ? ItemStack.EMPTY : ItemDrone.withFuel(new ItemStack(item), fuel);
+        ItemStack stack = item == null ? ItemStack.EMPTY : ItemDrone.withAmmo(ItemDrone.withFuel(new ItemStack(item), fuel), ammo);
         clearUnit();
         return stack;
     }
@@ -188,7 +233,7 @@ public class EntityLaunchRamp extends Entity {
         double radians = Math.toRadians(rotationYaw);
         double x = posX - Math.sin(radians) * RAIL_END;
         double z = posZ + Math.cos(radians) * RAIL_END;
-        world.spawnEntity(new EntityRampUnit(world, type, owner, route, fuel, x, posY + 1.0, z, rotationYaw));
+        world.spawnEntity(new EntityRampUnit(world, type, owner, route, fuel, ammo, x, posY + 1.0, z, rotationYaw));
         world.playSound(null, posX, posY, posZ, ModSounds.UNIT_LAUNCH, SoundCategory.NEUTRAL, 2.0F, 1.0F);
         clearUnit();
     }
@@ -197,6 +242,7 @@ public class EntityLaunchRamp extends Entity {
         dataManager.set(UNIT_TYPE, "");
         owner = null;
         setFuel(0);
+        ammo = 0;
         route = Route.empty(Route.TerminalAction.LOITER);
     }
 
@@ -244,6 +290,7 @@ public class EntityLaunchRamp extends Entity {
             compound.setUniqueId("Owner", owner);
         }
         compound.setDouble("Fuel", fuel);
+        compound.setInteger("Ammo", ammo);
         compound.setTag("Route", RouteCodec.toNbt(route));
     }
 
@@ -252,6 +299,7 @@ public class EntityLaunchRamp extends Entity {
         dataManager.set(UNIT_TYPE, compound.getString("Unit"));
         owner = compound.hasUniqueId("Owner") ? compound.getUniqueId("Owner") : null;
         setFuel(compound.getDouble("Fuel"));
+        ammo = compound.getInteger("Ammo");
         route = RouteCodec.fromNbt(compound.getCompoundTag("Route"), Route.TerminalAction.LOITER);
     }
 }

@@ -2,6 +2,7 @@ package io.github.duckysmacky.combatdrones.client;
 
 import io.github.duckysmacky.combatdrones.CombatDrones;
 import io.github.duckysmacky.combatdrones.entity.EntityHandFlownDrone;
+import io.github.duckysmacky.combatdrones.entity.EntityRampUnit;
 import io.github.duckysmacky.combatdrones.physics.HandFlownFlight;
 import io.github.duckysmacky.combatdrones.type.BatteryPack;
 import io.github.duckysmacky.combatdrones.type.BombType;
@@ -11,6 +12,7 @@ import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.client.resources.I18n;
+import net.minecraft.entity.Entity;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.RayTraceResult;
 import net.minecraft.util.math.Vec3d;
@@ -62,15 +64,23 @@ public final class HudOverlay {
 
     @SubscribeEvent
     public static void onRenderPre(RenderGameOverlayEvent.Pre event) {
-        if (PilotController.getPilotedDrone() != null && HIDDEN_WHILE_FLYING.contains(event.getType())) {
+        if ((PilotController.getPilotedDrone() != null || RemoteController.getUnit() != null) && HIDDEN_WHILE_FLYING.contains(event.getType())) {
             event.setCanceled(true);
         }
     }
 
     @SubscribeEvent
     public static void onRenderPost(RenderGameOverlayEvent.Post event) {
+        if (event.getType() != ElementType.ALL) {
+            return;
+        }
+        EntityRampUnit unit = RemoteController.getUnit();
+        if (unit != null) {
+            drawPlaneHud(event.getResolution(), unit);
+            return;
+        }
         EntityHandFlownDrone drone = PilotController.getPilotedDrone();
-        if (event.getType() != ElementType.ALL || drone == null) {
+        if (drone == null) {
             return;
         }
         DroneType type = drone.getDroneType();
@@ -139,6 +149,65 @@ public final class HudOverlay {
 
         drawCrosshair(centerX, centerY);
         drawWarnings(font, minecraft, centerX, centerY + 24, pack != null, battery, signal);
+    }
+
+    /** OSD for a ramp unit seen through its camera (remote view or Take control), same layout as the FPV one. */
+    private static void drawPlaneHud(ScaledResolution resolution, EntityRampUnit unit) {
+        DroneType type = unit.getDroneType();
+        if (type == null) {
+            return;
+        }
+        Minecraft minecraft = Minecraft.getMinecraft();
+        FontRenderer font = minecraft.fontRenderer;
+        int centerX = resolution.getScaledWidth() / 2;
+        int centerY = resolution.getScaledHeight() / 2;
+        int left = centerX - HALF_WIDTH;
+        int right = centerX + HALF_WIDTH;
+        int top = centerY - HALF_HEIGHT;
+        int bottom = centerY + HALF_HEIGHT;
+
+        double speedKmh = Math.sqrt(sq(unit.posX - unit.prevPosX) + sq(unit.posY - unit.prevPosY) + sq(unit.posZ - unit.prevPosZ)) * 72;
+        double altitude = altitudeAboveGround(minecraft, unit);
+        double heading = MathHelper.positiveModulo(unit.rotationYaw + 180, 360);
+        double fuel = unit.getFuelFraction();
+
+        drawCentered(font, I18n.format("hud.combat_drones.plane_status", Math.round(heading),
+                altitude < 0 ? "---" : String.valueOf(Math.round(altitude))), centerX, top - LINE - 4, TEXT);
+
+        String mode = !RemoteController.isControl() ? "view" : RemoteController.isStickControl() ? "manual" : "designate";
+        drawText(font, I18n.format("hud.combat_drones.mode." + mode), left, top, TEXT);
+        if (unit.isStrikingDesignated()) {
+            drawText(font, I18n.format("hud.combat_drones.striking"), left, top + LINE, WARNING);
+        }
+
+        String fuelText = I18n.format("hud.combat_drones.fuel", percent(fuel));
+        drawText(font, fuelText, right - font.getStringWidth(fuelText), top, fuel < LOW_BATTERY ? WARNING : TEXT);
+        if (type.getWeaponType() != DroneType.WeaponType.NONE) {
+            String ammo = I18n.format("hud.combat_drones.ammo." + type.getWeaponType().name().toLowerCase(Locale.ROOT), unit.getAmmo(),
+                    type.getPayloadCapacity());
+            drawText(font, ammo, right - font.getStringWidth(ammo), top + LINE, unit.getAmmo() > 0 ? 0xFFAA00 : WARNING);
+        }
+
+        drawLadder(font, left, centerY, speedKmh, SPEED_PIXELS_PER_KMH, SPEED_TICK, true);
+        if (altitude >= 0) {
+            drawLadder(font, right, centerY, altitude, ALTITUDE_PIXELS_PER_METER, ALTITUDE_TICK, false);
+        }
+        drawHeadingTape(font, centerX, bottom, heading);
+        if (RemoteController.isStickControl()) {
+            drawText(font, I18n.format("hud.combat_drones.throttle", percent(RemoteController.getThrottle())), left, bottom + 16, TEXT);
+        }
+        float health = unit.getHealthFraction();
+        drawText(font, I18n.format("hud.combat_drones.health", percent(health)), left, bottom + 16 + LINE, health < 0.5F ? WARNING : TEXT);
+        drawCrosshair(centerX, centerY);
+        if (fuel <= 0) {
+            drawCentered(font, I18n.format("hud.combat_drones.warning.fuel_empty"), centerX, centerY + 24, WARNING);
+        } else if (fuel < LOW_BATTERY && (minecraft.world.getTotalWorldTime() / 10) % 2 == 0) {
+            drawCentered(font, I18n.format("hud.combat_drones.warning.low_fuel"), centerX, centerY + 24, WARNING);
+        }
+    }
+
+    private static double sq(double value) {
+        return value * value;
     }
 
     /** Grenade count, the loaded bomb size and count, or null for drones without payload slots. */
@@ -265,10 +334,10 @@ public final class HudOverlay {
     }
 
     /** Height above the first solid block below the drone, or -1 if there's none within range. */
-    private static double altitudeAboveGround(Minecraft minecraft, EntityHandFlownDrone drone) {
-        Vec3d from = new Vec3d(drone.posX, drone.posY, drone.posZ);
+    private static double altitudeAboveGround(Minecraft minecraft, Entity entity) {
+        Vec3d from = new Vec3d(entity.posX, entity.posY, entity.posZ);
         RayTraceResult hit = minecraft.world.rayTraceBlocks(from, from.add(0, -ALTIMETER_RANGE, 0), false, true, false);
-        return hit == null || hit.typeOfHit != RayTraceResult.Type.BLOCK ? -1 : drone.posY - hit.hitVec.y;
+        return hit == null || hit.typeOfHit != RayTraceResult.Type.BLOCK ? -1 : entity.posY - hit.hitVec.y;
     }
 
     private static long percent(double fraction) {

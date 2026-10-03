@@ -2,12 +2,14 @@ package io.github.duckysmacky.combatdrones.client;
 
 import io.github.duckysmacky.combatdrones.CombatDrones;
 import io.github.duckysmacky.combatdrones.entity.EntityHandFlownDrone;
+import io.github.duckysmacky.combatdrones.entity.EntityRampUnit;
 import io.github.duckysmacky.combatdrones.physics.HandFlownFlight;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.entity.EntityPlayerSP;
 import net.minecraft.client.renderer.RenderHelper;
 import net.minecraft.client.renderer.entity.RenderManager;
 import net.minecraft.entity.Entity;
+import net.minecraft.util.math.MathHelper;
 import net.minecraftforge.client.event.EntityViewRenderEvent;
 import net.minecraftforge.client.event.RenderHandEvent;
 import net.minecraftforge.client.event.RenderWorldLastEvent;
@@ -28,6 +30,11 @@ public final class CameraHandler {
 
     @SubscribeEvent
     public static void onCameraSetup(EntityViewRenderEvent.CameraSetup event) {
+        EntityRampUnit remoteUnit = RemoteController.getUnit();
+        if (remoteUnit != null && event.getEntity() == remoteUnit) {
+            remoteCamera(event, remoteUnit);
+            return;
+        }
         EntityHandFlownDrone drone = PilotController.getPilotedDrone();
         if (drone == null || event.getEntity() != drone) {
             return;
@@ -48,6 +55,25 @@ public final class CameraHandler {
         event.setYaw((float) euler[0] + 180.0F); // vanilla's camera yaw convention is offset by 180
         event.setPitch((float) euler[1]);
         event.setRoll((float) euler[2]);
+    }
+
+    /**
+     * Ramp unit camera: under stick control it's fixed to the airframe and banks with it; otherwise it's a stabilized
+     * gimbal the mouse turns (relative to the heading, absolute tilt, never rolls).
+     */
+    private static void remoteCamera(EntityViewRenderEvent.CameraSetup event, EntityRampUnit unit) {
+        RemoteController.updateLook();
+        float partialTicks = (float) event.getRenderPartialTicks();
+        float yaw = unit.prevRotationYaw + MathHelper.wrapDegrees(unit.rotationYaw - unit.prevRotationYaw) * partialTicks;
+        if (RemoteController.isStickControl()) {
+            event.setYaw(yaw + 180.0F); // vanilla's camera yaw convention is offset by 180
+            event.setPitch(unit.prevRotationPitch + (unit.rotationPitch - unit.prevRotationPitch) * partialTicks);
+            event.setRoll(unit.prevBank + (unit.getBank() - unit.prevBank) * partialTicks);
+        } else {
+            event.setYaw(yaw + RemoteController.getLookYaw() + 180.0F);
+            event.setPitch(RemoteController.getLookPitch());
+            event.setRoll(0);
+        }
     }
 
     /**
@@ -74,7 +100,7 @@ public final class CameraHandler {
 
     @SubscribeEvent
     public static void onRenderHand(RenderHandEvent event) {
-        if (PilotController.getPilotedDrone() != null) {
+        if (PilotController.getPilotedDrone() != null || RemoteController.isActive()) {
             event.setCanceled(true);
         }
     }

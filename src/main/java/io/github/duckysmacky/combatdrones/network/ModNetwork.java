@@ -31,6 +31,11 @@ public final class ModNetwork {
         CHANNEL.registerMessage(PlannerOpenPacket.Handler.class, PlannerOpenPacket.class, id++, Side.CLIENT);
         CHANNEL.registerMessage(PlannerRequestPacket.Handler.class, PlannerRequestPacket.class, id++, Side.SERVER);
         CHANNEL.registerMessage(PlannerSubmitPacket.Handler.class, PlannerSubmitPacket.class, id++, Side.SERVER);
+        CHANNEL.registerMessage(RemoteRequestPacket.Handler.class, RemoteRequestPacket.class, id++, Side.SERVER);
+        CHANNEL.registerMessage(RemoteSessionPacket.Handler.class, RemoteSessionPacket.class, id++, Side.CLIENT);
+        CHANNEL.registerMessage(PlaneInputPacket.Handler.class, PlaneInputPacket.class, id++, Side.SERVER);
+        CHANNEL.registerMessage(DesignatePacket.Handler.class, DesignatePacket.class, id++, Side.SERVER);
+        CHANNEL.registerMessage(GunFirePacket.Handler.class, GunFirePacket.class, id++, Side.CLIENT);
     }
 
     /** Clients predict flight locally, so they need the server's (possibly overridden) stats, not their own files. */
