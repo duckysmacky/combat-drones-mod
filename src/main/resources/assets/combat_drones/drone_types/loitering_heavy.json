@@ -10,5 +10,6 @@
   "payloadCapacity": 0,
   "maxHP": 30,
   "defaultCruiseAltitude": 50,
-  "controlScheme": "CLICK_DESIGNATE"
+  "controlScheme": "CLICK_DESIGNATE",
+  "motorSoundRange": 128
 }

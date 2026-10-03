@@ -11,5 +11,6 @@
   "maxHP": 30,
   "defaultCruiseAltitude": 60,
   "controlScheme": "GIMBAL_OBSERVE",
-  "armed": false
+  "armed": false,
+  "motorSoundRange": 96
 }

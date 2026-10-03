@@ -14,6 +14,7 @@ public final class ClientPacketHandlers {
 
     public static void onTypeSync(TypeSyncPacket packet) {
         DroneTypes.applyServerTypes(packet.getTypesJson());
+        packet.applyBatteryPacks();
     }
 
     public static void onDroneState(DroneStatePacket packet) {
@@ -23,7 +24,7 @@ public final class ClientPacketHandlers {
         }
         Entity entity = minecraft.world.getEntityByID(packet.getDroneId());
         if (entity instanceof EntityHandFlownDrone && ((EntityHandFlownDrone) entity).isLocallyPiloted()) {
-            ((EntityHandFlownDrone) entity).reconcile(packet.getSequence(), packet.getState());
+            ((EntityHandFlownDrone) entity).reconcile(packet.getSequence(), packet.getState(), packet.getBatteryFraction(), packet.getPayload());
         }
     }
 }

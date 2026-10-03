@@ -30,7 +30,7 @@ public final class DroneType {
     private double maxSpeed;
     /** Blocks per tick², at full throttle. */
     private double acceleration;
-    /** Battery (hand-flown) or fuel (ramp-launched) units. */
+    /** Battery (hand-flown, with a Light pack) or fuel (ramp-launched) units. */
     private double batteryOrFuelCapacity;
     /** Units drained per tick at full throttle. */
     private double drainRatePerTick;
@@ -41,6 +41,10 @@ public final class DroneType {
     private float maxHP;
     /** Hand-flown only: blocks from the pilot before the link drops. */
     private double signalRange;
+    /** Hand-flown only: the pack size this airframe is designed around (shown in its tooltip). */
+    private BatteryPack defaultBattery;
+    /** Blocks from which the motor can be heard. Drones are meant to be loud: hearing one is the counterplay. */
+    private double motorSoundRange = 64;
     /** Ramp-launched only: blocks above the launch point. */
     private double defaultCruiseAltitude;
     /** Ramp-launched only: what "Take control" does from the Mission Planner. */
@@ -117,8 +121,10 @@ public final class DroneType {
         require(blastPower >= 0, "'blastPower' must be >= 0");
         require(payloadCapacity >= 0, "'payloadCapacity' must be >= 0");
         require(maxHP > 0, "'maxHP' must be > 0");
+        require(motorSoundRange >= 0, "'motorSoundRange' must be >= 0");
         if (category == Category.HAND_FLOWN) {
             require(signalRange > 0, "hand-flown types need 'signalRange' > 0");
+            require(defaultBattery != null, "hand-flown types need a valid 'defaultBattery' (LIGHT, STANDARD or HEAVY)");
         } else {
             require(controlScheme != null, "ramp-launched types need a valid 'controlScheme'");
             require(defaultCruiseAltitude > 0, "ramp-launched types need 'defaultCruiseAltitude' > 0");
@@ -173,6 +179,14 @@ public final class DroneType {
 
     public double getSignalRange() {
         return signalRange;
+    }
+
+    public BatteryPack getDefaultBattery() {
+        return defaultBattery;
+    }
+
+    public double getMotorSoundRange() {
+        return motorSoundRange;
     }
 
     public double getDefaultCruiseAltitude() {

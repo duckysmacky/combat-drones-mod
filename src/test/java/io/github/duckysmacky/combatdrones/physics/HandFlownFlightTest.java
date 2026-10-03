@@ -33,6 +33,14 @@ class HandFlownFlightTest {
     }
 
     @Test
+    void reportsThrustFraction() {
+        assertEquals(HOVER_THROTTLE, HandFlownFlight.step(new State(), input(HOVER_THROTTLE, 0, 0, 0, Mode.ANGLE), RACER), 1e-9);
+        // Hover mode holding still needs the same thrust as the manual hover throttle
+        assertEquals(HOVER_THROTTLE, HandFlownFlight.step(new State(), HandFlownFlight.Input.HOLD_POSITION, RACER), 1e-9);
+        assertEquals(0, HandFlownFlight.step(new State(), HandFlownFlight.Input.MOTORS_OFF, RACER), 1e-9);
+    }
+
+    @Test
     void fullThrottleNeverExceedsMaxSpeed() {
         State state = new State();
         for (int tick = 0; tick < 200; tick++) {

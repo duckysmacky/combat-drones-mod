@@ -11,5 +11,6 @@
   "maxHP": 40,
   "defaultCruiseAltitude": 40,
   "controlScheme": "STICK",
-  "weaponType": "ROCKET_POD"
+  "weaponType": "ROCKET_POD",
+  "motorSoundRange": 128
 }

@@ -10,5 +10,6 @@
   "payloadCapacity": 0,
   "maxHP": 12,
   "defaultCruiseAltitude": 40,
-  "controlScheme": "STICK"
+  "controlScheme": "STICK",
+  "motorSoundRange": 128
 }

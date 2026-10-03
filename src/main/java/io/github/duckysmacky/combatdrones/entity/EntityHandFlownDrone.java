@@ -3,10 +3,13 @@ package io.github.duckysmacky.combatdrones.entity;
 import io.github.duckysmacky.combatdrones.CombatDrones;
 import io.github.duckysmacky.combatdrones.ModContent;
 import io.github.duckysmacky.combatdrones.config.ModConfig;
+import io.github.duckysmacky.combatdrones.item.ItemBattery;
 import io.github.duckysmacky.combatdrones.item.ItemRemote;
 import io.github.duckysmacky.combatdrones.network.DroneStatePacket;
 import io.github.duckysmacky.combatdrones.network.ModNetwork;
+import io.github.duckysmacky.combatdrones.physics.DroneSystems;
 import io.github.duckysmacky.combatdrones.physics.HandFlownFlight;
+import io.github.duckysmacky.combatdrones.type.BatteryPack;
 import io.github.duckysmacky.combatdrones.type.DroneType;
 import io.github.duckysmacky.combatdrones.type.DroneTypes;
 import net.minecraft.entity.Entity;
@@ -56,6 +59,10 @@ public class EntityHandFlownDrone extends Entity {
     /** Entity ID of the player flying this drone, or -1. Lets the pilot's client know to switch into FPV. */
     private static final DataParameter<Integer> PILOT_ID = EntityDataManager.createKey(EntityHandFlownDrone.class, DataSerializers.VARINT);
     private static final DataParameter<Boolean> MOTORS_ON = EntityDataManager.createKey(EntityHandFlownDrone.class, DataSerializers.BOOLEAN);
+    /** Installed {@link BatteryPack} ordinal, or -1. Synced because the pack's weight changes flight prediction. */
+    private static final DataParameter<Integer> BATTERY_PACK = EntityDataManager.createKey(EntityHandFlownDrone.class, DataSerializers.VARINT);
+    /** Thrust as a fraction of maximum, for motor sound pitch on every client. */
+    private static final DataParameter<Float> THRUST = EntityDataManager.createKey(EntityHandFlownDrone.class, DataSerializers.FLOAT);
     /** Inputs the server holds ahead of simulation; anything beyond this is dropped (per-drone rate limit). */
     private static final int MAX_QUEUED_INPUTS = 3;
 
@@ -64,6 +71,8 @@ public class EntityHandFlownDrone extends Entity {
     private UUID owner;
     private float health;
     private int grenades;
+    /** Server-side battery charge in charge units; capacity depends on the type and installed pack. */
+    private double charge;
 
     // Server-side piloting state
     @Nullable
@@ -77,6 +86,9 @@ public class EntityHandFlownDrone extends Entity {
 
     // Client-side prediction, only active on the pilot's own client
     private boolean locallyPiloted;
+    /** Pilot's client: last battery level and payload the server reported (HUD + prediction). */
+    private float knownBatteryFraction;
+    private int knownPayload;
     @Nullable
     private InputFrame pendingPrediction;
     private final ArrayDeque<InputFrame> predictionHistory = new ArrayDeque<>();
@@ -106,6 +118,35 @@ public class EntityHandFlownDrone extends Entity {
         dataManager.register(ROLL, 0.0F);
         dataManager.register(PILOT_ID, -1);
         dataManager.register(MOTORS_ON, false);
+        dataManager.register(BATTERY_PACK, -1);
+        dataManager.register(THRUST, 0.0F);
+    }
+
+    public float getThrust() {
+        return dataManager.get(THRUST);
+    }
+
+    /** Motors need an installed pack with charge left. */
+    private boolean hasPower() {
+        return getBatteryPack() != null && charge > 0;
+    }
+
+    @Nullable
+    public BatteryPack getBatteryPack() {
+        return BatteryPack.byIndex(dataManager.get(BATTERY_PACK));
+    }
+
+    /** Full charge for the installed pack, or 0 without one. */
+    private double getCapacity() {
+        DroneType type = getDroneType();
+        BatteryPack pack = getBatteryPack();
+        return type == null || pack == null ? 0 : type.getBatteryOrFuelCapacity() * pack.getCapacityMultiplier();
+    }
+
+    /** Server: 0..1 charge of the installed pack (0 without one). */
+    public double getChargeFraction() {
+        double capacity = getCapacity();
+        return capacity > 0 ? Math.min(1, charge / capacity) : 0;
     }
 
     public int getPilotId() {
@@ -149,10 +190,20 @@ public class EntityHandFlownDrone extends Entity {
             clearPilot(true);
         }
         HandFlownFlight.Input input = nextInput();
+        if (input.motorsOn && !hasPower()) {
+            input = HandFlownFlight.Input.MOTORS_OFF;
+            if (pilot != null && areMotorsOn()) {
+                pilot.sendStatusMessage(new TextComponentTranslation("message.combat_drones.battery_empty"), true);
+            }
+        }
         dataManager.set(MOTORS_ON, input.motorsOn);
         // The entity position is the truth: picks up /tp, pistons, or a position set after NBT load
         flightState.position.set(posX, posY, posZ);
-        HandFlownFlight.step(flightState, input, paramsOf(type));
+        double thrust = HandFlownFlight.step(flightState, input, flightParams(type));
+        dataManager.set(THRUST, (float) thrust);
+        if (input.motorsOn) {
+            charge = Math.max(0, charge - DroneSystems.drainPerTick(type.getDrainRatePerTick(), thrust));
+        }
         applyStepToEntity(type);
         if (pilot != null && !isDead) {
             ModNetwork.CHANNEL.sendTo(new DroneStatePacket(this, lastProcessedSequence), pilot);
@@ -280,8 +331,11 @@ public class EntityHandFlownDrone extends Entity {
         }
     }
 
-    static HandFlownFlight.Params paramsOf(DroneType type) {
-        return new HandFlownFlight.Params(type.getMaxSpeed(), type.getAcceleration());
+    /** Flight tuning for this drone: its type's stats, slowed down by the weight of the installed pack. */
+    HandFlownFlight.Params flightParams(DroneType type) {
+        BatteryPack pack = getBatteryPack();
+        double weight = pack == null ? 1.0 : pack.getPerformanceMultiplier();
+        return new HandFlownFlight.Params(type.getMaxSpeed() * weight, type.getAcceleration() * weight);
     }
 
     /**
@@ -346,6 +400,8 @@ public class EntityHandFlownDrone extends Entity {
         prevOrientation.set(flightState.orientation);
         predictionHistory.clear();
         pendingPrediction = null;
+        // Assume powered until the first state packet says otherwise, so takeoff isn't held back
+        knownBatteryFraction = 1;
     }
 
     public void stopLocalPiloting() {
@@ -366,7 +422,7 @@ public class EntityHandFlownDrone extends Entity {
             return;
         }
         flightState.position.set(posX, posY, posZ);
-        HandFlownFlight.step(flightState, pendingPrediction.input, paramsOf(type));
+        HandFlownFlight.step(flightState, predictedInput(pendingPrediction.input), flightParams(type));
         moveWithCollision();
         syncRotation();
         predictionHistory.add(pendingPrediction);
@@ -380,7 +436,9 @@ public class EntityHandFlownDrone extends Entity {
      * Client: authoritative state after the server processed input {@code sequence}. Rewind to it and replay the
      * inputs the server hasn't seen yet, so the pilot keeps a responsive view that still converges on the truth.
      */
-    public void reconcile(int sequence, HandFlownFlight.State serverState) {
+    public void reconcile(int sequence, HandFlownFlight.State serverState, float batteryFraction, int payload) {
+        knownBatteryFraction = batteryFraction;
+        knownPayload = payload;
         while (!predictionHistory.isEmpty() && predictionHistory.peek().sequence <= sequence) {
             predictionHistory.poll();
         }
@@ -392,12 +450,26 @@ public class EntityHandFlownDrone extends Entity {
         flightState.velocity.set(serverState.velocity);
         flightState.orientation.set(serverState.orientation);
         setPosition(serverState.position.x, serverState.position.y, serverState.position.z);
-        HandFlownFlight.Params params = paramsOf(type);
+        HandFlownFlight.Params params = flightParams(type);
         for (InputFrame frame : predictionHistory) {
-            HandFlownFlight.step(flightState, frame.input, params);
+            HandFlownFlight.step(flightState, predictedInput(frame.input), params);
             moveWithCollision();
         }
         syncRotation();
+    }
+
+    /** Mirror the server's empty-battery motor cut so prediction doesn't fly on with dead motors. */
+    private HandFlownFlight.Input predictedInput(HandFlownFlight.Input input) {
+        boolean powered = getBatteryPack() != null && knownBatteryFraction > 0;
+        return input.motorsOn && !powered ? HandFlownFlight.Input.MOTORS_OFF : input;
+    }
+
+    public float getKnownBatteryFraction() {
+        return knownBatteryFraction;
+    }
+
+    public int getKnownPayload() {
+        return knownPayload;
     }
 
     /** Tracker updates would fight our own prediction, so the pilot's client ignores them. */
@@ -476,6 +548,10 @@ public class EntityHandFlownDrone extends Entity {
         if (grenades > 0) {
             entityDropItem(new ItemStack(ModContent.fragGrenade, grenades), 0);
         }
+        ItemStack battery = removeBattery();
+        if (!battery.isEmpty()) {
+            entityDropItem(battery, 0);
+        }
     }
 
     @Nullable
@@ -491,7 +567,8 @@ public class EntityHandFlownDrone extends Entity {
     public boolean processInitialInteract(EntityPlayer player, EnumHand hand) {
         ItemStack stack = player.getHeldItem(hand);
         if (world.isRemote) {
-            return stack.getItem() == ModContent.fpvRemote || stack.getItem() == ModContent.fragGrenade || (stack.isEmpty() && player.isSneaking());
+            return stack.getItem() == ModContent.fpvRemote || stack.getItem() == ModContent.fragGrenade
+                    || stack.getItem() instanceof ItemBattery || (stack.isEmpty() && player.isSneaking());
         }
         if (owner != null && !isOwnedBy(player)) {
             player.sendStatusMessage(new TextComponentTranslation("message.combat_drones.owned_by_other"), true);
@@ -508,11 +585,39 @@ public class EntityHandFlownDrone extends Entity {
             attachGrenade(player, stack);
             return true;
         }
+        if (stack.getItem() instanceof ItemBattery) {
+            swapBattery(player, hand, stack);
+            return true;
+        }
         if (stack.isEmpty() && player.isSneaking()) {
             pickUp(player);
             return true;
         }
         return false;
+    }
+
+    /** Puts the held pack in; the pack that was installed (if any) goes back into the player's hand. */
+    private void swapBattery(EntityPlayer player, EnumHand hand, ItemStack stack) {
+        ItemStack removed = removeBattery();
+        BatteryPack pack = ((ItemBattery) stack.getItem()).getPack();
+        double fraction = ItemBattery.getCharge(stack);
+        dataManager.set(BATTERY_PACK, pack.ordinal());
+        charge = fraction * getCapacity();
+        player.setHeldItem(hand, removed);
+        player.sendStatusMessage(new TextComponentTranslation("message.combat_drones.battery_installed",
+                new TextComponentTranslation(stack.getItem().getTranslationKey() + ".name"), Math.round(fraction * 100)), true);
+    }
+
+    /** Takes the installed pack out as an item carrying its remaining charge (empty stack if none). */
+    private ItemStack removeBattery() {
+        BatteryPack pack = getBatteryPack();
+        if (pack == null) {
+            return ItemStack.EMPTY;
+        }
+        ItemStack battery = ItemBattery.withCharge(ModContent.batteryItem(pack), getChargeFraction());
+        dataManager.set(BATTERY_PACK, -1);
+        charge = 0;
+        return battery;
     }
 
     /** Grenades only arm kamikaze racers; other drones' payload slots hold bombs or ammo (M4). */
@@ -552,6 +657,10 @@ public class EntityHandFlownDrone extends Entity {
         if (grenades > 0) {
             ItemHandlerHelper.giveItemToPlayer(player, new ItemStack(ModContent.fragGrenade, grenades));
         }
+        ItemStack battery = removeBattery();
+        if (!battery.isEmpty()) {
+            ItemHandlerHelper.giveItemToPlayer(player, battery);
+        }
     }
 
     @Override
@@ -579,6 +688,8 @@ public class EntityHandFlownDrone extends Entity {
         }
         compound.setFloat("Health", health);
         compound.setInteger("Grenades", grenades);
+        compound.setInteger("Battery", dataManager.get(BATTERY_PACK));
+        compound.setDouble("Charge", charge);
         Quat4d orientation = flightState.orientation;
         compound.setDouble("QX", orientation.x);
         compound.setDouble("QY", orientation.y);
@@ -597,6 +708,9 @@ public class EntityHandFlownDrone extends Entity {
         owner = compound.hasUniqueId("Owner") ? compound.getUniqueId("Owner") : null;
         health = compound.getFloat("Health");
         grenades = compound.getInteger("Grenades");
+        BatteryPack pack = compound.hasKey("Battery") ? BatteryPack.byIndex(compound.getInteger("Battery")) : null;
+        dataManager.set(BATTERY_PACK, pack == null ? -1 : pack.ordinal());
+        charge = compound.getDouble("Charge");
         flightState.orientation.set(compound.getDouble("QX"), compound.getDouble("QY"), compound.getDouble("QZ"), compound.getDouble("QW"));
         if (flightState.orientation.w == 0 && flightState.orientation.x == 0 && flightState.orientation.y == 0 && flightState.orientation.z == 0) {
             flightState.orientation.set(0, 0, 0, 1);

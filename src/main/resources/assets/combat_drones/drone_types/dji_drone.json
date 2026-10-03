@@ -10,5 +10,7 @@
   "blastPower": 0,
   "payloadCapacity": 1,
   "maxHP": 24,
-  "signalRange": 128
+  "signalRange": 128,
+  "motorSoundRange": 80,
+  "defaultBattery": "STANDARD"
 }

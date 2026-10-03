@@ -1,11 +1,13 @@
 package io.github.duckysmacky.combatdrones;
 
 import io.github.duckysmacky.combatdrones.entity.EntityHandFlownDrone;
+import io.github.duckysmacky.combatdrones.item.ItemBattery;
 import io.github.duckysmacky.combatdrones.item.ItemBlockWithTooltip;
 import io.github.duckysmacky.combatdrones.item.ItemDrone;
 import io.github.duckysmacky.combatdrones.item.ItemGoggles;
 import io.github.duckysmacky.combatdrones.item.ItemRemote;
 import io.github.duckysmacky.combatdrones.item.ItemWithTooltip;
+import io.github.duckysmacky.combatdrones.type.BatteryPack;
 import io.github.duckysmacky.combatdrones.type.DroneType;
 import io.github.duckysmacky.combatdrones.type.DroneTypes;
 import net.minecraft.block.Block;
@@ -76,9 +78,9 @@ public final class ModContent {
         fpvRemote = register(event, named(new ItemRemote(), "fpv_remote"));
         fpvGoggles = register(event, named(new ItemGoggles(GOGGLES_MATERIAL), "fpv_goggles"));
         missionPlanner = register(event, simpleItem("mission_planner").setMaxStackSize(1));
-        lightBattery = register(event, simpleItem("light_battery").setMaxStackSize(1));
-        standardBattery = register(event, simpleItem("standard_battery").setMaxStackSize(1));
-        heavyBattery = register(event, simpleItem("heavy_battery").setMaxStackSize(1));
+        lightBattery = register(event, named(new ItemBattery(BatteryPack.LIGHT), BatteryPack.LIGHT.itemName()));
+        standardBattery = register(event, named(new ItemBattery(BatteryPack.STANDARD), BatteryPack.STANDARD.itemName()));
+        heavyBattery = register(event, named(new ItemBattery(BatteryPack.HEAVY), BatteryPack.HEAVY.itemName()));
         fuelCan = register(event, simpleItem("fuel_can").setMaxStackSize(1));
         fragGrenade = register(event, simpleItem("frag_grenade").setMaxStackSize(16));
         bomb = register(event, simpleItem("bomb").setMaxStackSize(4));
@@ -99,6 +101,17 @@ public final class ModContent {
                 .name(CombatDrones.MOD_ID + ".hand_flown_drone")
                 .tracker(160, 1, false)
                 .build());
+    }
+
+    public static Item batteryItem(BatteryPack pack) {
+        switch (pack) {
+            case STANDARD:
+                return standardBattery;
+            case HEAVY:
+                return heavyBattery;
+            default:
+                return lightBattery;
+        }
     }
 
     private static Block simpleBlock(String name) {

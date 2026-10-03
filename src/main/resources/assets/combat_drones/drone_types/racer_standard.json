@@ -9,5 +9,7 @@
   "payloadCapacity": 1,
   "maxHP": 10,
   "signalRange": 112,
-  "impactDetonates": true
+  "impactDetonates": true,
+  "motorSoundRange": 96,
+  "defaultBattery": "LIGHT"
 }

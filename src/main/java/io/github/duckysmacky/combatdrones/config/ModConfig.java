@@ -4,6 +4,7 @@ import com.electronwill.nightconfig.core.Config;
 import com.electronwill.nightconfig.core.file.CommentedFileConfig;
 import com.electronwill.nightconfig.toml.TomlFormat;
 import io.github.duckysmacky.combatdrones.CombatDrones;
+import io.github.duckysmacky.combatdrones.type.BatteryPack;
 import io.github.duckysmacky.combatdrones.type.DroneType;
 import io.github.duckysmacky.combatdrones.type.DroneTypes;
 
@@ -18,6 +19,7 @@ import java.util.Map;
  * <ul>
  *   <li>{@code [general]}: global server balance knobs.</li>
  *   <li>{@code [client]}: options for your own client only; a server ignores them.</li>
+ *   <li>{@code [batteries.<size>]}: battery pack capacity and weight multipliers, synced to clients.</li>
  *   <li>{@code [drones.<id>]}: per-type balance stats, defaulting to the bundled drone type data. The server's
  *       values are synced to clients on login.</li>
  * </ul>
@@ -51,6 +53,13 @@ public final class ModConfig {
 
             invertMousePitch = defaults.get("client.invertMousePitch", invertMousePitch, "Invert vertical mouse movement when flying a drone in FPV.");
 
+            for (BatteryPack pack : BatteryPack.values()) {
+                String table = "batteries." + pack.key();
+                pack.setMultipliers(
+                        defaults.number(table + ".capacityMultiplier", pack.getDefaultCapacityMultiplier(), 0.1, 10, null),
+                        defaults.number(table + ".performanceMultiplier", pack.getDefaultPerformanceMultiplier(), 0.1, 2, null));
+            }
+
             for (DroneType type : DroneTypes.all()) {
                 applyDroneTable(defaults, type);
             }
@@ -59,9 +68,11 @@ public final class ModConfig {
             // Table comments last: a comment can only attach to a table that exists
             defaults.comment("general", "Global balance settings. On a server these apply to everyone.");
             defaults.comment("client", "Options for your own client only.");
+            defaults.comment("batteries", "Battery pack sizes for hand-flown drones. capacityMultiplier scales a drone's base capacity "
+                    + "(defined for a Light pack); performanceMultiplier scales its top speed and acceleration (pack weight).");
             defaults.comment("drones", "Per-drone-type stats. Units: speed in blocks/tick (1 = 72 km/h), acceleration in blocks/tick², "
-                    + "capacity and drain in charge units (full-throttle flight time = capacity / drain ticks), blastPower on the vanilla "
-                    + "scale (TNT = 4), maxHP like mob health, signalRange in blocks.");
+                    + "capacity (with a Light pack) and drain in charge units (full-throttle flight time = capacity / drain ticks), blastPower on the vanilla "
+                    + "scale (TNT = 4), maxHP like mob health, signalRange and motorSoundRange in blocks.");
 
             if (defaults.changed) {
                 config.save();

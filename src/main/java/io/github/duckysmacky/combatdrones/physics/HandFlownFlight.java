@@ -98,16 +98,21 @@ public final class HandFlownFlight {
     private HandFlownFlight() {
     }
 
-    /** Advances {@code state} by one tick. Block collisions are applied afterwards by the caller. */
-    public static void step(State state, Input input, Params params) {
+    /**
+     * Advances {@code state} by one tick. Block collisions are applied afterwards by the caller.
+     *
+     * @return thrust used this tick as a fraction of maximum (0..1), which drives battery drain and motor sound
+     */
+    public static double step(State state, Input input, Params params) {
         if (input.motorsOn) {
             updateAttitude(state.orientation, input);
         }
 
         Vector3d up = rotate(state.orientation, UP);
         Vector3d acceleration = new Vector3d(0, -GRAVITY, 0);
+        double thrust = 0;
         if (input.motorsOn) {
-            double thrust = input.mode == Mode.HOVER
+            thrust = input.mode == Mode.HOVER
                     ? hoverThrust(state.velocity.y, up.y, input.vertical, params)
                     : input.throttle * params.thrustAccel;
             up.scale(thrust);
@@ -126,6 +131,7 @@ public final class HandFlownFlight {
             velocity.scale(params.maxSpeed / speed);
         }
         state.position.add(velocity);
+        return thrust / params.thrustAccel;
     }
 
     private static void updateAttitude(Quat4d orientation, Input input) {

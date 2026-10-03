@@ -18,7 +18,7 @@ class DroneTypeTest {
             + "  \"maxSpeed\": 1.5, \"acceleration\": 0.1,\n"
             + "  \"batteryOrFuelCapacity\": 2400, \"drainRatePerTick\": 1,\n"
             + "  \"blastPower\": 2, \"maxHP\": 4, \"signalRange\": 96,\n"
-            + "  \"impactDetonates\": true\n"
+            + "  \"impactDetonates\": true, \"defaultBattery\": \"LIGHT\"\n"
             + "}";
 
     private static DroneType parse(String json) {
