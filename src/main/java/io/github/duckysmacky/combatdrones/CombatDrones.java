@@ -1,8 +1,10 @@
 package io.github.duckysmacky.combatdrones;
 
 import io.github.duckysmacky.combatdrones.config.ModConfig;
+import io.github.duckysmacky.combatdrones.entity.EntityRampUnit;
 import io.github.duckysmacky.combatdrones.network.ModNetwork;
 import io.github.duckysmacky.combatdrones.type.DroneTypes;
+import net.minecraftforge.common.ForgeChunkManager;
 import net.minecraftforge.fml.common.Loader;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.SidedProxy;
@@ -16,6 +18,9 @@ public class CombatDrones {
     public static final String NAME = "Combat Drones";
 
     public static Logger logger;
+
+    @Mod.Instance
+    public static CombatDrones instance;
 
     @SidedProxy(clientSide = "io.github.duckysmacky.combatdrones.client.ClientProxy", serverSide = "io.github.duckysmacky.combatdrones.CommonProxy")
     public static CommonProxy proxy;
@@ -32,5 +37,15 @@ public class CombatDrones {
     @Mod.EventHandler
     public void init(FMLInitializationEvent event) {
         proxy.init();
+        // Flying ramp units keep their own chunks loaded; after a restart Forge returns their tickets here
+        ForgeChunkManager.setForcedChunkLoadingCallback(this, (tickets, world) -> {
+            for (ForgeChunkManager.Ticket ticket : tickets) {
+                if (ticket.getEntity() instanceof EntityRampUnit) {
+                    ((EntityRampUnit) ticket.getEntity()).adoptChunkTicket(ticket);
+                } else {
+                    ForgeChunkManager.releaseTicket(ticket);
+                }
+            }
+        });
     }
 }

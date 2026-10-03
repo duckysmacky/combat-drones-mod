@@ -12,6 +12,7 @@ import net.minecraft.client.util.ITooltipFlag;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
+import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.EnumActionResult;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.EnumHand;
@@ -32,6 +33,23 @@ public class ItemDrone extends Item {
     public ItemDrone(String typeId) {
         this.typeId = typeId;
         setMaxStackSize(4);
+    }
+
+    private static final String TAG_FUEL = "Fuel";
+
+    /** Fuel stored in a ramp-launched unit's item (kept when it's taken off a ramp or lands). */
+    public static double getFuel(ItemStack stack) {
+        NBTTagCompound tag = stack.getTagCompound();
+        return tag != null ? Math.max(0, tag.getDouble(TAG_FUEL)) : 0;
+    }
+
+    public static ItemStack withFuel(ItemStack stack, double fuel) {
+        if (fuel > 0) {
+            NBTTagCompound tag = stack.hasTagCompound() ? stack.getTagCompound() : new NBTTagCompound();
+            tag.setDouble(TAG_FUEL, fuel);
+            stack.setTagCompound(tag);
+        }
+        return stack;
     }
 
     /** Looked up on use rather than cached, so server-synced type stats are always the ones applied. */

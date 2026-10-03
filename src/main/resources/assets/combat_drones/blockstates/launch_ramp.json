@@ -1,7 +1,19 @@
 {
   "variants": {
-    "normal": {
+    "facing=north": {
       "model": "combat_drones:launch_ramp"
+    },
+    "facing=east": {
+      "model": "combat_drones:launch_ramp",
+      "y": 90
+    },
+    "facing=south": {
+      "model": "combat_drones:launch_ramp",
+      "y": 180
+    },
+    "facing=west": {
+      "model": "combat_drones:launch_ramp",
+      "y": 270
     }
   }
 }

@@ -1,7 +1,10 @@
 package io.github.duckysmacky.combatdrones;
 
+import io.github.duckysmacky.combatdrones.block.BlockLaunchRamp;
+import io.github.duckysmacky.combatdrones.block.TileLaunchRamp;
 import io.github.duckysmacky.combatdrones.entity.EntityBomb;
 import io.github.duckysmacky.combatdrones.entity.EntityHandFlownDrone;
+import io.github.duckysmacky.combatdrones.entity.EntityRampUnit;
 import io.github.duckysmacky.combatdrones.item.ItemBattery;
 import io.github.duckysmacky.combatdrones.item.ItemBlockWithTooltip;
 import io.github.duckysmacky.combatdrones.item.ItemBomb;
@@ -27,6 +30,7 @@ import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.registry.EntityEntry;
 import net.minecraftforge.fml.common.registry.EntityEntryBuilder;
+import net.minecraftforge.fml.common.registry.GameRegistry;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -70,9 +74,10 @@ public final class ModContent {
 
     @SubscribeEvent
     public static void registerBlocks(RegistryEvent.Register<Block> event) {
-        launchRamp = simpleBlock("launch_ramp");
+        launchRamp = named(new BlockLaunchRamp(), "launch_ramp");
         rearmStation = simpleBlock("rearm_station");
         event.getRegistry().registerAll(launchRamp, rearmStation);
+        GameRegistry.registerTileEntity(TileLaunchRamp.class, new ResourceLocation(CombatDrones.MOD_ID, "launch_ramp"));
     }
 
     // Forge fires the block registry event before the item one, so the blocks exist here
@@ -86,7 +91,7 @@ public final class ModContent {
         lightBattery = register(event, named(new ItemBattery(BatteryPack.LIGHT), BatteryPack.LIGHT.itemName()));
         standardBattery = register(event, named(new ItemBattery(BatteryPack.STANDARD), BatteryPack.STANDARD.itemName()));
         heavyBattery = register(event, named(new ItemBattery(BatteryPack.HEAVY), BatteryPack.HEAVY.itemName()));
-        fuelCan = register(event, simpleItem("fuel_can").setMaxStackSize(1));
+        fuelCan = register(event, simpleItem("fuel_can").setMaxStackSize(16));
         fragGrenade = register(event, simpleItem("frag_grenade").setMaxStackSize(16));
         bombLight = register(event, named(new ItemBomb(BombType.LIGHT, 64), BombType.LIGHT.itemName()));
         bomb = register(event, named(new ItemBomb(BombType.MEDIUM, 32), BombType.MEDIUM.itemName()));
@@ -114,6 +119,12 @@ public final class ModContent {
                 .name(CombatDrones.MOD_ID + ".bomb")
                 .tracker(160, 1, true)
                 .build());
+        event.getRegistry().register(EntityEntryBuilder.create()
+                .entity(EntityRampUnit.class)
+                .id(new ResourceLocation(CombatDrones.MOD_ID, "ramp_unit"), 2)
+                .name(CombatDrones.MOD_ID + ".ramp_unit")
+                .tracker(160, 1, false)
+                .build());
     }
 
     public static Item bombItem(BombType type) {
@@ -139,8 +150,11 @@ public final class ModContent {
     }
 
     private static Block simpleBlock(String name) {
-        return new Block(Material.IRON).setHardness(3.0F).setResistance(10.0F)
-                .setRegistryName(CombatDrones.MOD_ID, name).setTranslationKey(CombatDrones.MOD_ID + "." + name).setCreativeTab(TAB);
+        return named(new Block(Material.IRON).setHardness(3.0F).setResistance(10.0F), name);
+    }
+
+    private static Block named(Block block, String name) {
+        return block.setRegistryName(CombatDrones.MOD_ID, name).setTranslationKey(CombatDrones.MOD_ID + "." + name).setCreativeTab(TAB);
     }
 
     private static Item simpleItem(String name) {

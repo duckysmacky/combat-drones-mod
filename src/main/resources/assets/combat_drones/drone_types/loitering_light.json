@@ -11,5 +11,6 @@
   "maxHP": 12,
   "defaultCruiseAltitude": 40,
   "controlScheme": "STICK",
-  "motorSoundRange": 64
+  "motorSoundRange": 64,
+  "impactDetonates": true
 }
