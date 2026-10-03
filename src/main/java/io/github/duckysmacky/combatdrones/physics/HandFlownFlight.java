@@ -139,11 +139,19 @@ public final class HandFlownFlight {
         rotateBody(target, UP, -input.yaw * YAW_RATE_DEG);
         rotateBody(target, RIGHT, -input.pitch * MAX_TILT_DEG);
         rotateBody(target, FORWARD, input.roll * MAX_TILT_DEG);
-        if (orientation.x * target.x + orientation.y * target.y + orientation.z * target.z + orientation.w * target.w < 0) {
-            target.negate(); // slerp the short way
-        }
-        orientation.interpolate(target, LEVEL_RATE);
+        orientation.set(slerp(orientation, target, LEVEL_RATE));
         orientation.normalize();
+    }
+
+    /** Spherical interpolation that always takes the short way round. Inputs are not modified. */
+    public static Quat4d slerp(Quat4d from, Quat4d to, double alpha) {
+        Quat4d target = new Quat4d(to);
+        if (from.x * to.x + from.y * to.y + from.z * to.z + from.w * to.w < 0) {
+            target.negate();
+        }
+        Quat4d result = new Quat4d();
+        result.interpolate(from, target, alpha);
+        return result;
     }
 
     /** Vertical-speed controller: thrust that drives vertical speed toward the commanded climb rate. */

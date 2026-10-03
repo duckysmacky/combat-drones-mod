@@ -4,6 +4,8 @@ import io.github.duckysmacky.combatdrones.CombatDrones;
 import io.github.duckysmacky.combatdrones.ModContent;
 import io.github.duckysmacky.combatdrones.config.ModConfig;
 import io.github.duckysmacky.combatdrones.item.ItemRemote;
+import io.github.duckysmacky.combatdrones.network.DroneStatePacket;
+import io.github.duckysmacky.combatdrones.network.ModNetwork;
 import io.github.duckysmacky.combatdrones.physics.HandFlownFlight;
 import io.github.duckysmacky.combatdrones.type.DroneType;
 import io.github.duckysmacky.combatdrones.type.DroneTypes;
@@ -11,6 +13,8 @@ import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.MoverType;
 import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.entity.player.EntityPlayerMP;
+import net.minecraft.inventory.EntityEquipmentSlot;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
@@ -25,10 +29,13 @@ import net.minecraft.util.text.TextComponentTranslation;
 import net.minecraft.world.World;
 import net.minecraft.world.WorldServer;
 import net.minecraftforge.fml.common.registry.ForgeRegistries;
+import net.minecraftforge.fml.relauncher.Side;
+import net.minecraftforge.fml.relauncher.SideOnly;
 import net.minecraftforge.items.ItemHandlerHelper;
 
 import javax.annotation.Nullable;
 import javax.vecmath.Quat4d;
+import java.util.ArrayDeque;
 import java.util.List;
 import java.util.UUID;
 
@@ -41,9 +48,17 @@ public class EntityHandFlownDrone extends Entity {
     static final double ARM_SPEED = 0.25;
     /** Crash damage per block/tick of impact speed for drones that don't detonate. */
     private static final float CRASH_DAMAGE_PER_SPEED = 8.0F;
+    /** Blocks; matches the tracker range so a drone is visible wherever it's tracked. */
+    private static final double RENDER_DISTANCE = 160.0;
 
     private static final DataParameter<String> TYPE_ID = EntityDataManager.createKey(EntityHandFlownDrone.class, DataSerializers.STRING);
     private static final DataParameter<Float> ROLL = EntityDataManager.createKey(EntityHandFlownDrone.class, DataSerializers.FLOAT);
+    /** Entity ID of the player flying this drone, or -1. Lets the pilot's client know to switch into FPV. */
+    private static final DataParameter<Integer> PILOT_ID = EntityDataManager.createKey(EntityHandFlownDrone.class, DataSerializers.VARINT);
+    private static final DataParameter<Boolean> MOTORS_ON = EntityDataManager.createKey(EntityHandFlownDrone.class, DataSerializers.BOOLEAN);
+    /** Inputs the server holds ahead of simulation; anything beyond this is dropped (per-drone rate limit). */
+    private static final int MAX_QUEUED_INPUTS = 3;
+    private static final HandFlownFlight.Input MOTORS_OFF = new HandFlownFlight.Input(0, 0, 0, 0, 0, HandFlownFlight.Mode.ANGLE, false);
 
     protected final HandFlownFlight.State flightState = new HandFlownFlight.State();
     @Nullable
@@ -51,7 +66,25 @@ public class EntityHandFlownDrone extends Entity {
     private float health;
     private int grenades;
 
+    // Server-side piloting state
+    @Nullable
+    private EntityPlayerMP pilot;
+    private final ArrayDeque<InputFrame> inputQueue = new ArrayDeque<>();
+    private HandFlownFlight.Input lastInput = MOTORS_OFF;
+    private int lastQueuedSequence = Integer.MIN_VALUE;
+    protected int lastProcessedSequence;
+
     public float prevRoll;
+
+    // Client-side prediction, only active on the pilot's own client
+    private boolean locallyPiloted;
+    @Nullable
+    private InputFrame pendingPrediction;
+    private final ArrayDeque<InputFrame> predictionHistory = new ArrayDeque<>();
+    /** Orientation before this tick's predicted step; the FPV camera interpolates from it. */
+    public final Quat4d prevOrientation = new Quat4d(0, 0, 0, 1);
+    /** Inputs kept for replay; must cover a round trip (40 ticks = 2 s of latency). */
+    private static final int PREDICTION_HISTORY = 40;
 
     public EntityHandFlownDrone(World world) {
         super(world);
@@ -72,6 +105,16 @@ public class EntityHandFlownDrone extends Entity {
     protected void entityInit() {
         dataManager.register(TYPE_ID, "");
         dataManager.register(ROLL, 0.0F);
+        dataManager.register(PILOT_ID, -1);
+        dataManager.register(MOTORS_ON, false);
+    }
+
+    public int getPilotId() {
+        return dataManager.get(PILOT_ID);
+    }
+
+    public boolean areMotorsOn() {
+        return dataManager.get(MOTORS_ON);
     }
 
     @Nullable
@@ -92,6 +135,9 @@ public class EntityHandFlownDrone extends Entity {
         prevRoll = getRoll();
         super.onUpdate();
         if (world.isRemote) {
+            if (locallyPiloted) {
+                predictStep();
+            }
             return;
         }
         DroneType type = getDroneType();
@@ -100,13 +146,135 @@ public class EntityHandFlownDrone extends Entity {
             setDead();
             return;
         }
-        HandFlownFlight.step(flightState, currentInput(), paramsOf(type));
+        if (pilot != null && checkPilot(pilot) != null) {
+            clearPilot(true);
+        }
+        HandFlownFlight.Input input = nextInput();
+        dataManager.set(MOTORS_ON, input.motorsOn);
+        // The entity position is the truth: picks up /tp, pistons, or a position set after NBT load
+        flightState.position.set(posX, posY, posZ);
+        HandFlownFlight.step(flightState, input, paramsOf(type));
         applyStepToEntity(type);
+        if (pilot != null && !isDead) {
+            ModNetwork.CHANNEL.sendTo(new DroneStatePacket(this, lastProcessedSequence), pilot);
+        }
     }
 
-    /** What the drone flies with this tick. Unpiloted drones just fall. */
-    protected HandFlownFlight.Input currentInput() {
-        return HandFlownFlight.Input.IDLE;
+    /**
+     * One queued input per tick, in order; if the client fell behind, repeat its last intent. Unpiloted drones
+     * have their motors off and fall.
+     */
+    private HandFlownFlight.Input nextInput() {
+        if (pilot == null) {
+            return MOTORS_OFF;
+        }
+        InputFrame frame = inputQueue.poll();
+        if (frame != null) {
+            lastInput = frame.input;
+            lastProcessedSequence = frame.sequence;
+        }
+        return lastInput;
+    }
+
+    /** Server: accept a control input from the network. Only the current pilot's inputs count. */
+    public void queueInput(EntityPlayerMP sender, int sequence, HandFlownFlight.Input input) {
+        if (sender != pilot || sequence <= lastQueuedSequence) {
+            return;
+        }
+        lastQueuedSequence = sequence;
+        if (inputQueue.size() >= MAX_QUEUED_INPUTS) {
+            inputQueue.poll();
+        }
+        inputQueue.add(new InputFrame(sequence, input));
+    }
+
+    /**
+     * Why {@code player} can't fly this drone right now, as a translation key, or null if they can. Checked on
+     * takeoff and every tick while flying.
+     */
+    @Nullable
+    public String checkPilot(EntityPlayerMP player) {
+        DroneType type = getDroneType();
+        if (!player.isEntityAlive() || player.hasDisconnected() || player.world != world || type == null) {
+            return "message.combat_drones.cannot_pilot";
+        }
+        if (!isOwnedBy(player)) {
+            return "message.combat_drones.owned_by_other";
+        }
+        if (player.getItemStackFromSlot(EntityEquipmentSlot.HEAD).getItem() != ModContent.fpvGoggles) {
+            return "message.combat_drones.need_goggles";
+        }
+        if (!getUniqueID().equals(heldRemoteLink(player))) {
+            return "message.combat_drones.need_remote";
+        }
+        if (getDistanceSq(player) > type.getSignalRange() * type.getSignalRange()) {
+            return "message.combat_drones.out_of_range";
+        }
+        return null;
+    }
+
+    private void setPilot(EntityPlayerMP player) {
+        pilot = player;
+        inputQueue.clear();
+        lastInput = MOTORS_OFF;
+        lastQueuedSequence = Integer.MIN_VALUE;
+        dataManager.set(PILOT_ID, player.getEntityId());
+    }
+
+    private void clearPilot(boolean linkLost) {
+        if (pilot != null && linkLost) {
+            pilot.sendStatusMessage(new TextComponentTranslation("message.combat_drones.link_lost"), true);
+        }
+        pilot = null;
+        inputQueue.clear();
+        lastInput = MOTORS_OFF;
+        dataManager.set(PILOT_ID, -1);
+    }
+
+    /** Server: G key. Exits FPV if already flying the remote's drone, otherwise tries to take off with it. */
+    public static void togglePilot(EntityPlayerMP player) {
+        UUID linked = heldRemoteLink(player);
+        if (linked == null) {
+            player.sendStatusMessage(new TextComponentTranslation("message.combat_drones.need_remote"), true);
+            return;
+        }
+        Entity entity = ((WorldServer) player.world).getEntityFromUuid(linked);
+        if (!(entity instanceof EntityHandFlownDrone) || entity.isDead) {
+            player.sendStatusMessage(new TextComponentTranslation("message.combat_drones.drone_not_found"), true);
+            return;
+        }
+        EntityHandFlownDrone drone = (EntityHandFlownDrone) entity;
+        if (drone.pilot == player) {
+            drone.clearPilot(false);
+            return;
+        }
+        String problem = drone.checkPilot(player);
+        if (problem != null) {
+            player.sendStatusMessage(new TextComponentTranslation(problem), true);
+            return;
+        }
+        drone.setPilot(player);
+    }
+
+    @Nullable
+    private static UUID heldRemoteLink(EntityPlayer player) {
+        for (EnumHand hand : EnumHand.values()) {
+            ItemStack stack = player.getHeldItem(hand);
+            if (stack.getItem() == ModContent.fpvRemote) {
+                return ItemRemote.getLinkedDrone(stack);
+            }
+        }
+        return null;
+    }
+
+    private static final class InputFrame {
+        final int sequence;
+        final HandFlownFlight.Input input;
+
+        InputFrame(int sequence, HandFlownFlight.Input input) {
+            this.sequence = sequence;
+            this.input = input;
+        }
     }
 
     static HandFlownFlight.Params paramsOf(DroneType type) {
@@ -153,7 +321,88 @@ public class EntityHandFlownDrone extends Entity {
         double[] euler = HandFlownFlight.toEuler(flightState.orientation);
         rotationYaw = (float) euler[0];
         rotationPitch = (float) euler[1];
-        dataManager.set(ROLL, (float) euler[2]);
+        if (!world.isRemote) {
+            dataManager.set(ROLL, (float) euler[2]);
+        }
+    }
+
+    public HandFlownFlight.State getFlightState() {
+        return flightState;
+    }
+
+    public boolean isLocallyPiloted() {
+        return locallyPiloted;
+    }
+
+    /** Client: this player just became the pilot. Seed prediction from what the tracker last told us. */
+    public void startLocalPiloting() {
+        locallyPiloted = true;
+        flightState.position.set(posX, posY, posZ);
+        flightState.velocity.set(0, 0, 0);
+        flightState.orientation.set(HandFlownFlight.fromEuler(rotationYaw, rotationPitch, getRoll()));
+        prevOrientation.set(flightState.orientation);
+        predictionHistory.clear();
+        pendingPrediction = null;
+    }
+
+    public void stopLocalPiloting() {
+        locallyPiloted = false;
+        predictionHistory.clear();
+        pendingPrediction = null;
+    }
+
+    /** Client: the input to predict with on this tick's update (same one just sent to the server). */
+    public void setPredictionInput(int sequence, HandFlownFlight.Input input) {
+        pendingPrediction = new InputFrame(sequence, input);
+    }
+
+    private void predictStep() {
+        prevOrientation.set(flightState.orientation);
+        DroneType type = getDroneType();
+        if (pendingPrediction == null || type == null) {
+            return;
+        }
+        flightState.position.set(posX, posY, posZ);
+        HandFlownFlight.step(flightState, pendingPrediction.input, paramsOf(type));
+        moveWithCollision();
+        syncRotation();
+        predictionHistory.add(pendingPrediction);
+        if (predictionHistory.size() > PREDICTION_HISTORY) {
+            predictionHistory.poll();
+        }
+        pendingPrediction = null;
+    }
+
+    /**
+     * Client: authoritative state after the server processed input {@code sequence}. Rewind to it and replay the
+     * inputs the server hasn't seen yet, so the pilot keeps a responsive view that still converges on the truth.
+     */
+    public void reconcile(int sequence, HandFlownFlight.State serverState) {
+        while (!predictionHistory.isEmpty() && predictionHistory.peek().sequence <= sequence) {
+            predictionHistory.poll();
+        }
+        DroneType type = getDroneType();
+        if (type == null) {
+            return;
+        }
+        flightState.position.set(serverState.position);
+        flightState.velocity.set(serverState.velocity);
+        flightState.orientation.set(serverState.orientation);
+        setPosition(serverState.position.x, serverState.position.y, serverState.position.z);
+        HandFlownFlight.Params params = paramsOf(type);
+        for (InputFrame frame : predictionHistory) {
+            HandFlownFlight.step(flightState, frame.input, params);
+            moveWithCollision();
+        }
+        syncRotation();
+    }
+
+    /** Tracker updates would fight our own prediction, so the pilot's client ignores them. */
+    @Override
+    public void setPositionAndRotationDirect(double x, double y, double z, float yaw, float pitch, int posRotationIncrements, boolean teleport) {
+        if (!locallyPiloted) {
+            super.setPositionAndRotationDirect(x, y, z, yaw, pitch, posRotationIncrements, teleport);
+        }
     }
 
     private boolean hitsEntity() {
@@ -208,10 +457,10 @@ public class EntityHandFlownDrone extends Entity {
         }
     }
 
-    /** Who gets kill credit for this drone's explosion. */
+    /** Kill credit goes to the owner (the only player who can fly it), if they're online. */
     @Nullable
     protected EntityLivingBase getBlameTarget() {
-        return null;
+        return owner != null ? world.getPlayerEntityByUUID(owner) : null;
     }
 
     /** Destroyed without exploding: drop the drone and anything loaded into it. */
@@ -239,7 +488,7 @@ public class EntityHandFlownDrone extends Entity {
     public boolean processInitialInteract(EntityPlayer player, EnumHand hand) {
         ItemStack stack = player.getHeldItem(hand);
         if (world.isRemote) {
-            return stack.getItem() == ModContent.fpvRemote || (stack.isEmpty() && player.isSneaking());
+            return stack.getItem() == ModContent.fpvRemote || stack.getItem() == ModContent.fragGrenade || (stack.isEmpty() && player.isSneaking());
         }
         if (owner != null && !isOwnedBy(player)) {
             player.sendStatusMessage(new TextComponentTranslation("message.combat_drones.owned_by_other"), true);
@@ -252,11 +501,33 @@ public class EntityHandFlownDrone extends Entity {
             player.sendStatusMessage(new TextComponentTranslation("message.combat_drones.linked", new TextComponentTranslation(nameKey)), true);
             return true;
         }
+        if (stack.getItem() == ModContent.fragGrenade) {
+            attachGrenade(player, stack);
+            return true;
+        }
         if (stack.isEmpty() && player.isSneaking()) {
             pickUp(player);
             return true;
         }
         return false;
+    }
+
+    /** Grenades only arm kamikaze racers; other drones' payload slots hold bombs or ammo (M4). */
+    private void attachGrenade(EntityPlayer player, ItemStack stack) {
+        DroneType type = getDroneType();
+        if (type == null || !type.isImpactDetonates() || type.getPayloadCapacity() == 0) {
+            player.sendStatusMessage(new TextComponentTranslation("message.combat_drones.no_grenade_slot"), true);
+            return;
+        }
+        if (grenades >= type.getPayloadCapacity()) {
+            player.sendStatusMessage(new TextComponentTranslation("message.combat_drones.payload_full"), true);
+            return;
+        }
+        grenades++;
+        if (!player.capabilities.isCreativeMode) {
+            stack.shrink(1);
+        }
+        player.sendStatusMessage(new TextComponentTranslation("message.combat_drones.grenade_attached", grenades, type.getPayloadCapacity()), true);
     }
 
     private String getDroneItemTranslationKey() {
@@ -283,6 +554,13 @@ public class EntityHandFlownDrone extends Entity {
     @Override
     public boolean canBeCollidedWith() {
         return !isDead;
+    }
+
+    /** Vanilla scales render distance with hitbox size, which would hide a small drone past ~30 blocks. */
+    @Override
+    @SideOnly(Side.CLIENT)
+    public boolean isInRangeToRenderDist(double distanceSq) {
+        return distanceSq < RENDER_DISTANCE * RENDER_DISTANCE;
     }
 
     @Override
@@ -315,6 +593,5 @@ public class EntityHandFlownDrone extends Entity {
         if (flightState.orientation.w == 0 && flightState.orientation.x == 0 && flightState.orientation.y == 0 && flightState.orientation.z == 0) {
             flightState.orientation.set(0, 0, 0, 1);
         }
-        flightState.position.set(posX, posY, posZ);
     }
 }

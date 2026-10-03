@@ -7,6 +7,7 @@ import net.minecraftforge.fml.common.ModContainer;
 import java.io.File;
 import java.io.IOException;
 import java.io.Reader;
+import java.io.StringReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collection;
@@ -61,6 +62,24 @@ public final class DroneTypes {
             }
         }
         CombatDrones.logger.info("Loaded {} drone types: {}", TYPES.size(), TYPES.keySet());
+    }
+
+    /**
+     * Client side: replace local stats with the server's. Only known IDs are taken; the item registry already
+     * guarantees both sides have the same set. On an integrated server this rewrites the same shared map, harmlessly.
+     */
+    public static void applyServerTypes(Map<String, String> typesJson) {
+        for (Map.Entry<String, String> entry : typesJson.entrySet()) {
+            String id = entry.getKey();
+            if (!TYPES.containsKey(id)) {
+                continue;
+            }
+            try {
+                TYPES.put(id, DroneType.parse(id, new StringReader(entry.getValue())));
+            } catch (IllegalArgumentException e) {
+                CombatDrones.logger.error("Server sent an invalid drone type, keeping local values: {}", e.getMessage());
+            }
+        }
     }
 
     private static void applyOverride(Path file) {

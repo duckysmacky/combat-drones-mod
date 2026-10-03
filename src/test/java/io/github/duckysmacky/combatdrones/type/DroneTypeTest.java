@@ -61,6 +61,15 @@ class DroneTypeTest {
     }
 
     @Test
+    void jsonRoundTripKeepsStats() {
+        DroneType original = parse(RACER);
+        DroneType copy = DroneType.parse("test", new StringReader(original.toJson()));
+        assertEquals(original.getMaxSpeed(), copy.getMaxSpeed());
+        assertEquals(original.getSignalRange(), copy.getSignalRange());
+        assertEquals(original.isImpactDetonates(), copy.isImpactDetonates());
+    }
+
+    @Test
     void rejectsMalformedJson() {
         assertThrows(IllegalArgumentException.class, () -> parse("{ \"category\": "));
     }

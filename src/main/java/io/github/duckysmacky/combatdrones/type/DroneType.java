@@ -62,6 +62,11 @@ public final class DroneType {
         return type;
     }
 
+    /** Serialized form for syncing to clients; {@link #parse} reads it back (the ID travels separately). */
+    public String toJson() {
+        return GSON.toJson(this);
+    }
+
     private void validate() {
         // Unknown enum names deserialize to null, so these also catch typos
         require(category != null, "missing or unknown 'category'");
