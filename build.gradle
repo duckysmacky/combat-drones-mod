@@ -1,0 +1,51 @@
+plugins {
+    id 'java'
+    id 'com.gtnewhorizons.retrofuturagradle' version '1.4.9'
+}
+
+version = mod_version
+group = 'io.github.duckysmacky.combatdrones'
+base {
+    archivesName.set('combat_drones')
+}
+
+java {
+    toolchain {
+        // Compile and run Minecraft on JDK 8 regardless of the JDK running Gradle
+        languageVersion.set(JavaLanguageVersion.of(8))
+    }
+}
+
+minecraft {
+    mcVersion.set('1.12.2')
+    mcpMappingChannel.set('stable')
+    mcpMappingVersion.set('39')
+    username.set('Developer')
+    extraRunJvmArguments.add('-ea:io.github.duckysmacky.combatdrones')
+}
+
+repositories {
+    maven {
+        name 'CleanroomMC Maven'
+        url 'https://maven.cleanroommc.com'
+    }
+}
+
+dependencies {
+    // Dev-env only: stops Forge 2860 refusing to load next to newer-Forge-only checks
+    runtimeOnly 'com.cleanroommc:strip-latest-forge-requirements:1.0'
+
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.7.1'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+test {
+    useJUnitPlatform()
+}
+
+processResources {
+    inputs.property 'version', version
+    filesMatching('mcmod.info') {
+        expand 'version': version, 'mcversion': '1.12.2'
+    }
+}

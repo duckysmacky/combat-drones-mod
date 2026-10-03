@@ -1,0 +1,122 @@
+# Combat Drones
+
+Minecraft 1.12.2 (Forge) mod adding pilotable and autonomous combat drones for
+PvP. This is a personal-server mod for a private 1.12.2 map — not a public
+release.
+
+**Inspiration, not source.** This project is inspired by the feature set of the
+"FPV Drones" CurseForge mod (https://www.curseforge.com/minecraft/mc-mods/fpvdrones, 1.20.1 only). 
+I provided a .jar file of that mod in the current project - use it for reference,
+but not to copy it 1-to-1.
+
+Full feature, item and balance spec lives in **`docs/GAMEPLAY_SPEC.md`**. Read
+it before implementing any drone, item, block or GUI, and keep it in sync with
+reality as the design evolves — it's the source of truth for names, stats and
+behaviour, not this file.
+
+## Identity
+
+| | |
+|---|---|
+| Display name | Combat Drones |
+| Mod ID (modid, resource-location namespace) | `combat_drones` |
+| Java base package | `io.github.duckysmacky.combatdrones` |
+| GitHub repo | `combat-drones` |
+
+> **Naming note:** Forge mod IDs and Java package segments can't contain
+> hyphens. `combat-drones` is fine as a repo name, but the modid is
+> `combat_drones` (underscore) and the Java package drops the separator
+> entirely: `combatdrones`. Keep this mapping consistent everywhere —
+> `@Mod`/`mcmod.info`, resource locations (e.g. `combat_drones:racer_drone`), and the
+> `package io.github.duckysmacky.combatdrones;` line at the top of every class.
+
+## Toolchain
+
+- Minecraft 1.12.2, Forge **14.23.5.2860**, MCP **stable_39**, Java 8 source
+  and target.
+- **RetroFuturaGradle 1.4.9** (Gradle 8.14.3), a trimmed-down CleanroomMC
+  TemplateDevEnv setup. The official 2860 MDK (which ships ForgeGradle 3, not
+  2.3) builds, but its dev `runServer` crashes in FML's network channel setup,
+  so it was dropped. Setup commands for Arch and WSL2 are in `README.md`.
+- JDK pinning: Minecraft compiles and runs on a **JDK 8 toolchain**
+  (`java.toolchain` in `build.gradle`, auto-downloaded via foojay if missing).
+  The Gradle daemon itself runs on **JDK 21**, pinned in
+  `gradle/gradle-daemon-jvm.properties`. Don't bump RFG to 2.x without also
+  moving the daemon to JDK 25 (RFG 2.x is compiled for Java 25).
+
+## Code style
+
+- Java: `camelCase` methods/fields/locals, `PascalCase` classes,
+  `SCREAMING_SNAKE_CASE` constants.
+- Brace style: opening brace on the same line — standard Java/Forge
+  convention. **Allman is a C/C++-only preference of mine; do not apply it to
+  this project's Java code.**
+- Descriptive, meaningful names everywhere. No single-letter or cryptic
+  names, except genuine loop counters with no broader meaning.
+- I'm an advanced developer: skip beginner-level explanations, but do call
+  out non-obvious design decisions (sync strategy, version quirks, tricky
+  edge cases) briefly as you go.
+
+## Architecture rules
+
+1. **Common/client/server split.** The dedicated server must start and run
+   without touching any client-only class. Use proxies and `@SideOnly`
+   correctly.
+2. **Server-authoritative state.** Position, orientation, battery, fuel,
+   ammo, payload, and route data all live server-side. Clients send *intent*
+   (control input, waypoint edits, trigger presses) as packets; the server
+   validates and applies. Never trust a client-reported position, hit, or
+   "target destroyed" claim.
+3. **Validate everything from the client.** Rate-limit control/trigger
+   packets, clamp values to config bounds, and confirm the sender actually
+   owns or is piloting the drone/munition in question before applying
+   anything.
+4. **Physics is pure Java.** Flight/orientation math (racer and gunship
+   drone flight, loitering-munition routing, recon UAV autopilot) lives in
+   classes with zero `net.minecraft.*` imports, so it's JUnit-testable
+   outside a Minecraft environment. Minecraft-side code adapts that output to
+   entities and packets.
+5. **Data-driven types.** Every drone/munition "model" — and its size or
+   payload variants — is defined by data (JSON, or a config-backed registry),
+   not a new Java class per variant. Adding a variant shouldn't require new
+   Java.
+6. **No crash-on-purpose for the recon UAV.** Per spec, the recon UAV can
+   never be hand-flown or deliberately destroyed by its own pilot. A
+   collision should redirect or stop it, not trigger a detonation — it
+   carries no warhead.
+
+## Working method
+
+1. Don't write code first. Read this file and `docs/GAMEPLAY_SPEC.md` in
+   full, inspect the current repo state, then propose a short plan (setup
+   steps, package layout, the milestone breakdown from `GAMEPLAY_SPEC.md`,
+   and any open questions or assumptions you want me to confirm) and wait for
+   my approval.
+2. Implement milestone by milestone — see `docs/GAMEPLAY_SPEC.md` →
+   Milestones for the order.
+3. After each milestone: confirm it compiles, run client + dedicated-server
+   smoke tests where possible, list what I should manually test in-game, and
+   commit with a clear message.
+4. If a milestone forces a change to an architecture rule above, update this
+   file in the same commit — don't let it drift out of sync with what's
+   actually built.
+5. Log anything deliberately deferred or cut in `docs/TODO.md` rather than
+   dropping it silently.
+
+## Build & run
+
+```
+./gradlew build
+./gradlew runClient
+./gradlew runServer
+```
+
+Confirmed with RFG. Client and server share the `run/` working directory, and
+the dev server needs `run/eula.txt` containing `eula=true` (`run/` is
+gitignored). `./gradlew build` also runs the JUnit 5 tests in `src/test/java`.
+
+## Config
+
+Balance numbers (speeds, drain/burn rates, blast radii, detection radii,
+route limits, ammo capacities) belong in a Forge config file, not hardcoded.
+See `docs/GAMEPLAY_SPEC.md` → Config for the full list of expected knobs.

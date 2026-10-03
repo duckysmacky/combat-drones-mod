@@ -1,0 +1,11 @@
+[
+{
+  "modid": "combat_drones",
+  "name": "Combat Drones",
+  "description": "Pilotable and autonomous combat drones for PvP.",
+  "version": "${version}",
+  "mcversion": "${mcversion}",
+  "authorList": ["DuckySmacky"],
+  "dependencies": []
+}
+]

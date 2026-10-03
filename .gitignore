@@ -1,3 +1,23 @@
 .context/
 docs/
+
+# Reference jar and build outputs; keep the wrapper
 *.jar
+!gradle/wrapper/gradle-wrapper.jar
+
+# Gradle
+build/
+.gradle/
+run/
+
+# IDE
+out/
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+bin/
+.classpath
+.project
+.settings/
