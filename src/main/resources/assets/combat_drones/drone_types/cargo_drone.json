@@ -1,0 +1,13 @@
+{
+  // Cargo Drone: stable bomber. Survives impacts; drops a Bomb from its bay.
+  // blastPower is 0 because the drone itself never explodes, only the dropped bomb does.
+  "category": "HAND_FLOWN",
+  "maxSpeed": 0.7,
+  "acceleration": 0.06,
+  "batteryOrFuelCapacity": 4800,
+  "drainRatePerTick": 1.0,
+  "blastPower": 0,
+  "payloadCapacity": 1,
+  "maxHP": 12,
+  "signalRange": 128
+}

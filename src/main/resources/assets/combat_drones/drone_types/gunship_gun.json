@@ -1,0 +1,14 @@
+{
+  // Gunship (gun mount): same airframe as the rocket gunship, high rate of fire Rifle Rounds, no splash.
+  // payloadCapacity is the belt size in rounds.
+  "category": "HAND_FLOWN",
+  "maxSpeed": 0.55,
+  "acceleration": 0.05,
+  "batteryOrFuelCapacity": 4800,
+  "drainRatePerTick": 1.0,
+  "blastPower": 0,
+  "payloadCapacity": 128,
+  "maxHP": 24,
+  "signalRange": 128,
+  "weaponType": "GUN_MOUNT"
+}

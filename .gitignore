@@ -21,3 +21,6 @@ bin/
 .classpath
 .project
 .settings/
+
+# graphify knowledge graph
+graphify-out/

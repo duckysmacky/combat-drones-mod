@@ -1,0 +1,14 @@
+{
+  // Long-Range Racer: slower, bigger battery and signal range. One grenade slot.
+  // Keep signalRange under server view distance (blocks) until remote view lands in M6.
+  "category": "HAND_FLOWN",
+  "maxSpeed": 1.1,
+  "acceleration": 0.10,
+  "batteryOrFuelCapacity": 3600,
+  "drainRatePerTick": 1.0,
+  "blastPower": 2.0,
+  "payloadCapacity": 1,
+  "maxHP": 3,
+  "signalRange": 144,
+  "impactDetonates": true
+}

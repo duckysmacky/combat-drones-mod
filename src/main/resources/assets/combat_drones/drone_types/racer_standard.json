@@ -1,0 +1,13 @@
+{
+  // Standard Racer: balanced kamikaze racer. One Fragmentation Grenade slot boosts the blast.
+  "category": "HAND_FLOWN",
+  "maxSpeed": 1.3,
+  "acceleration": 0.12,
+  "batteryOrFuelCapacity": 2400,
+  "drainRatePerTick": 1.0,
+  "blastPower": 2.0,
+  "payloadCapacity": 1,
+  "maxHP": 3,
+  "signalRange": 112,
+  "impactDetonates": true
+}

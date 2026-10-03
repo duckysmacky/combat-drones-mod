@@ -1,0 +1,26 @@
+itemGroup.combat_drones=Combat Drones
+
+item.combat_drones.fpv_remote.name=FPV Remote
+item.combat_drones.fpv_goggles.name=FPV Goggles
+item.combat_drones.mission_planner.name=Mission Planner
+item.combat_drones.light_battery.name=Light Battery Pack
+item.combat_drones.standard_battery.name=Standard Battery Pack
+item.combat_drones.heavy_battery.name=Heavy Battery Pack
+item.combat_drones.fuel_can.name=Fuel Can
+item.combat_drones.frag_grenade.name=Fragmentation Grenade
+item.combat_drones.bomb.name=Bomb
+item.combat_drones.rocket.name=Rocket
+item.combat_drones.rifle_rounds.name=Rifle Rounds
+
+item.combat_drones.racer_micro.name=Micro Racer
+item.combat_drones.racer_standard.name=Standard Racer
+item.combat_drones.racer_longrange.name=Long-Range Racer
+item.combat_drones.cargo_drone.name=Cargo Drone
+item.combat_drones.gunship_rocket.name=Gunship Drone (Rocket Pod)
+item.combat_drones.gunship_gun.name=Gunship Drone (Gun Mount)
+item.combat_drones.loitering_light.name=Light Loitering Munition
+item.combat_drones.loitering_heavy.name=Heavy Loitering Munition
+item.combat_drones.recon_uav.name=Recon UAV
+
+tile.combat_drones.launch_ramp.name=Launch Ramp
+tile.combat_drones.rearm_station.name=Rearm Station

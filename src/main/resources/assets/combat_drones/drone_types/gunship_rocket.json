@@ -1,0 +1,14 @@
+{
+  // Gunship (rocket pod): slow, tough, low rate of fire explosive Rockets.
+  // payloadCapacity is the magazine size in rockets.
+  "category": "HAND_FLOWN",
+  "maxSpeed": 0.55,
+  "acceleration": 0.05,
+  "batteryOrFuelCapacity": 4800,
+  "drainRatePerTick": 1.0,
+  "blastPower": 0,
+  "payloadCapacity": 8,
+  "maxHP": 24,
+  "signalRange": 128,
+  "weaponType": "ROCKET_POD"
+}

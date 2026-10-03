@@ -1,0 +1,14 @@
+{
+  // Heavy Loitering Munition: slower, large warhead, harder to shoot down.
+  // "Take control" is point-and-dive: click a spot on the feed and the autopilot strikes it.
+  "category": "RAMP_AUTOPILOT",
+  "maxSpeed": 0.9,
+  "acceleration": 0.08,
+  "batteryOrFuelCapacity": 7200,
+  "drainRatePerTick": 1.0,
+  "blastPower": 5.0,
+  "payloadCapacity": 0,
+  "maxHP": 16,
+  "defaultCruiseAltitude": 50,
+  "controlScheme": "CLICK_DESIGNATE"
+}

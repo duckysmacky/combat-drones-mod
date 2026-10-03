@@ -1,0 +1,14 @@
+{
+  // Light Loitering Munition: fast, small warhead. "Take control" flies it on sticks.
+  // Fuel in units; full-throttle endurance = capacity / drain ticks.
+  "category": "RAMP_AUTOPILOT",
+  "maxSpeed": 1.5,
+  "acceleration": 0.15,
+  "batteryOrFuelCapacity": 3600,
+  "drainRatePerTick": 1.0,
+  "blastPower": 3.0,
+  "payloadCapacity": 0,
+  "maxHP": 6,
+  "defaultCruiseAltitude": 40,
+  "controlScheme": "STICK"
+}

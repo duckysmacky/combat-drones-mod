@@ -1,0 +1,15 @@
+{
+  // Recon UAV: unarmed, long endurance. Can never be hand-flown or crashed on purpose;
+  // the only manual input is the camera gimbal.
+  "category": "RAMP_AUTOPILOT",
+  "maxSpeed": 1.0,
+  "acceleration": 0.08,
+  "batteryOrFuelCapacity": 24000,
+  "drainRatePerTick": 1.0,
+  "blastPower": 0,
+  "payloadCapacity": 0,
+  "maxHP": 20,
+  "defaultCruiseAltitude": 60,
+  "controlScheme": "GIMBAL_OBSERVE",
+  "armed": false
+}

@@ -1,0 +1,15 @@
+{
+  // Micro Racer: fastest and most fragile racer. No payload slot, speed is the weapon.
+  // Units: speed in blocks/tick (1 = 72 km/h), battery in charge units, HP like mobs.
+  // Full-throttle flight time = batteryOrFuelCapacity / drainRatePerTick ticks.
+  "category": "HAND_FLOWN",
+  "maxSpeed": 1.6,
+  "acceleration": 0.16,
+  "batteryOrFuelCapacity": 1800,
+  "drainRatePerTick": 1.0,
+  "blastPower": 1.5,
+  "payloadCapacity": 0,
+  "maxHP": 2,
+  "signalRange": 96,
+  "impactDetonates": true
+}
