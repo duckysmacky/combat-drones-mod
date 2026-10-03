@@ -431,7 +431,7 @@ public class EntityHandFlownDrone extends Entity {
         }
         if (!world.isRemote) {
             markVelocityChanged();
-            damage(amount);
+            damage(amount * (float) ModConfig.droneDamageTakenMultiplier);
         }
         return true;
     }

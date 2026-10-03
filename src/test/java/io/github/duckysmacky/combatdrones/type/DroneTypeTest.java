@@ -3,8 +3,11 @@ package io.github.duckysmacky.combatdrones.type;
 import org.junit.jupiter.api.Test;
 
 import java.io.StringReader;
+import java.util.Collections;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -67,6 +70,25 @@ class DroneTypeTest {
         assertEquals(original.getMaxSpeed(), copy.getMaxSpeed());
         assertEquals(original.getSignalRange(), copy.getSignalRange());
         assertEquals(original.isImpactDetonates(), copy.isImpactDetonates());
+    }
+
+    @Test
+    void statOverridesApplyAndRevalidate() {
+        DroneType tuned = parse(RACER).withStats(Collections.singletonMap("maxHP", 12));
+        assertEquals(12, tuned.getMaxHP());
+        assertEquals(1.5, tuned.getMaxSpeed());
+        assertThrows(IllegalArgumentException.class, () -> parse(RACER).withStats(Collections.singletonMap("maxHP", -1)));
+        assertThrows(IllegalArgumentException.class, () -> parse(RACER).withStats(Collections.singletonMap("category", 1)));
+        assertThrows(IllegalArgumentException.class, () -> parse(RACER).withStats(Collections.singletonMap("noSuchStat", 1)));
+    }
+
+    @Test
+    void numericStatsSkipOtherCategory() {
+        Map<String, Number> stats = parse(RACER).numericStats();
+        assertTrue(stats.containsKey("signalRange"));
+        assertTrue(stats.containsKey("maxHP"));
+        assertFalse(stats.containsKey("defaultCruiseAltitude"));
+        assertFalse(stats.containsKey("category"));
     }
 
     @Test

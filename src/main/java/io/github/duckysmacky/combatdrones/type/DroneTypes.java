@@ -4,7 +4,6 @@ import io.github.duckysmacky.combatdrones.CombatDrones;
 import net.minecraftforge.common.crafting.CraftingHelper;
 import net.minecraftforge.fml.common.ModContainer;
 
-import java.io.File;
 import java.io.IOException;
 import java.io.Reader;
 import java.io.StringReader;
@@ -17,10 +16,9 @@ import java.util.TreeMap;
 import java.util.regex.Pattern;
 
 /**
- * Registry of drone types. Bundled definitions live in {@code assets/combat_drones/drone_types/}; a file
- * with the same name in {@code config/combat_drones/drone_types/} replaces the bundled one (stat tuning).
- * Overrides can't add new IDs: each type registers an item, and an ID only one side knows would make
- * Forge reject the connection on registry sync.
+ * Registry of drone types, defined by the bundled {@code assets/combat_drones/drone_types/*.json}. Their numeric stats
+ * can then be tuned in the mod config. New IDs can only come from bundled files: each type registers an item, and an
+ * ID only one side knows would make Forge reject the connection on registry sync.
  */
 public final class DroneTypes {
     private static final String BUNDLED_DIR = "assets/" + CombatDrones.MOD_ID + "/drone_types";
@@ -41,7 +39,7 @@ public final class DroneTypes {
     }
 
     /** Must run in preInit: registry events fire right after it and register one item per type. */
-    public static void load(ModContainer mod, File configDir) {
+    public static void load(ModContainer mod) {
         TYPES.clear();
         CraftingHelper.findFiles(mod, BUNDLED_DIR, null, (root, file) -> {
             String id = idOf(file);
@@ -55,12 +53,6 @@ public final class DroneTypes {
             throw new IllegalStateException("No drone types found under " + BUNDLED_DIR);
         }
 
-        File[] overrideFiles = new File(configDir, CombatDrones.MOD_ID + "/drone_types").listFiles();
-        if (overrideFiles != null) {
-            for (File file : overrideFiles) {
-                applyOverride(file.toPath());
-            }
-        }
         CombatDrones.logger.info("Loaded {} drone types: {}", TYPES.size(), TYPES.keySet());
     }
 
@@ -82,20 +74,11 @@ public final class DroneTypes {
         }
     }
 
-    private static void applyOverride(Path file) {
-        try {
-            String id = idOf(file);
-            if (id == null) {
-                return;
-            }
-            if (!TYPES.containsKey(id)) {
-                CombatDrones.logger.warn("Ignoring drone type override '{}': no bundled type with that ID", id);
-                return;
-            }
-            TYPES.put(id, read(id, file));
-            CombatDrones.logger.info("Drone type '{}' overridden from {}", id, file);
-        } catch (IllegalArgumentException e) {
-            CombatDrones.logger.error("Invalid drone type override {}, keeping bundled values: {}", file, e.getMessage());
+    /** Replaces a type's numeric stats (config tuning). Throws if the result is invalid; the old type stays. */
+    public static void override(String id, Map<String, Number> stats) {
+        DroneType type = TYPES.get(id);
+        if (type != null && !stats.isEmpty()) {
+            TYPES.put(id, type.withStats(stats));
         }
     }
 

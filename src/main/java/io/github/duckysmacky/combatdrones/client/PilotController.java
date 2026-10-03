@@ -1,6 +1,7 @@
 package io.github.duckysmacky.combatdrones.client;
 
 import io.github.duckysmacky.combatdrones.CombatDrones;
+import io.github.duckysmacky.combatdrones.config.ModConfig;
 import io.github.duckysmacky.combatdrones.entity.EntityHandFlownDrone;
 import io.github.duckysmacky.combatdrones.network.ControlInputPacket;
 import io.github.duckysmacky.combatdrones.network.ModNetwork;
@@ -137,6 +138,9 @@ public final class PilotController {
     private static HandFlownFlight.Input readInput(Minecraft minecraft, EntityPlayerSP player) {
         double mouseX = player.rotationYaw - heldYaw;
         double mouseY = heldPitch - player.rotationPitch; // mouse forward lowers pitch; we want that as nose-down
+        if (ModConfig.invertMousePitch) {
+            mouseY = -mouseY;
+        }
         player.rotationYaw = heldYaw;
         player.prevRotationYaw = heldYaw;
         player.rotationPitch = heldPitch;

@@ -1,9 +1,14 @@
 package io.github.duckysmacky.combatdrones.type;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 import com.google.gson.JsonParseException;
 
 import java.io.Reader;
+import java.io.StringReader;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 /**
  * One drone/munition "model", loaded from {@code drone_types/<id>.json}. Every roster variant is an
@@ -60,6 +65,40 @@ public final class DroneType {
         type.id = id;
         type.validate();
         return type;
+    }
+
+    /**
+     * The balance numbers a server admin may tune in the config, in declaration order. Stats that don't apply to
+     * this category are left out (signal range is hand-flown only, cruise altitude ramp-launched only).
+     */
+    public Map<String, Number> numericStats() {
+        Map<String, Number> stats = new LinkedHashMap<>();
+        for (Map.Entry<String, JsonElement> entry : GSON.toJsonTree(this).getAsJsonObject().entrySet()) {
+            JsonElement value = entry.getValue();
+            if (!value.isJsonPrimitive() || !value.getAsJsonPrimitive().isNumber()) {
+                continue;
+            }
+            String name = entry.getKey();
+            if ((name.equals("signalRange") && category != Category.HAND_FLOWN)
+                    || (name.equals("defaultCruiseAltitude") && category != Category.RAMP_AUTOPILOT)) {
+                continue;
+            }
+            stats.put(name, value.getAsNumber());
+        }
+        return stats;
+    }
+
+    /** A copy with some numeric stats replaced, re-validated. Unknown or non-numeric stat names are rejected. */
+    public DroneType withStats(Map<String, Number> overrides) {
+        JsonObject json = GSON.toJsonTree(this).getAsJsonObject();
+        for (Map.Entry<String, Number> override : overrides.entrySet()) {
+            JsonElement current = json.get(override.getKey());
+            if (current == null || !current.isJsonPrimitive() || !current.getAsJsonPrimitive().isNumber()) {
+                throw new IllegalArgumentException("Drone type '" + id + "': '" + override.getKey() + "' is not a tunable stat");
+            }
+            json.addProperty(override.getKey(), override.getValue());
+        }
+        return parse(id, new StringReader(json.toString()));
     }
 
     /** Serialized form for syncing to clients; {@link #parse} reads it back (the ID travels separately). */

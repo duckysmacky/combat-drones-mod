@@ -117,6 +117,11 @@ gitignored). `./gradlew build` also runs the JUnit 5 tests in `src/test/java`.
 
 ## Config
 
-Balance numbers (speeds, drain/burn rates, blast radii, detection radii,
-route limits, ammo capacities) belong in a Forge config file, not hardcoded.
-See `docs/GAMEPLAY_SPEC.md` → Config for the full list of expected knobs.
+Everything tunable lives in **one TOML file**, `config/combat_drones.toml`
+(`config/ModConfig.java`, night-config shaded into the jar). It has a
+`[general]` section for global server knobs, `[client]` for per-player
+options, and `[drones.<id>]` for per-type numeric stats, which default to the
+bundled `assets/combat_drones/drone_types/<id>.json`. Missing keys are written
+back with defaults, and the server's drone stats are synced to clients on
+login. Balance numbers never get hardcoded. See `docs/GAMEPLAY_SPEC.md` →
+Config for the full list of expected knobs.

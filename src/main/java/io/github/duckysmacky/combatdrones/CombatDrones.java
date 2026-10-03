@@ -1,5 +1,6 @@
 package io.github.duckysmacky.combatdrones;
 
+import io.github.duckysmacky.combatdrones.config.ModConfig;
 import io.github.duckysmacky.combatdrones.network.ModNetwork;
 import io.github.duckysmacky.combatdrones.type.DroneTypes;
 import net.minecraftforge.fml.common.Loader;
@@ -22,7 +23,8 @@ public class CombatDrones {
     @Mod.EventHandler
     public void preInit(FMLPreInitializationEvent event) {
         logger = event.getModLog();
-        DroneTypes.load(Loader.instance().activeModContainer(), event.getModConfigurationDirectory());
+        DroneTypes.load(Loader.instance().activeModContainer());
+        ModConfig.load(event.getModConfigurationDirectory());
         ModNetwork.register();
         proxy.preInit();
     }

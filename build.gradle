@@ -1,6 +1,7 @@
 plugins {
     id 'java'
     id 'com.gtnewhorizons.retrofuturagradle' version '1.4.9'
+    id 'com.gradleup.shadow' version '8.3.8'
 }
 
 version = mod_version
@@ -24,6 +25,12 @@ minecraft {
     extraRunJvmArguments.add('-ea:io.github.duckysmacky.combatdrones')
 }
 
+configurations {
+    // Libraries bundled (and relocated) into the mod jar; MC 1.12 doesn't ship them
+    shade
+    implementation.extendsFrom shade
+}
+
 repositories {
     maven {
         name 'CleanroomMC Maven'
@@ -32,6 +39,8 @@ repositories {
 }
 
 dependencies {
+    shade 'com.electronwill.night-config:toml:3.6.7'
+
     // Dev-env only: stops Forge 2860 refusing to load next to newer-Forge-only checks
     runtimeOnly 'com.cleanroommc:strip-latest-forge-requirements:1.0'
 
@@ -48,4 +57,14 @@ processResources {
     filesMatching('mcmod.info') {
         expand 'version': version, 'mcversion': '1.12.2'
     }
+}
+
+// Relocate so another mod bundling night-config can't clash, then reobfuscate the shaded jar instead of the plain one
+tasks.shadowJar {
+    configurations = [project.configurations.shade]
+    archiveClassifier.set('shaded')
+    relocate 'com.electronwill.nightconfig', 'io.github.duckysmacky.combatdrones.shadow.nightconfig'
+}
+tasks.named('reobfJar').configure {
+    inputJar.set(tasks.named('shadowJar').flatMap { it.archiveFile })
 }
