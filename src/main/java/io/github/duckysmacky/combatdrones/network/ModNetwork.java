@@ -28,6 +28,9 @@ public final class ModNetwork {
         CHANNEL.registerMessage(ControlInputPacket.Handler.class, ControlInputPacket.class, id++, Side.SERVER);
         CHANNEL.registerMessage(DroneStatePacket.Handler.class, DroneStatePacket.class, id++, Side.CLIENT);
         CHANNEL.registerMessage(TriggerPacket.Handler.class, TriggerPacket.class, id++, Side.SERVER);
+        CHANNEL.registerMessage(PlannerOpenPacket.Handler.class, PlannerOpenPacket.class, id++, Side.CLIENT);
+        CHANNEL.registerMessage(PlannerRequestPacket.Handler.class, PlannerRequestPacket.class, id++, Side.SERVER);
+        CHANNEL.registerMessage(PlannerSubmitPacket.Handler.class, PlannerSubmitPacket.class, id++, Side.SERVER);
     }
 
     /** Clients predict flight locally, so they need the server's (possibly overridden) stats, not their own files. */

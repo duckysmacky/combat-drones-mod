@@ -52,6 +52,9 @@ public final class RouteValidator {
         if (route.length(startX, startZ) > limits.maxLength) {
             return "message.combat_drones.route.too_long";
         }
+        if (!(route.getLoiterRadius() >= Route.MIN_LOITER_RADIUS && route.getLoiterRadius() <= Route.MAX_LOITER_RADIUS)) {
+            return "message.combat_drones.route.loiter_radius";
+        }
         if (route.getTerminal() == null || !allowedTerminals.contains(route.getTerminal())) {
             return "message.combat_drones.route.bad_terminal";
         }

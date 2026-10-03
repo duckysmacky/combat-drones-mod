@@ -78,6 +78,36 @@ class RouteAutopilotTest {
     }
 
     @Test
+    void slowerLegsFlySlower() {
+        FixedWingFlight.State slow = launched();
+        FixedWingFlight.State fast = launched();
+        Route slowRoute = new Route(Collections.singletonList(new Waypoint(0, 3000, 0, Route.Speed.SLOW)), TerminalAction.LOITER);
+        Route fastRoute = new Route(Collections.singletonList(new Waypoint(0, 3000, 0, Route.Speed.FAST)), TerminalAction.LOITER);
+        for (int tick = 0; tick < 300; tick++) {
+            FixedWingFlight.step(slow, RouteAutopilot.guide(slow, slowRoute, 0, ORIGIN_Y, 0, PLANE, true).controls, PLANE);
+            FixedWingFlight.step(fast, RouteAutopilot.guide(fast, fastRoute, 0, ORIGIN_Y, 0, PLANE, true).controls, PLANE);
+        }
+        assertEquals(0.5, slow.speed, 0.05);
+        assertEquals(0.8, fast.speed, 0.05);
+    }
+
+    @Test
+    void loiterRadiusIsRespected() {
+        FixedWingFlight.State state = launched();
+        Route route = new Route(Collections.singletonList(new Waypoint(0, 80, 20, Route.Speed.MEDIUM)), TerminalAction.LOITER, 60);
+        int index = 0;
+        for (int tick = 0; tick < 2500; tick++) {
+            RouteAutopilot.Command command = RouteAutopilot.guide(state, route, index, ORIGIN_Y, 0, PLANE, true);
+            index = command.waypointIndex;
+            FixedWingFlight.step(state, command.controls, PLANE);
+            if (tick > 2000) {
+                double distance = Math.hypot(state.position.x, state.position.z - 80);
+                assertTrue(distance > 45 && distance < 75, "wide orbit drifted to " + distance);
+            }
+        }
+    }
+
+    @Test
     void withoutFuelItGlidesDown() {
         FixedWingFlight.State state = launched();
         Route route = route(0, 500, 30);

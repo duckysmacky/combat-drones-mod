@@ -3,6 +3,7 @@ package io.github.duckysmacky.combatdrones.block;
 import io.github.duckysmacky.combatdrones.ModContent;
 import io.github.duckysmacky.combatdrones.ModSounds;
 import io.github.duckysmacky.combatdrones.item.ItemDrone;
+import io.github.duckysmacky.combatdrones.network.PlannerServer;
 import io.github.duckysmacky.combatdrones.type.DroneType;
 import net.minecraft.block.BlockHorizontal;
 import net.minecraft.block.material.Material;
@@ -94,7 +95,8 @@ public class BlockLaunchRamp extends BlockHorizontal {
             return true;
         }
         if (stack.getItem() == ModContent.missionPlanner) {
-            return RampActions.openPlanner(ramp, player);
+            PlannerServer.openRamp(player, ramp);
+            return true;
         }
         if (stack.isEmpty() && player.isSneaking() && ramp.isLoaded()) {
             if (!ramp.isOwnedBy(player)) {

@@ -47,6 +47,12 @@ class RouteValidatorTest {
     }
 
     @Test
+    void loiterRadiusMustBeSensible() {
+        Route tight = new Route(Collections.singletonList(new Waypoint(10, 10, 30)), TerminalAction.LOITER, 4);
+        assertEquals("message.combat_drones.route.loiter_radius", RouteValidator.validate(tight, 0, 0, LIMITS, MUNITION));
+    }
+
+    @Test
     void lengthIncludesTheLegFromLaunch() {
         Route route = new Route(Arrays.asList(new Waypoint(30, 40, 20), new Waypoint(30, 0, 20)), TerminalAction.LOITER);
         assertEquals(90, route.length(0, 0), 1e-9);

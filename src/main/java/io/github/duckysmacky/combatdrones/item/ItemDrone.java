@@ -104,7 +104,10 @@ public class ItemDrone extends Item {
             Tooltips.addDetails("tooltip.combat_drones.drone.setup", tooltip,
                     Tooltips.keyName(DroneKeys.TOGGLE_FPV), Tooltips.keyName(DroneKeys.FLIGHT_MODE), Tooltips.keyName(DroneKeys.MOTORS));
         } else {
-            tooltip.add(TextFormatting.GRAY + I18n.format("tooltip.combat_drones.not_functional"));
+            double fuel = getFuel(stack);
+            tooltip.add(TextFormatting.YELLOW + I18n.format("tooltip.combat_drones.drone.fuel",
+                    Math.round(Math.min(1, fuel / type.getBatteryOrFuelCapacity()) * 100)));
+            Tooltips.addDetails("tooltip.combat_drones.drone.setup_ramp", tooltip);
         }
     }
 

@@ -2,6 +2,7 @@ package io.github.duckysmacky.combatdrones.client;
 
 import io.github.duckysmacky.combatdrones.entity.EntityHandFlownDrone;
 import io.github.duckysmacky.combatdrones.network.DroneStatePacket;
+import io.github.duckysmacky.combatdrones.network.PlannerOpenPacket;
 import io.github.duckysmacky.combatdrones.network.TypeSyncPacket;
 import io.github.duckysmacky.combatdrones.type.DroneTypes;
 import net.minecraft.client.Minecraft;
@@ -15,6 +16,15 @@ public final class ClientPacketHandlers {
     public static void onTypeSync(TypeSyncPacket packet) {
         DroneTypes.applyServerTypes(packet.getTypesJson());
         packet.applyEquipment();
+    }
+
+    public static void onPlannerOpen(PlannerOpenPacket packet) {
+        Minecraft minecraft = Minecraft.getMinecraft();
+        if (minecraft.currentScreen instanceof GuiMissionPlanner && ((GuiMissionPlanner) minecraft.currentScreen).accepts(packet)) {
+            ((GuiMissionPlanner) minecraft.currentScreen).update(packet);
+        } else {
+            minecraft.displayGuiScreen(new GuiMissionPlanner(packet));
+        }
     }
 
     public static void onDroneState(DroneStatePacket packet) {

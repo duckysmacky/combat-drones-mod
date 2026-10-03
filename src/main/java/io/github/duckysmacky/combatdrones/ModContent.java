@@ -10,6 +10,7 @@ import io.github.duckysmacky.combatdrones.item.ItemBlockWithTooltip;
 import io.github.duckysmacky.combatdrones.item.ItemBomb;
 import io.github.duckysmacky.combatdrones.item.ItemDrone;
 import io.github.duckysmacky.combatdrones.item.ItemGoggles;
+import io.github.duckysmacky.combatdrones.item.ItemMissionPlanner;
 import io.github.duckysmacky.combatdrones.item.ItemRemote;
 import io.github.duckysmacky.combatdrones.item.ItemWithTooltip;
 import io.github.duckysmacky.combatdrones.type.BatteryPack;
@@ -87,7 +88,7 @@ public final class ModContent {
         register(event, new ItemBlockWithTooltip(rearmStation));
         fpvRemote = register(event, named(new ItemRemote(), "fpv_remote"));
         fpvGoggles = register(event, named(new ItemGoggles(GOGGLES_MATERIAL), "fpv_goggles"));
-        missionPlanner = register(event, simpleItem("mission_planner").setMaxStackSize(1));
+        missionPlanner = register(event, named(new ItemMissionPlanner(), "mission_planner"));
         lightBattery = register(event, named(new ItemBattery(BatteryPack.LIGHT), BatteryPack.LIGHT.itemName()));
         standardBattery = register(event, named(new ItemBattery(BatteryPack.STANDARD), BatteryPack.STANDARD.itemName()));
         heavyBattery = register(event, named(new ItemBattery(BatteryPack.HEAVY), BatteryPack.HEAVY.itemName()));
