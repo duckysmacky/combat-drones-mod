@@ -66,6 +66,30 @@ def motor_far():
     return normalize(hum * beating + 0.5 * normalize(noise, 1.0), 0.75)
 
 
+def engine():
+    """One-second seamless loop for ramp-launched planes: a low pulsing propeller-engine drone, kept soft."""
+    t = time(1.0)
+    hum = sum(np.sin(2 * np.pi * 120 * k * t) / k ** 1.8 for k in range(1, 8))
+    # Engine firing pulses (whole-Hz so the loop stays seamless)
+    pulse = 0.7 + 0.3 * np.sin(2 * np.pi * 40 * t)
+    rng = np.random.default_rng(17)
+    noise = rng.standard_normal(len(t))
+    noise = np.convolve(np.concatenate([noise[-120:], noise]), np.ones(120) / 120, mode='valid')[:len(t)]
+    return normalize(hum * pulse + 0.35 * normalize(noise, 1.0), 0.75)
+
+
+def launch():
+    """Catapult launch: a thump, then a rising-falling whoosh of air."""
+    rng = np.random.default_rng(23)
+    t = time(0.9)
+    noise = rng.standard_normal(len(t))
+    smoothing = 24
+    whoosh = np.convolve(np.concatenate([np.zeros(smoothing), noise]), np.ones(smoothing) / smoothing, mode='valid')[:len(t)]
+    envelope = np.sin(np.pi * np.minimum(1, t / 0.9)) ** 2
+    thump = np.sin(2 * np.pi * 70 * t) * np.exp(-t * 25)
+    return normalize(whoosh * envelope * 1.5 + thump, 0.8)
+
+
 def tone(frequency, seconds, square=0.0):
     t = time(seconds)
     sine = np.sin(2 * np.pi * frequency * t)
@@ -131,6 +155,8 @@ SOUNDS = {
     'clink': clink,
     'connect': connect,
     'hit': hit,
+    'engine': engine,
+    'launch': launch,
 }
 
 if __name__ == '__main__':

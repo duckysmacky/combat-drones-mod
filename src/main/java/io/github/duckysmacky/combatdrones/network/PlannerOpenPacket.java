@@ -4,7 +4,6 @@ import io.github.duckysmacky.combatdrones.client.ClientPacketHandlers;
 import io.github.duckysmacky.combatdrones.config.ModConfig;
 import io.github.duckysmacky.combatdrones.physics.Route;
 import io.netty.buffer.ByteBuf;
-import net.minecraft.util.math.BlockPos;
 import net.minecraftforge.fml.common.FMLCommonHandler;
 import net.minecraftforge.fml.common.network.ByteBufUtils;
 import net.minecraftforge.fml.common.network.simpleimpl.IMessage;
@@ -76,8 +75,8 @@ public class PlannerOpenPacket implements IMessage {
         }
     }
 
-    /** Ramp position in ramp mode, or null in airborne mode. */
-    public BlockPos rampPos;
+    /** Launch Ramp entity ID in ramp mode, or -1 in airborne mode. */
+    public int rampId = -1;
     public final List<UnitView> units = new ArrayList<>();
     public int maxWaypoints = ModConfig.maxWaypointsPerRoute;
     public double maxAltitude = ModConfig.maxRouteAltitude;
@@ -85,15 +84,12 @@ public class PlannerOpenPacket implements IMessage {
     public double minLaunchFuel = ModConfig.minLaunchFuel;
 
     public boolean isRampMode() {
-        return rampPos != null;
+        return rampId >= 0;
     }
 
     @Override
     public void toBytes(ByteBuf buf) {
-        buf.writeBoolean(rampPos != null);
-        if (rampPos != null) {
-            buf.writeLong(rampPos.toLong());
-        }
+        buf.writeInt(rampId);
         buf.writeInt(maxWaypoints);
         buf.writeDouble(maxAltitude);
         buf.writeDouble(maxLength);
@@ -106,7 +102,7 @@ public class PlannerOpenPacket implements IMessage {
 
     @Override
     public void fromBytes(ByteBuf buf) {
-        rampPos = buf.readBoolean() ? BlockPos.fromLong(buf.readLong()) : null;
+        rampId = buf.readInt();
         maxWaypoints = buf.readInt();
         maxAltitude = buf.readDouble();
         maxLength = buf.readDouble();

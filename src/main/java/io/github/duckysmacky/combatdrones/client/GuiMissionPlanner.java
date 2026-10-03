@@ -1,5 +1,7 @@
 package io.github.duckysmacky.combatdrones.client;
 
+import io.github.duckysmacky.combatdrones.CombatDrones;
+import io.github.duckysmacky.combatdrones.entity.EntityRampUnit;
 import io.github.duckysmacky.combatdrones.network.ModNetwork;
 import io.github.duckysmacky.combatdrones.network.PlannerOpenPacket;
 import io.github.duckysmacky.combatdrones.network.PlannerRequestPacket;
@@ -13,10 +15,16 @@ import net.minecraft.client.gui.GuiButton;
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.renderer.BufferBuilder;
 import net.minecraft.client.renderer.GlStateManager;
+import net.minecraft.client.renderer.RenderHelper;
 import net.minecraft.client.renderer.Tessellator;
 import net.minecraft.client.renderer.vertex.DefaultVertexFormats;
 import net.minecraft.client.resources.I18n;
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.entity.Entity;
+import net.minecraft.item.Item;
+import net.minecraft.item.ItemStack;
+import net.minecraft.util.ResourceLocation;
+import net.minecraftforge.fml.common.registry.ForgeRegistries;
+import org.lwjgl.input.Keyboard;
 import org.lwjgl.input.Mouse;
 import org.lwjgl.opengl.GL11;
 
@@ -30,8 +38,9 @@ import java.util.Locale;
  * launching it, or (airborne mode) watching owned units fly and re-routing them. The client only proposes; the server
  * validates every route.
  *
- * <p>Map controls: left-click adds a waypoint, left-drag moves one, right-click deletes one, right-drag pans, the
- * wheel zooms. The side list selects waypoints for reordering and altitude changes.
+ * <p>Map controls (like the reference mod): left-drag pans, or moves a waypoint when grabbed on one; right-click opens
+ * a context menu (add a waypoint, or set a waypoint's height, speed, final action, loiter radius, or remove it); the
+ * wheel zooms. The side list selects waypoints for reordering.
  */
 public class GuiMissionPlanner extends GuiScreen {
     private static final int PANEL_WIDTH = 140;
@@ -44,7 +53,8 @@ public class GuiMissionPlanner extends GuiScreen {
     private static final double MIN_SCALE = 0.1;
     private static final double MAX_SCALE = 8;
     private static final double PICK_RADIUS_PX = 6;
-    private static final int REFRESH_TICKS = 20;
+    /** Fallback refresh for units outside client tracking range; tracked ones are read from their entity each frame. */
+    private static final int REFRESH_TICKS = 4;
 
     private static final int BUTTON_TERMINAL = 0;
     private static final int BUTTON_CLEAR = 1;
@@ -80,6 +90,12 @@ public class GuiMissionPlanner extends GuiScreen {
     private int lastMouseX;
     private int lastMouseY;
     private int ticks;
+    private int cursorX;
+    private int cursorY;
+    private PlannerContextMenu menu;
+    private PlannerTerrainMap terrain;
+    /** While true the loiter radius follows the cursor's distance from the last waypoint. */
+    private boolean editingRadius;
 
     private GuiButton terminalButton;
     private GuiButton launchButton;
@@ -91,7 +107,7 @@ public class GuiMissionPlanner extends GuiScreen {
 
     /** Whether an incoming planner packet belongs to this screen (same ramp, or both airborne). */
     public boolean accepts(PlannerOpenPacket packet) {
-        return view.isRampMode() ? view.rampPos.equals(packet.rampPos) : !packet.isRampMode();
+        return view.isRampMode() ? view.rampId == packet.rampId : !packet.isRampMode();
     }
 
     /** New data from the server: keep the player's unsent edits, refresh everything else. */
@@ -104,26 +120,40 @@ public class GuiMissionPlanner extends GuiScreen {
                 index = candidate;
             }
         }
-        if (dirty && index == selectedUnit) {
-            return;
+        boolean sameUnit = index == selectedUnit && currentUnit() != null && currentUnit().entityId == previousId;
+        if (!sameUnit) {
+            selectUnit(index);
+        } else if (!dirty) {
+            // Periodic refresh of the unit being viewed: keep the map position and selection
+            loadRoute();
         }
-        selectUnit(index);
     }
 
     private void selectUnit(int index) {
         selectedUnit = index;
-        waypoints.clear();
         selectedWaypoint = -1;
+        loadRoute();
+        PlannerOpenPacket.UnitView unit = currentUnit();
+        if (unit != null) {
+            centerX = unit.x;
+            centerZ = unit.z;
+        }
+    }
+
+    private void loadRoute() {
+        waypoints.clear();
         dirty = false;
         PlannerOpenPacket.UnitView unit = currentUnit();
         if (unit == null) {
+            selectedWaypoint = -1;
             return;
         }
         waypoints.addAll(unit.route.getWaypoints());
         terminal = unit.allowedTerminals.contains(unit.route.getTerminal()) ? unit.route.getTerminal() : firstAllowed(unit);
         loiterRadius = unit.route.getLoiterRadius();
-        centerX = unit.x;
-        centerZ = unit.z;
+        if (selectedWaypoint >= waypoints.size()) {
+            selectedWaypoint = -1;
+        }
     }
 
     private PlannerOpenPacket.UnitView currentUnit() {
@@ -190,9 +220,17 @@ public class GuiMissionPlanner extends GuiScreen {
 
     @Override
     public void updateScreen() {
-        // Airborne units move: ask for fresh positions every second while the map is open
+        // Airborne units move: keep their positions, fuel and progress fresh while the map is open
         if (!view.isRampMode() && ++ticks % REFRESH_TICKS == 0) {
             ModNetwork.CHANNEL.sendToServer(new PlannerRequestPacket());
+        }
+    }
+
+    @Override
+    public void onGuiClosed() {
+        super.onGuiClosed();
+        if (terrain != null) {
+            terrain.delete();
         }
     }
 
@@ -206,11 +244,21 @@ public class GuiMissionPlanner extends GuiScreen {
     @Override
     public void drawScreen(int mouseX, int mouseY, float partialTicks) {
         drawDefaultBackground();
+        followTrackedUnits(partialTicks);
+        cursorX = mouseX;
+        cursorY = mouseY;
         drawCenteredString(fontRenderer, title(), width / 2, 10, 0xFFFFFF);
         drawPanel(mouseX, mouseY);
         drawMap(mouseX, mouseY);
         drawStats();
         super.drawScreen(mouseX, mouseY, partialTicks);
+        if (editingRadius && !waypoints.isEmpty()) {
+            drawCenteredString(fontRenderer, I18n.format("gui.combat_drones.planner.radius_hint", Math.round(previewRadius(mouseX, mouseY))),
+                    (mapLeft + mapRight) / 2, mapTop + 4, 0xFFFF55);
+        }
+        if (menu != null) {
+            menu.draw(fontRenderer, width, height, mouseX, mouseY);
+        }
     }
 
     private String title() {
@@ -253,7 +301,8 @@ public class GuiMissionPlanner extends GuiScreen {
         y += ROW;
         for (int index = 0; index < waypoints.size() && y < height - 64; index++) {
             Route.Waypoint waypoint = waypoints.get(index);
-            String line = String.format(Locale.ROOT, "#%d  %d, %d  ↑%d", index + 1, Math.round(waypoint.x), Math.round(waypoint.z), Math.round(waypoint.altitude));
+            String line = String.format(Locale.ROOT, "#%d  %d, %d  ↑%d %s", index + 1, Math.round(waypoint.x), Math.round(waypoint.z),
+                    Math.round(waypoint.altitude), waypoint.speed.name().charAt(0));
             boolean badAltitude = waypoint.altitude < RouteValidator.MIN_ALTITUDE || waypoint.altitude > view.maxAltitude;
             int color = index == selectedWaypoint ? 0xFFFF55 : badAltitude ? WARNING : 0xFFFFFF;
             fontRenderer.drawString(line, MARGIN, y, color);
@@ -263,6 +312,11 @@ public class GuiMissionPlanner extends GuiScreen {
 
     private void drawMap(int mouseX, int mouseY) {
         Gui.drawRect(mapLeft, mapTop, mapRight, mapBottom, 0xC0101810);
+        if (terrain == null) {
+            terrain = new PlannerTerrainMap();
+        }
+        terrain.update(mc.world, centerX, centerZ);
+        terrain.draw(mapLeft, mapTop, mapRight, mapBottom, centerX, centerZ, scale);
         PlannerOpenPacket.UnitView unit = currentUnit();
 
         GlStateManager.disableTexture2D();
@@ -283,6 +337,7 @@ public class GuiMissionPlanner extends GuiScreen {
         }
         tessellator.draw();
         GlStateManager.enableTexture2D();
+        drawUnitIcons();
 
         // Markers and labels
         if (view.isRampMode() && unit != null) {
@@ -336,7 +391,7 @@ public class GuiMissionPlanner extends GuiScreen {
         }
         if (!waypoints.isEmpty() && (terminal == Route.TerminalAction.LOITER || terminal == Route.TerminalAction.LOOP)) {
             Route.Waypoint last = waypoints.get(waypoints.size() - 1);
-            double radius = loiterRadius;
+            double radius = editingRadius ? previewRadius(cursorX, cursorY) : loiterRadius;
             double previousX = last.x + radius;
             double previousZ = last.z;
             for (int step = 1; step <= 32; step++) {
@@ -350,15 +405,41 @@ public class GuiMissionPlanner extends GuiScreen {
         }
     }
 
-    /** A small arrow showing where an airborne unit is and which way it's heading. */
+    /** Interpolated live positions for units the client is tracking, smoother than the packet refresh. */
+    private void followTrackedUnits(float partialTicks) {
+        for (PlannerOpenPacket.UnitView unit : view.units) {
+            Entity entity = unit.entityId >= 0 ? mc.world.getEntityByID(unit.entityId) : null;
+            if (entity instanceof EntityRampUnit) {
+                unit.x = entity.prevPosX + (entity.posX - entity.prevPosX) * partialTicks;
+                unit.z = entity.prevPosZ + (entity.posZ - entity.prevPosZ) * partialTicks;
+                unit.heading = entity.rotationYaw;
+            }
+        }
+    }
+
+    /** Each airborne unit's item icon, so different unit types can be told apart. */
+    private void drawUnitIcons() {
+        RenderHelper.enableGUIStandardItemLighting();
+        for (PlannerOpenPacket.UnitView unit : view.units) {
+            Item item = unit.entityId < 0 ? null : ForgeRegistries.ITEMS.getValue(new ResourceLocation(CombatDrones.MOD_ID, unit.typeId));
+            int screenX = toScreenX(unit.x);
+            int screenY = toScreenY(unit.z);
+            if (item != null && insideMap(screenX, screenY)) {
+                itemRender.renderItemAndEffectIntoGUI(new ItemStack(item), screenX - 8, screenY - 8);
+            }
+        }
+        RenderHelper.disableStandardItemLighting();
+    }
+
+    /** An arrowhead around an airborne unit's icon, pointing the way it's heading. */
     private void drawUnitMarker(BufferBuilder buffer, PlannerOpenPacket.UnitView unit) {
         double radians = Math.toRadians(unit.heading);
-        double noseX = unit.x - Math.sin(radians) * 6 / scale;
-        double noseZ = unit.z + Math.cos(radians) * 6 / scale;
-        double leftX = unit.x - Math.sin(radians + 2.5) * 4 / scale;
-        double leftZ = unit.z + Math.cos(radians + 2.5) * 4 / scale;
-        double rightX = unit.x - Math.sin(radians - 2.5) * 4 / scale;
-        double rightZ = unit.z + Math.cos(radians - 2.5) * 4 / scale;
+        double noseX = unit.x - Math.sin(radians) * 14 / scale;
+        double noseZ = unit.z + Math.cos(radians) * 14 / scale;
+        double leftX = unit.x - Math.sin(radians + 0.45) * 10 / scale;
+        double leftZ = unit.z + Math.cos(radians + 0.45) * 10 / scale;
+        double rightX = unit.x - Math.sin(radians - 0.45) * 10 / scale;
+        double rightZ = unit.z + Math.cos(radians - 0.45) * 10 / scale;
         int color = view.units.indexOf(unit) == selectedUnit ? 0xFFFFFF55 : UNIT_COLOR;
         clippedLine(buffer, leftX, leftZ, noseX, noseZ, color);
         clippedLine(buffer, noseX, noseZ, rightX, rightZ, color);
@@ -403,10 +484,20 @@ public class GuiMissionPlanner extends GuiScreen {
         boolean tooLong = length > view.maxLength;
         String text;
         if (type != null && type.getMaxSpeed() > 0) {
-            double cruise = type.getMaxSpeed() * 0.8;
-            double seconds = length / cruise / 20;
-            // Cruise throttle burns about 70% of full-throttle drain
-            double fuelNeeded = length / cruise * type.getDrainRatePerTick() * 0.7 / type.getBatteryOrFuelCapacity();
+            // Each leg flies at its target waypoint's speed; level cruise needs throttle ~ speed fraction squared
+            double ticks = 0;
+            double fuelTicks = 0;
+            double fromX = unit.x;
+            double fromZ = unit.z;
+            for (Route.Waypoint waypoint : waypoints) {
+                double legTicks = Math.hypot(waypoint.x - fromX, waypoint.z - fromZ) / (type.getMaxSpeed() * waypoint.speed.fraction);
+                ticks += legTicks;
+                fuelTicks += legTicks * waypoint.speed.fraction * waypoint.speed.fraction;
+                fromX = waypoint.x;
+                fromZ = waypoint.z;
+            }
+            double seconds = ticks / 20;
+            double fuelNeeded = fuelTicks * type.getDrainRatePerTick() / type.getBatteryOrFuelCapacity();
             text = I18n.format("gui.combat_drones.planner.stats", Math.round(length), Math.round(seconds), percent(fuelNeeded), percent(unit.fuelFraction));
         } else {
             text = I18n.format("gui.combat_drones.planner.length", Math.round(length));
@@ -454,9 +545,27 @@ public class GuiMissionPlanner extends GuiScreen {
 
     @Override
     protected void mouseClicked(int mouseX, int mouseY, int button) throws IOException {
-        super.mouseClicked(mouseX, mouseY, button);
         lastMouseX = mouseX;
         lastMouseY = mouseY;
+        if (editingRadius) {
+            if (button == 0 && !waypoints.isEmpty()) {
+                loiterRadius = previewRadius(mouseX, mouseY);
+                dirty = true;
+            }
+            editingRadius = false;
+            return;
+        }
+        if (menu != null) {
+            boolean inside = menu.contains(fontRenderer, width, height, mouseX, mouseY);
+            if (!inside || menu.click(fontRenderer, width, height, mouseX, mouseY)) {
+                menu = null;
+            }
+            refreshButtons();
+            if (inside) {
+                return;
+            }
+        }
+        super.mouseClicked(mouseX, mouseY, button);
         if (mouseX >= MARGIN && mouseX <= MARGIN + PANEL_WIDTH) {
             int unitRow = (mouseY - mapTop - ROW) / ROW;
             if (!view.isRampMode() && mouseY >= mapTop + ROW && unitRow < view.units.size()) {
@@ -474,22 +583,91 @@ public class GuiMissionPlanner extends GuiScreen {
             if (hit >= 0) {
                 dragWaypoint = hit;
                 selectedWaypoint = hit;
-            } else if (waypoints.size() < view.maxWaypoints) {
-                double altitude = selectedWaypoint >= 0 ? waypoints.get(selectedWaypoint).altitude : defaultAltitude();
-                waypoints.add(new Route.Waypoint(Math.round(toWorldX(mouseX)), Math.round(toWorldZ(mouseY)), altitude));
-                selectedWaypoint = waypoints.size() - 1;
-                dirty = true;
-            }
-        } else if (button == 1) {
-            if (hit >= 0) {
-                waypoints.remove(hit);
-                selectedWaypoint = -1;
-                dirty = true;
             } else {
                 panning = true;
             }
+        } else if (button == 1) {
+            if (hit >= 0) {
+                selectedWaypoint = hit;
+                menu = waypointMenu(hit, mouseX, mouseY);
+            } else {
+                menu = addMenu(toWorldX(mouseX), toWorldZ(mouseY), mouseX, mouseY);
+            }
         }
         refreshButtons();
+    }
+
+    private PlannerContextMenu addMenu(double worldX, double worldZ, int mouseX, int mouseY) {
+        PlannerContextMenu addMenu = new PlannerContextMenu(mouseX, mouseY);
+        if (waypoints.size() >= view.maxWaypoints) {
+            return addMenu.row(PlannerContextMenu.Segment.label(() -> I18n.format("gui.combat_drones.planner.menu.full")));
+        }
+        return addMenu.row(PlannerContextMenu.Segment.command(() -> I18n.format("gui.combat_drones.planner.menu.add"), () -> {
+            Route.Waypoint previous = waypoints.isEmpty() ? null : waypoints.get(waypoints.size() - 1);
+            double altitude = previous != null ? previous.altitude : defaultAltitude();
+            Route.Speed speed = previous != null ? previous.speed : Route.Speed.FAST;
+            waypoints.add(new Route.Waypoint(Math.round(worldX), Math.round(worldZ), altitude, speed));
+            selectedWaypoint = waypoints.size() - 1;
+            dirty = true;
+        }));
+    }
+
+    /** Options act on {@link #selectedWaypoint}, which is the clicked waypoint for as long as the menu is open. */
+    private PlannerContextMenu waypointMenu(int index, int mouseX, int mouseY) {
+        PlannerContextMenu waypointMenu = new PlannerContextMenu(mouseX, mouseY);
+        waypointMenu.row(PlannerContextMenu.Segment.label(() -> I18n.format("gui.combat_drones.planner.waypoint", index + 1)));
+        waypointMenu.row(
+                PlannerContextMenu.Segment.label(() -> I18n.format("gui.combat_drones.planner.menu.height")),
+                PlannerContextMenu.Segment.option(() -> "-5", () -> changeAltitude(-5), () -> false),
+                PlannerContextMenu.Segment.option(() -> "-1", () -> changeAltitude(-1), () -> false),
+                PlannerContextMenu.Segment.label(() -> index < waypoints.size() ? Math.round(waypoints.get(index).altitude) + " m" : ""),
+                PlannerContextMenu.Segment.option(() -> "+1", () -> changeAltitude(1), () -> false),
+                PlannerContextMenu.Segment.option(() -> "+5", () -> changeAltitude(5), () -> false));
+        List<PlannerContextMenu.Segment> speedRow = new ArrayList<>();
+        speedRow.add(PlannerContextMenu.Segment.label(() -> I18n.format("gui.combat_drones.planner.menu.speed")));
+        for (Route.Speed speed : Route.Speed.values()) {
+            speedRow.add(PlannerContextMenu.Segment.option(
+                    () -> I18n.format("gui.combat_drones.speed." + speed.name().toLowerCase(Locale.ROOT)),
+                    () -> {
+                        waypoints.set(index, waypoints.get(index).withSpeed(speed));
+                        dirty = true;
+                    },
+                    () -> index < waypoints.size() && waypoints.get(index).speed == speed));
+        }
+        waypointMenu.row(speedRow.toArray(new PlannerContextMenu.Segment[0]));
+        if (index == waypoints.size() - 1) {
+            waypointMenu.row(
+                    PlannerContextMenu.Segment.label(() -> I18n.format("gui.combat_drones.planner.menu.final")),
+                    PlannerContextMenu.Segment.option(() -> I18n.format("gui.combat_drones.terminal." + terminal.name().toLowerCase(Locale.ROOT)),
+                            this::cycleTerminal, () -> true));
+            waypointMenu.row(
+                    PlannerContextMenu.Segment.label(() -> I18n.format("gui.combat_drones.planner.menu.radius", Math.round(loiterRadius))),
+                    PlannerContextMenu.Segment.command(() -> I18n.format("gui.combat_drones.planner.menu.set_radius"), () -> editingRadius = true));
+        }
+        waypointMenu.row(PlannerContextMenu.Segment.command(() -> I18n.format("gui.combat_drones.planner.menu.remove"), () -> {
+            waypoints.remove(index);
+            selectedWaypoint = -1;
+            dirty = true;
+        }));
+        return waypointMenu;
+    }
+
+    /** Loiter radius implied by the cursor's distance from the last waypoint. */
+    private double previewRadius(int mouseX, int mouseY) {
+        Route.Waypoint last = waypoints.get(waypoints.size() - 1);
+        double distance = Math.hypot(toWorldX(mouseX) - last.x, toWorldZ(mouseY) - last.z);
+        return Math.max(Route.MIN_LOITER_RADIUS, Math.min(Route.MAX_LOITER_RADIUS, Math.round(distance)));
+    }
+
+    @Override
+    protected void keyTyped(char typedChar, int keyCode) throws IOException {
+        // Esc closes the menu or cancels radius editing before it closes the screen
+        if (keyCode == Keyboard.KEY_ESCAPE && (menu != null || editingRadius)) {
+            menu = null;
+            editingRadius = false;
+            return;
+        }
+        super.keyTyped(typedChar, keyCode);
     }
 
     private double defaultAltitude() {
@@ -637,9 +815,8 @@ public class GuiMissionPlanner extends GuiScreen {
         if (unit == null) {
             return;
         }
-        BlockPos rampPos = view.rampPos;
-        ModNetwork.CHANNEL.sendToServer(rampPos != null
-                ? PlannerSubmitPacket.forRamp(rampPos, currentRoute(), launch)
+        ModNetwork.CHANNEL.sendToServer(view.isRampMode()
+                ? PlannerSubmitPacket.forRamp(view.rampId, currentRoute(), launch)
                 : PlannerSubmitPacket.forUnit(unit.entityId, currentRoute()));
         dirty = false;
     }

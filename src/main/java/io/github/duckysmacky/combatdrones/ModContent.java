@@ -1,15 +1,15 @@
 package io.github.duckysmacky.combatdrones;
 
-import io.github.duckysmacky.combatdrones.block.BlockLaunchRamp;
-import io.github.duckysmacky.combatdrones.block.TileLaunchRamp;
 import io.github.duckysmacky.combatdrones.entity.EntityBomb;
 import io.github.duckysmacky.combatdrones.entity.EntityHandFlownDrone;
+import io.github.duckysmacky.combatdrones.entity.EntityLaunchRamp;
 import io.github.duckysmacky.combatdrones.entity.EntityRampUnit;
 import io.github.duckysmacky.combatdrones.item.ItemBattery;
 import io.github.duckysmacky.combatdrones.item.ItemBlockWithTooltip;
 import io.github.duckysmacky.combatdrones.item.ItemBomb;
 import io.github.duckysmacky.combatdrones.item.ItemDrone;
 import io.github.duckysmacky.combatdrones.item.ItemGoggles;
+import io.github.duckysmacky.combatdrones.item.ItemLaunchRamp;
 import io.github.duckysmacky.combatdrones.item.ItemMissionPlanner;
 import io.github.duckysmacky.combatdrones.item.ItemRemote;
 import io.github.duckysmacky.combatdrones.item.ItemWithTooltip;
@@ -31,7 +31,6 @@ import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.registry.EntityEntry;
 import net.minecraftforge.fml.common.registry.EntityEntryBuilder;
-import net.minecraftforge.fml.common.registry.GameRegistry;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -53,7 +52,7 @@ public final class ModContent {
     /** Every registered item, in creative-tab order. The client registers one model per entry. */
     public static final List<Item> ITEMS = new ArrayList<>();
 
-    public static Block launchRamp;
+    public static Item launchRamp;
     public static Block rearmStation;
 
     public static Item lightBattery;
@@ -75,16 +74,14 @@ public final class ModContent {
 
     @SubscribeEvent
     public static void registerBlocks(RegistryEvent.Register<Block> event) {
-        launchRamp = named(new BlockLaunchRamp(), "launch_ramp");
         rearmStation = simpleBlock("rearm_station");
-        event.getRegistry().registerAll(launchRamp, rearmStation);
-        GameRegistry.registerTileEntity(TileLaunchRamp.class, new ResourceLocation(CombatDrones.MOD_ID, "launch_ramp"));
+        event.getRegistry().registerAll(rearmStation);
     }
 
     // Forge fires the block registry event before the item one, so the blocks exist here
     @SubscribeEvent
     public static void registerItems(RegistryEvent.Register<Item> event) {
-        register(event, new ItemBlockWithTooltip(launchRamp));
+        launchRamp = register(event, named(new ItemLaunchRamp(), "launch_ramp"));
         register(event, new ItemBlockWithTooltip(rearmStation));
         fpvRemote = register(event, named(new ItemRemote(), "fpv_remote"));
         fpvGoggles = register(event, named(new ItemGoggles(GOGGLES_MATERIAL), "fpv_goggles"));
@@ -102,6 +99,16 @@ public final class ModContent {
         // One placeable item per data-defined type; the registry name is the type ID
         for (DroneType type : DroneTypes.all()) {
             register(event, named(new ItemDrone(type.getId()), type.getId()));
+        }
+    }
+
+    /** The Launch Ramp used to be a block; worlds from before it became an entity just drop the old blocks. */
+    @SubscribeEvent
+    public static void dropRetiredBlocks(RegistryEvent.MissingMappings<Block> event) {
+        for (RegistryEvent.MissingMappings.Mapping<Block> mapping : event.getAllMappings()) {
+            if (mapping.key.equals(new ResourceLocation(CombatDrones.MOD_ID, "launch_ramp"))) {
+                mapping.ignore();
+            }
         }
     }
 
@@ -125,6 +132,13 @@ public final class ModContent {
                 .id(new ResourceLocation(CombatDrones.MOD_ID, "ramp_unit"), 2)
                 .name(CombatDrones.MOD_ID + ".ramp_unit")
                 .tracker(160, 1, false)
+                .build());
+        // Static: the yaw it was placed with arrives in the spawn packet, nothing to stream afterwards
+        event.getRegistry().register(EntityEntryBuilder.create()
+                .entity(EntityLaunchRamp.class)
+                .id(new ResourceLocation(CombatDrones.MOD_ID, "launch_ramp"), 3)
+                .name(CombatDrones.MOD_ID + ".launch_ramp")
+                .tracker(128, 20, false)
                 .build());
     }
 

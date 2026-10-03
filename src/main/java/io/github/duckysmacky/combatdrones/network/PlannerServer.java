@@ -1,17 +1,14 @@
 package io.github.duckysmacky.combatdrones.network;
 
-import io.github.duckysmacky.combatdrones.block.BlockLaunchRamp;
-import io.github.duckysmacky.combatdrones.block.TileLaunchRamp;
 import io.github.duckysmacky.combatdrones.config.ModConfig;
+import io.github.duckysmacky.combatdrones.entity.EntityLaunchRamp;
 import io.github.duckysmacky.combatdrones.entity.EntityRampUnit;
 import io.github.duckysmacky.combatdrones.physics.Route;
 import io.github.duckysmacky.combatdrones.physics.RouteValidator;
 import io.github.duckysmacky.combatdrones.type.DroneType;
-import net.minecraft.block.state.IBlockState;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.EntityPlayerMP;
-import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.text.TextComponentTranslation;
 
 import java.util.Set;
@@ -29,7 +26,7 @@ public final class PlannerServer {
     }
 
     /** Opens the planner on a ramp (owner only). */
-    public static void openRamp(EntityPlayer player, TileLaunchRamp ramp) {
+    public static void openRamp(EntityPlayer player, EntityLaunchRamp ramp) {
         DroneType type = ramp.getUnitType();
         if (type == null) {
             status(player, "message.combat_drones.ramp.empty");
@@ -40,15 +37,14 @@ public final class PlannerServer {
             return;
         }
         PlannerOpenPacket packet = new PlannerOpenPacket();
-        packet.rampPos = ramp.getPos();
+        packet.rampId = ramp.getEntityId();
         PlannerOpenPacket.UnitView view = new PlannerOpenPacket.UnitView();
         view.typeId = type.getId();
-        view.x = ramp.getPos().getX() + 0.5;
-        view.y = ramp.getPos().getY() + 1;
-        view.z = ramp.getPos().getZ() + 0.5;
-        IBlockState state = ramp.getWorld().getBlockState(ramp.getPos());
-        view.heading = state.getBlock() instanceof BlockLaunchRamp ? state.getValue(BlockLaunchRamp.FACING).getHorizontalAngle() : 0;
-        view.fuelFraction = (float) ramp.getFuelFraction();
+        view.x = ramp.posX;
+        view.y = ramp.posY + 1;
+        view.z = ramp.posZ;
+        view.heading = ramp.rotationYaw;
+        view.fuelFraction = ramp.getFuelFraction();
         view.originY = view.y;
         view.route = ramp.getRoute();
         view.allowedTerminals = allowedTerminals(type);
@@ -86,7 +82,7 @@ public final class PlannerServer {
     }
 
     public static void submit(EntityPlayerMP player, PlannerSubmitPacket packet) {
-        if (packet.rampPos != null) {
+        if (packet.rampId >= 0) {
             submitToRamp(player, packet);
         } else {
             submitToUnit(player, packet);
@@ -94,22 +90,21 @@ public final class PlannerServer {
     }
 
     private static void submitToRamp(EntityPlayerMP player, PlannerSubmitPacket packet) {
-        if (player.getDistanceSq(packet.rampPos) > RAMP_REACH * RAMP_REACH || !player.world.isBlockLoaded(packet.rampPos)) {
+        Entity entity = player.world.getEntityByID(packet.rampId);
+        if (!(entity instanceof EntityLaunchRamp) || entity.isDead) {
+            return;
+        }
+        EntityLaunchRamp ramp = (EntityLaunchRamp) entity;
+        if (player.getDistanceSq(ramp) > RAMP_REACH * RAMP_REACH) {
             status(player, "message.combat_drones.planner.too_far");
             return;
         }
-        TileEntity tile = player.world.getTileEntity(packet.rampPos);
-        if (!(tile instanceof TileLaunchRamp)) {
-            return;
-        }
-        TileLaunchRamp ramp = (TileLaunchRamp) tile;
         DroneType type = ramp.getUnitType();
         if (type == null || !ramp.isOwnedBy(player)) {
             status(player, "message.combat_drones.ramp.not_owner");
             return;
         }
-        String problem = RouteValidator.validate(packet.route, packet.rampPos.getX() + 0.5, packet.rampPos.getZ() + 0.5,
-                ModConfig.routeLimits(), allowedTerminals(type));
+        String problem = RouteValidator.validate(packet.route, ramp.posX, ramp.posZ, ModConfig.routeLimits(), allowedTerminals(type));
         if (problem != null) {
             status(player, problem);
             return;
@@ -125,8 +120,7 @@ public final class PlannerServer {
             openRamp(player, ramp);
             return;
         }
-        IBlockState state = player.world.getBlockState(packet.rampPos);
-        ramp.launch(state.getValue(BlockLaunchRamp.FACING));
+        ramp.launch();
         status(player, "message.combat_drones.planner.launched");
     }
 

@@ -36,5 +36,15 @@
     "category": "neutral",
     "subtitle": "subtitles.combat_drones.drone.hit",
     "sounds": ["combat_drones:drone/hit"]
+  },
+  "unit.engine": {
+    "category": "neutral",
+    "subtitle": "subtitles.combat_drones.unit.engine",
+    "sounds": ["combat_drones:drone/engine"]
+  },
+  "unit.launch": {
+    "category": "neutral",
+    "subtitle": "subtitles.combat_drones.unit.launch",
+    "sounds": ["combat_drones:drone/launch"]
   }
 }

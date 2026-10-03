@@ -19,6 +19,9 @@ public final class ModSounds {
     public static final SoundEvent DRONE_ATTACH = create("drone.attach");
     public static final SoundEvent DRONE_CONNECT = create("drone.connect");
     public static final SoundEvent DRONE_HIT = create("drone.hit");
+    /** Propeller engine of a flying ramp-launched unit. */
+    public static final SoundEvent UNIT_ENGINE = create("unit.engine");
+    public static final SoundEvent UNIT_LAUNCH = create("unit.launch");
 
     private ModSounds() {
     }
@@ -30,6 +33,6 @@ public final class ModSounds {
 
     @SubscribeEvent
     public static void registerSounds(RegistryEvent.Register<SoundEvent> event) {
-        event.getRegistry().registerAll(DRONE_MOTOR, DRONE_MOTOR_FAR, DRONE_LINK, DRONE_BEEP, DRONE_BATTERY, DRONE_ATTACH, DRONE_CONNECT, DRONE_HIT);
+        event.getRegistry().registerAll(DRONE_MOTOR, DRONE_MOTOR_FAR, DRONE_LINK, DRONE_BEEP, DRONE_BATTERY, DRONE_ATTACH, DRONE_CONNECT, DRONE_HIT, UNIT_ENGINE, UNIT_LAUNCH);
     }
 }
