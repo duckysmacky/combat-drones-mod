@@ -1,14 +1,15 @@
 {
-  // Gunship (rocket pod): slow, tough, low rate of fire explosive Rockets.
-  // payloadCapacity is the magazine size in rockets.
-  "category": "HAND_FLOWN",
-  "maxSpeed": 0.55,
+  // Gunship Plane (rocket pod): small armed fixed-wing, ramp-launched and routed like a loitering munition,
+  // flown manually via the Mission Planner's "Take control". Never detonates; low rate of fire explosive Rockets; payloadCapacity = magazine size in rockets.
+  "category": "RAMP_AUTOPILOT",
+  "maxSpeed": 0.9,
   "acceleration": 0.05,
-  "batteryOrFuelCapacity": 4800,
+  "batteryOrFuelCapacity": 6000,
   "drainRatePerTick": 1.0,
   "blastPower": 0,
   "payloadCapacity": 8,
   "maxHP": 40,
-  "signalRange": 128,
+  "defaultCruiseAltitude": 40,
+  "controlScheme": "STICK",
   "weaponType": "ROCKET_POD"
 }

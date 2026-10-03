@@ -40,7 +40,7 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Shared entity for every HAND_FLOWN drone type (racers, cargo, gunships); behaviour differences come from
+ * Shared entity for every HAND_FLOWN drone type (FPV racers, DJI drone); behaviour differences come from
  * its {@link DroneType}. The server owns the flight state; the pilot's client predicts it (see client code).
  */
 public class EntityHandFlownDrone extends Entity {
