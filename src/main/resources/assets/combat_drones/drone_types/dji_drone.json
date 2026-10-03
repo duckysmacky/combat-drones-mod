@@ -3,7 +3,7 @@
   // Flown with velocity controls (WASD + Space/Shift), always stabilized: control scheme arrives in M4.
   // blastPower is 0 because the drone itself never explodes, only the dropped bomb does.
   "category": "HAND_FLOWN",
-  "maxSpeed": 0.9,
+  "maxSpeed": 0.7,
   "acceleration": 0.07,
   "batteryOrFuelCapacity": 4800,
   "drainRatePerTick": 1.0,
@@ -12,5 +12,7 @@
   "maxHP": 16,
   "signalRange": 144,
   "motorSoundRange": 32,
-  "defaultBattery": "STANDARD"
+  "defaultBattery": "STANDARD",
+  "controlScheme": "DJI",
+  "payload": "BOMB"
 }

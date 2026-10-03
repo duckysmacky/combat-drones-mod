@@ -102,7 +102,9 @@ public final class HudOverlay {
         drawText(font, I18n.format("hud.combat_drones.mode." + PilotController.getMode().name().toLowerCase(Locale.ROOT)), left, top, TEXT);
         boolean armed = drone.areMotorsOn();
         drawText(font, I18n.format(armed ? "hud.combat_drones.armed" : "hud.combat_drones.disarmed"), left, top + LINE, armed ? TEXT : WARNING);
-        drawText(font, I18n.format("hud.combat_drones.camera." + CameraHandler.getCameraMode().name().toLowerCase(Locale.ROOT)), left, top + LINE * 2, TEXT);
+        if (PilotController.isDji()) {
+            drawText(font, I18n.format("hud.combat_drones.gimbal", Math.round(-PilotController.getGimbalPitch())), left, top + LINE * 2, TEXT);
+        }
 
         // Top-right of the box: segmented battery gauge
         drawBattery(font, right, top, pack, battery);
@@ -115,14 +117,22 @@ public final class HudOverlay {
 
         // Bottom: heading tape, then throttle / payload
         drawHeadingTape(font, centerX, bottom, heading);
-        String throttle = PilotController.getMode() == HandFlownFlight.Mode.HOVER ? I18n.format("hud.combat_drones.throttle_hold")
-                : I18n.format("hud.combat_drones.throttle", percent(PilotController.getThrottle()));
+        String throttle;
+        if (PilotController.getMode() == HandFlownFlight.Mode.VELOCITY) {
+            // DJI has no throttle: show vertical speed in m/s instead
+            throttle = I18n.format("hud.combat_drones.vertical_speed", String.format(Locale.ROOT, "%+.1f", drone.getFlightState().velocity.y * 20));
+        } else if (PilotController.getMode() == HandFlownFlight.Mode.HOVER) {
+            throttle = I18n.format("hud.combat_drones.throttle_hold");
+        } else {
+            throttle = I18n.format("hud.combat_drones.throttle", percent(PilotController.getThrottle()));
+        }
         drawText(font, throttle, left, bottom + 16, TEXT);
         float health = drone.getHealthFraction();
         drawText(font, I18n.format("hud.combat_drones.health", percent(health)), left, bottom + 16 + LINE, health < 0.5F ? WARNING : TEXT);
-        if (type.isImpactDetonates() && type.getPayloadCapacity() > 0) {
-            String grenades = I18n.format("hud.combat_drones.grenades", drone.getKnownPayload(), type.getPayloadCapacity());
-            drawText(font, grenades, right - font.getStringWidth(grenades), bottom + 16, TEXT);
+        if (type.getPayload() != null && type.getPayloadCapacity() > 0) {
+            String payload = I18n.format("hud.combat_drones.payload." + type.getPayload().name().toLowerCase(Locale.ROOT),
+                    drone.getKnownPayload(), type.getPayloadCapacity());
+            drawText(font, payload, right - font.getStringWidth(payload), bottom + 16, TEXT);
         }
 
         drawCrosshair(centerX, centerY);

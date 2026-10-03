@@ -18,7 +18,7 @@ class DroneTypeTest {
             + "  \"maxSpeed\": 1.5, \"acceleration\": 0.1,\n"
             + "  \"batteryOrFuelCapacity\": 2400, \"drainRatePerTick\": 1,\n"
             + "  \"blastPower\": 2, \"maxHP\": 4, \"signalRange\": 96,\n"
-            + "  \"impactDetonates\": true, \"defaultBattery\": \"LIGHT\"\n"
+            + "  \"impactDetonates\": true, \"defaultBattery\": \"LIGHT\", \"controlScheme\": \"FPV\"\n"
             + "}";
 
     private static DroneType parse(String json) {
@@ -54,8 +54,10 @@ class DroneTypeTest {
     void rampTypeNeedsControlScheme() {
         String ramp = RACER.replace("HAND_FLOWN", "RAMP_AUTOPILOT")
                 .replace("\"signalRange\": 96", "\"defaultCruiseAltitude\": 40");
+        // A hand-flown scheme isn't valid on a ramp-launched type
         assertThrows(IllegalArgumentException.class, () -> parse(ramp));
-        assertEquals(DroneType.ControlScheme.STICK, parse(ramp.replace("{", "{ \"controlScheme\": \"STICK\",")).getControlScheme());
+        assertEquals(DroneType.ControlScheme.STICK, parse(ramp.replace("\"FPV\"", "\"STICK\"")).getControlScheme());
+        assertThrows(IllegalArgumentException.class, () -> parse(RACER.replace("\"FPV\"", "\"STICK\"")));
     }
 
     @Test
@@ -89,6 +91,13 @@ class DroneTypeTest {
         assertTrue(stats.containsKey("maxHP"));
         assertFalse(stats.containsKey("defaultCruiseAltitude"));
         assertFalse(stats.containsKey("category"));
+    }
+
+    @Test
+    void payloadSlotsNeedAPayloadKind() {
+        assertThrows(IllegalArgumentException.class, () -> parse(RACER.replace("{", "{ \"payloadCapacity\": 1,")));
+        DroneType withBombs = parse(RACER.replace("{", "{ \"payloadCapacity\": 1, \"payload\": \"BOMB\","));
+        assertEquals(DroneType.PayloadKind.BOMB, withBombs.getPayload());
     }
 
     @Test

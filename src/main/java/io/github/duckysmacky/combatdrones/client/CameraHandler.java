@@ -23,26 +23,7 @@ public final class CameraHandler {
     /** Racing quads tilt the camera up so it looks ahead while the drone pitches forward to fly. */
     private static final Quat4d CAMERA_UPTILT = HandFlownFlight.fromEuler(0, -20, 0);
 
-    public enum CameraMode {
-        /** Body-fixed FPV camera: rolls and pitches with the drone. */
-        FORWARD,
-        /** Stabilized straight-down view following the drone's heading: a map-like overview, best in Hover. */
-        DOWN
-    }
-
-    private static CameraMode cameraMode = CameraMode.FORWARD;
-
     private CameraHandler() {
-    }
-
-    public static CameraMode getCameraMode() {
-        return cameraMode;
-    }
-
-    /** Switches to the next camera mode and returns it. The choice sticks across flights. */
-    public static CameraMode cycleCameraMode() {
-        cameraMode = CameraMode.values()[(cameraMode.ordinal() + 1) % CameraMode.values().length];
-        return cameraMode;
     }
 
     @SubscribeEvent
@@ -55,8 +36,11 @@ public final class CameraHandler {
         // issues, and it carries roll)
         Quat4d view = HandFlownFlight.slerp(drone.prevOrientation, drone.getFlightState().orientation, event.getRenderPartialTicks());
         double[] euler;
-        if (cameraMode == CameraMode.DOWN) {
-            euler = new double[] {HandFlownFlight.toEuler(view)[0], 90, 0};
+        if (PilotController.isDji()) {
+            PilotController.updateGimbal();
+            // Gimbal-stabilized: follows the heading, pilot-controlled tilt (straight down for bombing/scouting),
+            // never rolls with the airframe. FPV drones only get their fixed forward camera.
+            euler = new double[] {HandFlownFlight.toEuler(view)[0], PilotController.getGimbalPitch(), 0};
         } else {
             view.mul(CAMERA_UPTILT);
             euler = HandFlownFlight.toEuler(view);

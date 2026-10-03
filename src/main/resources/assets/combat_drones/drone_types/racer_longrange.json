@@ -12,5 +12,7 @@
   "signalRange": 160,
   "impactDetonates": true,
   "motorSoundRange": 40,
-  "defaultBattery": "LIGHT"
+  "defaultBattery": "LIGHT",
+  "controlScheme": "FPV",
+  "payload": "GRENADE"
 }

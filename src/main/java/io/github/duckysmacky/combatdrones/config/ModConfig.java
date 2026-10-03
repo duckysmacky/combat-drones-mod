@@ -31,6 +31,7 @@ public final class ModConfig {
     public static boolean blockDamageEnabled = true;
     public static double grenadeBlastBonus = 2.0;
     public static double droneDamageTakenMultiplier = 1.0;
+    public static double bombBlastPower = 5.0;
 
     // [client]
     public static boolean invertMousePitch = false;
@@ -49,6 +50,8 @@ public final class ModConfig {
             blockDamageEnabled = defaults.get("general.blockDamageEnabled", blockDamageEnabled, "Whether drone and munition explosions break blocks.");
             grenadeBlastBonus = defaults.number("general.grenadeBlastBonus", grenadeBlastBonus, 0, 20,
                     "Extra blast power per Fragmentation Grenade attached to a racer (vanilla TNT = 4).");
+            bombBlastPower = defaults.number("general.bombBlastPower", bombBlastPower, 0, 20,
+                    "Blast power of a Bomb dropped from a DJI Drone (vanilla TNT = 4).");
             droneDamageTakenMultiplier = defaults.number("general.droneDamageTakenMultiplier", droneDamageTakenMultiplier, 0, 10,
                     "Multiplies all damage drones take from attacks (weapons, arrows, melee). Lower = harder to shoot down.");
 

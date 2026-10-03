@@ -13,5 +13,6 @@
   "signalRange": 112,
   "impactDetonates": true,
   "motorSoundRange": 40,
-  "defaultBattery": "LIGHT"
+  "defaultBattery": "LIGHT",
+  "controlScheme": "FPV"
 }

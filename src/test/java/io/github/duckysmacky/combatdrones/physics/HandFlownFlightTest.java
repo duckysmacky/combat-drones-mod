@@ -107,6 +107,64 @@ class HandFlownFlightTest {
         assertEquals(-1, forward.x, 1e-9);
     }
 
+    private static final Params DJI = new Params(0.9, 0.07);
+
+    private static Input velocity(double forward, double right, double vertical, double yaw) {
+        return new Input(0, vertical, forward, right, yaw, Mode.VELOCITY, true);
+    }
+
+    private static State runDji(State state, Input input, int ticks) {
+        for (int tick = 0; tick < ticks; tick++) {
+            HandFlownFlight.step(state, input, DJI);
+        }
+        return state;
+    }
+
+    @Test
+    void velocityModeReachesCommandedSpeedAlongHeading() {
+        State state = runDji(new State(), velocity(1, 0, 0, 0), 60);
+        assertEquals(0.9, state.velocity.z, 0.02);
+        assertEquals(0, state.velocity.x, 1e-6);
+        assertEquals(0, state.position.y, 0.5);
+    }
+
+    @Test
+    void velocityModeBrakesAndHoldsAltitudeWhenReleased() {
+        State state = runDji(new State(), velocity(1, 0, 0, 0), 40);
+        runDji(state, HandFlownFlight.Input.VELOCITY_HOLD, 40);
+        assertEquals(0, Math.hypot(state.velocity.x, state.velocity.z), 1e-6);
+        assertEquals(0, state.velocity.y, 0.01);
+    }
+
+    @Test
+    void velocityModeStrafesRelativeToHeading() {
+        State state = runDji(new State(), velocity(0, 1, 0, 0), 30);
+        assertTrue(state.velocity.x < -0.5, "strafe right should move toward -X at yaw 0");
+        // After yawing right 90 degrees, forward is -X too
+        State turned = runDji(new State(), velocity(0, 0, 0, 1), 15);
+        runDji(turned, velocity(1, 0, 0, 0), 30);
+        assertTrue(turned.velocity.x < -0.5);
+    }
+
+    @Test
+    void velocityModeBuildsSpeedGraduallyButStopsQuickly() {
+        State state = runDji(new State(), velocity(1, 0, 0, 0), 10);
+        assertTrue(state.velocity.z < 0.45, "should still be building speed after half a second");
+        runDji(state, velocity(1, 0, 0, 0), 60);
+        int ticksToStop = 0;
+        while (Math.hypot(state.velocity.x, state.velocity.z) > 1e-6 && ticksToStop < 100) {
+            HandFlownFlight.step(state, HandFlownFlight.Input.VELOCITY_HOLD, DJI);
+            ticksToStop++;
+        }
+        assertTrue(ticksToStop <= 14, "braking from top speed should take well under a second, took " + ticksToStop);
+    }
+
+    @Test
+    void velocityModeClimbsOnCommand() {
+        State state = runDji(new State(), velocity(0, 0, 1, 0), 40);
+        assertTrue(state.position.y > 5);
+    }
+
     @Test
     void motorsOffFalls() {
         State state = run(new State(), new Input(1, 0, 0, 0, 0, Mode.ANGLE, false), 20);

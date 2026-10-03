@@ -13,7 +13,11 @@ import javax.vecmath.Vector3d;
  * <p>Body frame at identity orientation: forward = +Z, up = +Y, right = -X (Minecraft faces +Z at yaw 0).
  */
 public final class HandFlownFlight {
-    public enum Mode { ACRO, ANGLE, HOVER }
+    /**
+     * ACRO/ANGLE/HOVER: FPV quad modes, cycled by the pilot. VELOCITY: DJI-style "GPS" flight, where sticks command
+     * a horizontal velocity relative to the heading and releasing them holds position.
+     */
+    public enum Mode { ACRO, ANGLE, HOVER, VELOCITY }
 
     /** Matches vanilla entity gravity, so drones fall like everything else. */
     public static final double GRAVITY = 0.08;
@@ -27,6 +31,10 @@ public final class HandFlownFlight {
     static final double HOVER_CLIMB_GAIN = 0.5;
     /** Fraction of horizontal velocity removed per tick in HOVER ("position hold"). */
     static final double HOVER_BRAKE = 0.1;
+    /** VELOCITY: how far the airframe visibly leans into its acceleration. Cosmetic; the physics is GPS-assisted. */
+    static final double VELOCITY_MAX_TILT_DEG = 25.0;
+    /** VELOCITY: speeding up uses this share of the type's acceleration; braking uses all of it (quick stops). */
+    static final double VELOCITY_ACCEL_FRACTION = 0.35;
 
     private static final Vector3d FORWARD = new Vector3d(0, 0, 1);
     private static final Vector3d UP = new Vector3d(0, 1, 0);
@@ -35,6 +43,7 @@ public final class HandFlownFlight {
     /** Per-type tuning, taken from the drone type data. */
     public static final class Params {
         final double maxSpeed;
+        final double acceleration;
         final double thrustAccel;
         final double drag;
 
@@ -44,6 +53,7 @@ public final class HandFlownFlight {
          */
         public Params(double maxSpeed, double acceleration) {
             this.maxSpeed = maxSpeed;
+            this.acceleration = acceleration;
             this.thrustAccel = GRAVITY + acceleration;
             // Linear drag sized so full thrust can't push past maxSpeed even before the hard clamp
             this.drag = thrustAccel / maxSpeed;
@@ -55,6 +65,8 @@ public final class HandFlownFlight {
         public static final Input MOTORS_OFF = new Input(0, 0, 0, 0, 0, Mode.ANGLE, false);
         /** Neutral sticks in HOVER: what an unattended drone with running motors flies (position/altitude hold). */
         public static final Input HOLD_POSITION = new Input(0, 0, 0, 0, 0, Mode.HOVER, true);
+        /** Neutral sticks in VELOCITY: an unattended DJI-style drone brakes and holds position. */
+        public static final Input VELOCITY_HOLD = new Input(0, 0, 0, 0, 0, Mode.VELOCITY, true);
 
         /** 0..1, held level (ACRO/ANGLE). */
         public final double throttle;
@@ -104,6 +116,9 @@ public final class HandFlownFlight {
      * @return thrust used this tick as a fraction of maximum (0..1), which drives battery drain and motor sound
      */
     public static double step(State state, Input input, Params params) {
+        if (input.motorsOn && input.mode == Mode.VELOCITY) {
+            return stepVelocity(state, input, params);
+        }
         if (input.motorsOn) {
             updateAttitude(state.orientation, input);
         }
@@ -151,6 +166,79 @@ public final class HandFlownFlight {
         orientation.normalize();
     }
 
+    /**
+     * DJI-style flight. Horizontal velocity tracks the stick command (rotated by heading) at the type's acceleration,
+     * like a GPS-stabilized consumer drone; altitude uses the hover climb controller pushing straight up. The tilt is
+     * only visual, leaning into the acceleration so the drone and its non-gimballed parts look right.
+     */
+    private static double stepVelocity(State state, Input input, Params params) {
+        // Yaw turns the airframe directly (not through the tilt easing), so the turn rate is the full YAW_RATE_DEG
+        if (input.yaw != 0) {
+            Quat4d yaw = new Quat4d();
+            yaw.set(new AxisAngle4d(UP, Math.toRadians(-input.yaw * YAW_RATE_DEG)));
+            yaw.mul(state.orientation);
+            state.orientation.set(yaw);
+        }
+        Quat4d heading = headingOf(state.orientation);
+        Vector3d forward = rotate(heading, FORWARD);
+        Vector3d right = rotate(heading, RIGHT);
+
+        // Commanded horizontal velocity; diagonal input isn't faster than straight
+        double forwardCommand = input.pitch;
+        double rightCommand = input.roll;
+        double commandLength = Math.hypot(forwardCommand, rightCommand);
+        if (commandLength > 1) {
+            forwardCommand /= commandLength;
+            rightCommand /= commandLength;
+        }
+        double wantedX = (forward.x * forwardCommand + right.x * rightCommand) * params.maxSpeed;
+        double wantedZ = (forward.z * forwardCommand + right.z * rightCommand) * params.maxSpeed;
+
+        Vector3d velocity = state.velocity;
+        double rawDeltaX = wantedX - velocity.x;
+        double rawDeltaZ = wantedZ - velocity.z;
+        double effort = Math.min(1, Math.hypot(rawDeltaX, rawDeltaZ) / params.acceleration);
+        // Split the change into slowing down (along current motion, fast brake) and everything else (gentle build-up)
+        double speed = Math.hypot(velocity.x, velocity.z);
+        double alongX = speed > 1e-9 ? velocity.x / speed : 0;
+        double alongZ = speed > 1e-9 ? velocity.z / speed : 0;
+        double parallel = rawDeltaX * alongX + rawDeltaZ * alongZ;
+        double perpendicularX = rawDeltaX - parallel * alongX;
+        double perpendicularZ = rawDeltaZ - parallel * alongZ;
+        double gain = params.acceleration * VELOCITY_ACCEL_FRACTION;
+        parallel = parallel < 0 ? Math.max(parallel, -params.acceleration) : Math.min(parallel, gain);
+        double perpendicularLength = Math.hypot(perpendicularX, perpendicularZ);
+        if (perpendicularLength > gain) {
+            perpendicularX *= gain / perpendicularLength;
+            perpendicularZ *= gain / perpendicularLength;
+        }
+        double deltaX = parallel * alongX + perpendicularX;
+        double deltaZ = parallel * alongZ + perpendicularZ;
+        double deltaLength = Math.hypot(deltaX, deltaZ);
+        velocity.x += deltaX;
+        velocity.z += deltaZ;
+
+        double lift = Math.max(0, Math.min(climbAccel(velocity.y, input.vertical, params), params.thrustAccel));
+        velocity.y += lift - GRAVITY;
+        velocity.y -= params.drag * velocity.y;
+        double totalSpeed = velocity.length();
+        if (totalSpeed > params.maxSpeed) {
+            velocity.scale(params.maxSpeed / totalSpeed);
+        }
+        state.position.add(velocity);
+
+        // Visual lean into the acceleration, expressed relative to the heading
+        double leanForward = deltaLength > 0 ? (deltaX * forward.x + deltaZ * forward.z) / deltaLength * effort : 0;
+        double leanRight = deltaLength > 0 ? (deltaX * right.x + deltaZ * right.z) / deltaLength * effort : 0;
+        Quat4d target = new Quat4d(heading);
+        rotateBody(target, RIGHT, -leanForward * VELOCITY_MAX_TILT_DEG);
+        rotateBody(target, FORWARD, leanRight * VELOCITY_MAX_TILT_DEG);
+        state.orientation.set(slerp(state.orientation, target, LEVEL_RATE));
+        state.orientation.normalize();
+
+        return Math.min(1, (lift + effort * params.acceleration) / params.thrustAccel);
+    }
+
     /** Spherical interpolation that always takes the short way round. Inputs are not modified. */
     public static Quat4d slerp(Quat4d from, Quat4d to, double alpha) {
         Quat4d target = new Quat4d(to);
@@ -164,11 +252,15 @@ public final class HandFlownFlight {
 
     /** Vertical-speed controller: thrust that drives vertical speed toward the commanded climb rate. */
     private static double hoverThrust(double verticalSpeed, double upY, double vertical, Params params) {
-        double targetSpeed = vertical * HOVER_MAX_CLIMB;
-        double wantedAccel = GRAVITY + params.drag * verticalSpeed + HOVER_CLIMB_GAIN * (targetSpeed - verticalSpeed);
         // Tilt compensation: only the vertical component of thrust fights gravity
-        double thrust = wantedAccel / Math.max(upY, 0.2);
+        double thrust = climbAccel(verticalSpeed, vertical, params) / Math.max(upY, 0.2);
         return Math.max(0, Math.min(thrust, params.thrustAccel));
+    }
+
+    /** Upward acceleration that drives vertical speed toward the commanded climb rate (unclamped). */
+    private static double climbAccel(double verticalSpeed, double vertical, Params params) {
+        double targetSpeed = vertical * HOVER_MAX_CLIMB;
+        return GRAVITY + params.drag * verticalSpeed + HOVER_CLIMB_GAIN * (targetSpeed - verticalSpeed);
     }
 
     /** Yaw-only rotation matching the horizontal direction of the body's forward axis. */

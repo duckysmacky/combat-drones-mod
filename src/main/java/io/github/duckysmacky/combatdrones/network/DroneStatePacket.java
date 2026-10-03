@@ -31,7 +31,7 @@ public class DroneStatePacket implements IMessage {
         state.velocity.set(source.velocity);
         state.orientation.set(source.orientation);
         batteryFraction = (float) drone.getChargeFraction();
-        payload = drone.getGrenades();
+        payload = drone.getPayloadCount();
     }
 
     public float getBatteryFraction() {

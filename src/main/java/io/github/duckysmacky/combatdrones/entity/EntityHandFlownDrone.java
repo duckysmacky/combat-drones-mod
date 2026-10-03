@@ -78,7 +78,8 @@ public class EntityHandFlownDrone extends Entity {
     @Nullable
     private UUID owner;
     private float health;
-    private int grenades;
+    /** Grenades or bombs loaded, per the type's {@link DroneType.PayloadKind}. */
+    private int payload;
     /** Server-side battery charge in charge units; capacity depends on the type and installed pack. */
     private double charge;
 
@@ -88,6 +89,9 @@ public class EntityHandFlownDrone extends Entity {
     private final ArrayDeque<InputFrame> inputQueue = new ArrayDeque<>();
     private HandFlownFlight.Input lastInput = HandFlownFlight.Input.MOTORS_OFF;
     private int lastQueuedSequence = Integer.MIN_VALUE;
+    /** Ticks until the trigger can fire again (rate limit for TriggerPacket). */
+    private int triggerCooldown;
+    private static final int TRIGGER_COOLDOWN_TICKS = 10;
     /**
      * Set when the link dropped because the drone flew out of range: it keeps flying on the pilot's last input
      * instead of hovering, so losing signal is a real risk (a racer just carries on until it hits something).
@@ -214,8 +218,13 @@ public class EntityHandFlownDrone extends Entity {
         return dataManager.get(ROLL);
     }
 
-    public int getGrenades() {
-        return grenades;
+    public int getPayloadCount() {
+        return payload;
+    }
+
+    /** The item a payload kind is loaded from and dropped as. */
+    private static Item payloadItem(DroneType.PayloadKind kind) {
+        return kind == DroneType.PayloadKind.BOMB ? ModContent.bomb : ModContent.fragGrenade;
     }
 
     @Override
@@ -237,6 +246,9 @@ public class EntityHandFlownDrone extends Entity {
             CombatDrones.logger.warn("Removing drone with unknown type '{}'", dataManager.get(TYPE_ID));
             setDead();
             return;
+        }
+        if (triggerCooldown > 0) {
+            triggerCooldown--;
         }
         if (pilot != null) {
             String problem = checkPilot(pilot);
@@ -286,7 +298,46 @@ public class EntityHandFlownDrone extends Entity {
             driftInput = null;
             return HandFlownFlight.Input.MOTORS_OFF;
         }
-        return driftInput != null ? driftInput : HandFlownFlight.Input.HOLD_POSITION;
+        return driftInput != null ? driftInput : holdInput();
+    }
+
+    private boolean isDjiScheme() {
+        DroneType type = getDroneType();
+        return type != null && type.getControlScheme() == DroneType.ControlScheme.DJI;
+    }
+
+    /** Neutral position hold in the drone's own scheme. */
+    private HandFlownFlight.Input holdInput() {
+        return isDjiScheme() ? HandFlownFlight.Input.VELOCITY_HOLD : HandFlownFlight.Input.HOLD_POSITION;
+    }
+
+    /**
+     * Clients choose the flight mode, so a modified client could ask for any of them; only the modes of this
+     * drone's scheme are allowed (a DJI can't be flown in acro, an FPV quad can't use GPS velocity hold).
+     */
+    private HandFlownFlight.Input restrictToScheme(HandFlownFlight.Input input) {
+        boolean dji = isDjiScheme();
+        if (dji == (input.mode == HandFlownFlight.Mode.VELOCITY)) {
+            return input;
+        }
+        HandFlownFlight.Mode fallback = dji ? HandFlownFlight.Mode.VELOCITY : HandFlownFlight.Mode.HOVER;
+        return new HandFlownFlight.Input(input.throttle, input.vertical, input.pitch, input.roll, input.yaw, fallback, input.motorsOn);
+    }
+
+    /** Server: the pilot pulled the trigger. Bomb-carrying drones release one bomb below the airframe. */
+    public void onTrigger(EntityPlayerMP sender) {
+        DroneType type = getDroneType();
+        if (sender != pilot || triggerCooldown > 0 || type == null) {
+            return;
+        }
+        triggerCooldown = TRIGGER_COOLDOWN_TICKS;
+        if (type.getPayload() != DroneType.PayloadKind.BOMB || payload <= 0) {
+            return;
+        }
+        payload--;
+        HandFlownFlight.State state = flightState;
+        world.spawnEntity(new EntityBomb(world, posX, posY - 0.35, posZ, state.velocity.x, state.velocity.y, state.velocity.z, owner));
+        world.playSound(null, posX, posY, posZ, ModSounds.DRONE_BATTERY, SoundCategory.NEUTRAL, 1.0F, 0.6F);
     }
 
     /** Server: accept a control input from the network. Only the current pilot's inputs count. */
@@ -298,7 +349,7 @@ public class EntityHandFlownDrone extends Entity {
         if (inputQueue.size() >= MAX_QUEUED_INPUTS) {
             inputQueue.poll();
         }
-        inputQueue.add(new InputFrame(sequence, input));
+        inputQueue.add(new InputFrame(sequence, restrictToScheme(input)));
     }
 
     /**
@@ -600,6 +651,7 @@ public class EntityHandFlownDrone extends Entity {
     }
 
     protected void detonate(DroneType type) {
+        int grenades = type.getPayload() == DroneType.PayloadKind.GRENADE ? payload : 0;
         float power = type.getBlastPower() + grenades * (float) ModConfig.grenadeBlastBonus;
         setDead();
         if (power > 0) {
@@ -620,8 +672,9 @@ public class EntityHandFlownDrone extends Entity {
         if (droneItem != null) {
             entityDropItem(new ItemStack(droneItem), 0);
         }
-        if (grenades > 0) {
-            entityDropItem(new ItemStack(ModContent.fragGrenade, grenades), 0);
+        DroneType type = getDroneType();
+        if (payload > 0 && type != null && type.getPayload() != null) {
+            entityDropItem(new ItemStack(payloadItem(type.getPayload()), payload), 0);
         }
         ItemStack battery = removeBattery();
         if (!battery.isEmpty()) {
@@ -642,7 +695,7 @@ public class EntityHandFlownDrone extends Entity {
     public boolean processInitialInteract(EntityPlayer player, EnumHand hand) {
         ItemStack stack = player.getHeldItem(hand);
         if (world.isRemote) {
-            return stack.getItem() == ModContent.fpvRemote || stack.getItem() == ModContent.fragGrenade
+            return stack.getItem() == ModContent.fpvRemote || stack.getItem() == ModContent.fragGrenade || stack.getItem() == ModContent.bomb
                     || stack.getItem() instanceof ItemBattery || (stack.isEmpty() && player.isSneaking());
         }
         if (owner != null && !isOwnedBy(player)) {
@@ -657,8 +710,8 @@ public class EntityHandFlownDrone extends Entity {
             player.sendStatusMessage(new TextComponentTranslation("message.combat_drones.linked", new TextComponentTranslation(nameKey)), true);
             return true;
         }
-        if (stack.getItem() == ModContent.fragGrenade) {
-            attachGrenade(player, stack);
+        if (stack.getItem() == ModContent.fragGrenade || stack.getItem() == ModContent.bomb) {
+            attachPayload(player, stack);
             return true;
         }
         if (stack.getItem() instanceof ItemBattery) {
@@ -703,23 +756,24 @@ public class EntityHandFlownDrone extends Entity {
         return battery;
     }
 
-    /** Grenades only arm kamikaze racers; other drones' payload slots hold bombs or ammo (M4). */
-    private void attachGrenade(EntityPlayer player, ItemStack stack) {
+    /** Loads one grenade or bomb, if this drone's payload slots take that item. */
+    private void attachPayload(EntityPlayer player, ItemStack stack) {
         DroneType type = getDroneType();
-        if (type == null || !type.isImpactDetonates() || type.getPayloadCapacity() == 0) {
-            player.sendStatusMessage(new TextComponentTranslation("message.combat_drones.no_grenade_slot"), true);
+        if (type == null || type.getPayloadCapacity() == 0 || type.getPayload() == null || payloadItem(type.getPayload()) != stack.getItem()) {
+            player.sendStatusMessage(new TextComponentTranslation("message.combat_drones.wrong_payload"), true);
             return;
         }
-        if (grenades >= type.getPayloadCapacity()) {
+        if (payload >= type.getPayloadCapacity()) {
             player.sendStatusMessage(new TextComponentTranslation("message.combat_drones.payload_full"), true);
             return;
         }
-        grenades++;
+        payload++;
         world.playSound(null, posX, posY, posZ, ModSounds.DRONE_ATTACH, SoundCategory.PLAYERS, 1.0F, 1.0F);
         if (!player.capabilities.isCreativeMode) {
             stack.shrink(1);
         }
-        player.sendStatusMessage(new TextComponentTranslation("message.combat_drones.grenade_attached", grenades, type.getPayloadCapacity()), true);
+        player.sendStatusMessage(new TextComponentTranslation("message.combat_drones.payload_attached",
+                new TextComponentTranslation(stack.getItem().getTranslationKey() + ".name"), payload, type.getPayloadCapacity()), true);
     }
 
     private String getDroneItemTranslationKey() {
@@ -738,8 +792,9 @@ public class EntityHandFlownDrone extends Entity {
         if (droneItem != null) {
             ItemHandlerHelper.giveItemToPlayer(player, new ItemStack(droneItem));
         }
-        if (grenades > 0) {
-            ItemHandlerHelper.giveItemToPlayer(player, new ItemStack(ModContent.fragGrenade, grenades));
+        DroneType type = getDroneType();
+        if (payload > 0 && type != null && type.getPayload() != null) {
+            ItemHandlerHelper.giveItemToPlayer(player, new ItemStack(payloadItem(type.getPayload()), payload));
         }
         ItemStack battery = removeBattery();
         if (!battery.isEmpty()) {
@@ -771,7 +826,7 @@ public class EntityHandFlownDrone extends Entity {
             compound.setUniqueId("Owner", owner);
         }
         compound.setFloat("Health", health);
-        compound.setInteger("Grenades", grenades);
+        compound.setInteger("Payload", payload);
         compound.setInteger("Battery", dataManager.get(BATTERY_PACK));
         compound.setDouble("Charge", charge);
         Quat4d orientation = flightState.orientation;
@@ -791,7 +846,8 @@ public class EntityHandFlownDrone extends Entity {
         dataManager.set(TYPE_ID, compound.getString("Type"));
         owner = compound.hasUniqueId("Owner") ? compound.getUniqueId("Owner") : null;
         setHealth(compound.getFloat("Health"));
-        grenades = compound.getInteger("Grenades");
+        // "Grenades" was the M2/M3 key, before bombs shared the slot
+        payload = compound.hasKey("Payload") ? compound.getInteger("Payload") : compound.getInteger("Grenades");
         BatteryPack pack = compound.hasKey("Battery") ? BatteryPack.byIndex(compound.getInteger("Battery")) : null;
         dataManager.set(BATTERY_PACK, pack == null ? -1 : pack.ordinal());
         charge = compound.getDouble("Charge");

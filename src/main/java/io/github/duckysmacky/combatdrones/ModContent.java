@@ -1,5 +1,6 @@
 package io.github.duckysmacky.combatdrones;
 
+import io.github.duckysmacky.combatdrones.entity.EntityBomb;
 import io.github.duckysmacky.combatdrones.entity.EntityHandFlownDrone;
 import io.github.duckysmacky.combatdrones.item.ItemBattery;
 import io.github.duckysmacky.combatdrones.item.ItemBlockWithTooltip;
@@ -100,6 +101,12 @@ public final class ModContent {
                 .id(new ResourceLocation(CombatDrones.MOD_ID, "hand_flown_drone"), 0)
                 .name(CombatDrones.MOD_ID + ".hand_flown_drone")
                 .tracker(160, 1, false)
+                .build());
+        event.getRegistry().register(EntityEntryBuilder.create()
+                .entity(EntityBomb.class)
+                .id(new ResourceLocation(CombatDrones.MOD_ID, "bomb"), 1)
+                .name(CombatDrones.MOD_ID + ".bomb")
+                .tracker(160, 1, true)
                 .build());
     }
 

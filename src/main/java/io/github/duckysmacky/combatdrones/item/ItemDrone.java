@@ -22,6 +22,7 @@ import net.minecraftforge.fml.relauncher.SideOnly;
 
 import javax.annotation.Nullable;
 import java.util.List;
+import java.util.Locale;
 
 /** Placeable drone item; one instance per drone type, registered under the type ID. */
 public class ItemDrone extends Item {
@@ -63,14 +64,19 @@ public class ItemDrone extends Item {
         }
         if (type.isImpactDetonates()) {
             tooltip.add(TextFormatting.GRAY + I18n.format("tooltip.combat_drones.drone.kamikaze"));
-            tooltip.add(TextFormatting.GRAY + (type.getPayloadCapacity() > 0
-                    ? I18n.format("tooltip.combat_drones.drone.grenade_slots", type.getPayloadCapacity())
-                    : I18n.format("tooltip.combat_drones.drone.no_payload")));
         }
-        if (handFlown) {
+        if (type.getPayload() != null && type.getPayloadCapacity() > 0) {
+            tooltip.add(TextFormatting.GRAY + I18n.format("tooltip.combat_drones.drone.payload_slots", type.getPayloadCapacity(),
+                    I18n.format("tooltip.combat_drones.payload." + type.getPayload().name().toLowerCase(Locale.ROOT))));
+        } else if (handFlown && type.isImpactDetonates()) {
+            tooltip.add(TextFormatting.GRAY + I18n.format("tooltip.combat_drones.drone.no_payload"));
+        }
+        if (type.getControlScheme() == DroneType.ControlScheme.DJI) {
+            Tooltips.addDetails("tooltip.combat_drones.drone.setup_dji", tooltip,
+                    Tooltips.keyName(DroneKeys.TOGGLE_FPV), Tooltips.keyName(DroneKeys.MOTORS));
+        } else if (handFlown) {
             Tooltips.addDetails("tooltip.combat_drones.drone.setup", tooltip,
-                    Tooltips.keyName(DroneKeys.TOGGLE_FPV), Tooltips.keyName(DroneKeys.FLIGHT_MODE), Tooltips.keyName(DroneKeys.MOTORS),
-                    Tooltips.keyName(DroneKeys.CAMERA));
+                    Tooltips.keyName(DroneKeys.TOGGLE_FPV), Tooltips.keyName(DroneKeys.FLIGHT_MODE), Tooltips.keyName(DroneKeys.MOTORS));
         } else {
             tooltip.add(TextFormatting.GRAY + I18n.format("tooltip.combat_drones.not_functional"));
         }

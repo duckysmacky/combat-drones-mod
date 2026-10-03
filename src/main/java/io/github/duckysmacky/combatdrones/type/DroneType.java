@@ -17,9 +17,22 @@ import java.util.Map;
 public final class DroneType {
     public enum Category { HAND_FLOWN, RAMP_AUTOPILOT }
 
-    public enum ControlScheme { STICK, CLICK_DESIGNATE, GIMBAL_OBSERVE }
+    /**
+     * How the drone is flown. Hand-flown: FPV (acro/angle/hover quad) or DJI (stabilized velocity control).
+     * Ramp-launched (manual takeover from the Mission Planner): STICK, CLICK_DESIGNATE or GIMBAL_OBSERVE.
+     */
+    public enum ControlScheme {
+        FPV, DJI, STICK, CLICK_DESIGNATE, GIMBAL_OBSERVE;
+
+        public boolean isHandFlown() {
+            return this == FPV || this == DJI;
+        }
+    }
 
     public enum WeaponType { NONE, ROCKET_POD, GUN_MOUNT }
+
+    /** What a hand-flown drone's payload slots hold: grenades boost a racer's impact blast, bombs are dropped. */
+    public enum PayloadKind { GRENADE, BOMB }
 
     private static final Gson GSON = new Gson();
 
@@ -38,6 +51,8 @@ public final class DroneType {
     private float blastPower;
     /** Payload items the drone can carry. 0 = no payload slot. */
     private int payloadCapacity;
+    /** Hand-flown only, when payloadCapacity > 0: what goes in the slots. */
+    private PayloadKind payload;
     private float maxHP;
     /** Hand-flown only: blocks from the pilot before the link drops. */
     private double signalRange;
@@ -47,7 +62,7 @@ public final class DroneType {
     private double motorSoundRange = 64;
     /** Ramp-launched only: blocks above the launch point. */
     private double defaultCruiseAltitude;
-    /** Ramp-launched only: what "Take control" does from the Mission Planner. */
+    /** Input mapping: FPV/DJI for hand-flown types, the Mission Planner takeover scheme for ramp-launched ones. */
     private ControlScheme controlScheme;
     private WeaponType weaponType = WeaponType.NONE;
     /** Detonates on any collision (racer family). */
@@ -125,8 +140,10 @@ public final class DroneType {
         if (category == Category.HAND_FLOWN) {
             require(signalRange > 0, "hand-flown types need 'signalRange' > 0");
             require(defaultBattery != null, "hand-flown types need a valid 'defaultBattery' (LIGHT, STANDARD or HEAVY)");
+            require(controlScheme != null && controlScheme.isHandFlown(), "hand-flown types need 'controlScheme' FPV or DJI");
+            require(payloadCapacity == 0 || payload != null, "hand-flown types with payload slots need 'payload' GRENADE or BOMB");
         } else {
-            require(controlScheme != null, "ramp-launched types need a valid 'controlScheme'");
+            require(controlScheme != null && !controlScheme.isHandFlown(), "ramp-launched types need 'controlScheme' STICK, CLICK_DESIGNATE or GIMBAL_OBSERVE");
             require(defaultCruiseAltitude > 0, "ramp-launched types need 'defaultCruiseAltitude' > 0");
         }
         if (!armed) {
@@ -171,6 +188,10 @@ public final class DroneType {
 
     public int getPayloadCapacity() {
         return payloadCapacity;
+    }
+
+    public PayloadKind getPayload() {
+        return payload;
     }
 
     public float getMaxHP() {
