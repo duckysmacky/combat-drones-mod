@@ -65,6 +65,9 @@ public class ItemDrone extends Item {
         }
         if (type.isImpactDetonates()) {
             tooltip.add(TextFormatting.GRAY + I18n.format("tooltip.combat_drones.drone.kamikaze"));
+            if (type.getPayload() == DroneType.PayloadKind.GRENADE && type.getPayloadCapacity() > 0) {
+                tooltip.add(TextFormatting.GRAY + I18n.format("tooltip.combat_drones.drone.kamikaze_trigger"));
+            }
         }
         if (type.getPayload() == DroneType.PayloadKind.BOMB && type.getPayloadCapacity() > 0) {
             tooltip.add(TextFormatting.GRAY + I18n.format("tooltip.combat_drones.drone.bomb_bay",

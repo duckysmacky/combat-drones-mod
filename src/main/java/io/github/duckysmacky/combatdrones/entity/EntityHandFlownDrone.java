@@ -352,13 +352,21 @@ public class EntityHandFlownDrone extends Entity {
         return new HandFlownFlight.Input(input.throttle, input.vertical, input.pitch, input.roll, input.yaw, fallback, input.motorsOn);
     }
 
-    /** Server: the pilot pulled the trigger. Bomb-carrying drones release one bomb below the airframe. */
+    /**
+     * Server: the pilot pulled the trigger. Bomb-carrying drones release one bomb below the airframe; racers with a
+     * grenade loaded detonate on the spot.
+     */
     public void onTrigger(EntityPlayerMP sender) {
         DroneType type = getDroneType();
         if (sender != pilot || triggerCooldown > 0 || type == null) {
             return;
         }
         triggerCooldown = TRIGGER_COOLDOWN_TICKS;
+        // FPV racer with a grenade aboard: the trigger is an airburst
+        if (type.isImpactDetonates() && type.getPayload() == DroneType.PayloadKind.GRENADE && getPayloadCount() > 0) {
+            detonate(type);
+            return;
+        }
         BombType bomb = getPayloadBomb();
         int count = getPayloadCount();
         if (type.getPayload() != DroneType.PayloadKind.BOMB || bomb == null || count <= 0) {
@@ -526,8 +534,11 @@ public class EntityHandFlownDrone extends Entity {
     /** Server-side: collide, then copy orientation into the vanilla-synced rotation fields. */
     private void applyStepToEntity(DroneType type) {
         double speedBefore = flightState.velocity.length();
+        // Swept volume of this tick's move: at racer speeds the drone covers more than a player's width per tick,
+        // so checking only where it ends up would let it pass straight through people
+        AxisAlignedBB swept = getEntityBoundingBox().expand(flightState.position.x - posX, flightState.position.y - posY, flightState.position.z - posZ);
         double impactSpeed = moveWithCollision();
-        if (impactSpeed < ARM_SPEED && speedBefore >= ARM_SPEED && hitsEntity()) {
+        if (impactSpeed < ARM_SPEED && speedBefore >= ARM_SPEED && hitsEntity(swept)) {
             impactSpeed = speedBefore;
         }
         syncRotation();
@@ -637,8 +648,7 @@ public class EntityHandFlownDrone extends Entity {
         }
     }
 
-    private boolean hitsEntity() {
-        AxisAlignedBB box = getEntityBoundingBox();
+    private boolean hitsEntity(AxisAlignedBB box) {
         List<Entity> touching = world.getEntitiesWithinAABBExcludingEntity(this, box);
         for (Entity entity : touching) {
             if (entity.canBeCollidedWith() && entity.isEntityAlive()) {
@@ -688,7 +698,10 @@ public class EntityHandFlownDrone extends Entity {
         float power = type.getBlastPower() + grenades * (float) ModConfig.grenadeBlastBonus;
         setDead();
         if (power > 0) {
-            DroneExplosion.detonate((WorldServer) world, this, getBlameTarget(), posX, posY + height / 2, posZ, power);
+            // Kamikaze racers also throw shrapnel, so a near miss still hurts; each grenade adds more
+            float shrapnel = (float) (ModConfig.racerShrapnelDamage + grenades * ModConfig.grenadeShrapnelDamage);
+            DroneExplosion.detonate((WorldServer) world, this, getBlameTarget(), posX, posY + height / 2, posZ, power,
+                    shrapnel, (float) ModConfig.shrapnelRadius);
         }
     }
 

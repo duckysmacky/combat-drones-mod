@@ -34,8 +34,11 @@ public final class ModConfig {
 
     // [general]
     public static boolean blockDamageEnabled = true;
-    public static double grenadeBlastBonus = 2.0;
+    public static double grenadeBlastBonus = 2.5;
     public static double droneDamageTakenMultiplier = 1.0;
+    public static double racerShrapnelDamage = 6.0;
+    public static double grenadeShrapnelDamage = 5.0;
+    public static double shrapnelRadius = 7.0;
 
     // [client]
     public static boolean invertMousePitch = false;
@@ -54,6 +57,11 @@ public final class ModConfig {
             blockDamageEnabled = defaults.get("general.blockDamageEnabled", blockDamageEnabled, "Whether drone and munition explosions break blocks.");
             grenadeBlastBonus = defaults.number("general.grenadeBlastBonus", grenadeBlastBonus, 0, 20,
                     "Extra blast power per Fragmentation Grenade attached to a racer (vanilla TNT = 4).");
+            racerShrapnelDamage = defaults.number("general.racerShrapnelDamage", racerShrapnelDamage, 0, 40,
+                    "Shrapnel damage (half-hearts) at point blank when a racer detonates; falls off to 0 at shrapnelRadius, needs line of sight.");
+            grenadeShrapnelDamage = defaults.number("general.grenadeShrapnelDamage", grenadeShrapnelDamage, 0, 40,
+                    "Extra shrapnel damage per Fragmentation Grenade the racer carries.");
+            shrapnelRadius = defaults.number("general.shrapnelRadius", shrapnelRadius, 0, 20, "Reach of racer shrapnel, in blocks.");
             droneDamageTakenMultiplier = defaults.number("general.droneDamageTakenMultiplier", droneDamageTakenMultiplier, 0, 10,
                     "Multiplies all damage drones take from attacks (weapons, arrows, melee). Lower = harder to shoot down.");
 

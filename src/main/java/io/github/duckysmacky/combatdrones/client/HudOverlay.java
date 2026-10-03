@@ -107,8 +107,13 @@ public final class HudOverlay {
             drawText(font, I18n.format("hud.combat_drones.gimbal", Math.round(-PilotController.getGimbalPitch())), left, top + LINE * 2, TEXT);
         }
 
-        // Top-right of the box: segmented battery gauge
+        // Top-right of the box: segmented battery gauge, then what's loaded (grenades / bombs) right under it
         drawBattery(font, right, top, pack, battery);
+        String payload = payloadText(drone, type);
+        if (payload != null) {
+            boolean loaded = drone.getPayloadCount() > 0;
+            drawText(font, payload, right - font.getStringWidth(payload), top + 4 * 4 + 2 + LINE, loaded ? 0xFFAA00 : TEXT);
+        }
 
         // Side ladders
         drawLadder(font, left, centerY, speedKmh, SPEED_PIXELS_PER_KMH, SPEED_TICK, true);
@@ -130,10 +135,7 @@ public final class HudOverlay {
         drawText(font, throttle, left, bottom + 16, TEXT);
         float health = drone.getHealthFraction();
         drawText(font, I18n.format("hud.combat_drones.health", percent(health)), left, bottom + 16 + LINE, health < 0.5F ? WARNING : TEXT);
-        String payload = payloadText(drone, type);
-        if (payload != null) {
-            drawText(font, payload, right - font.getStringWidth(payload), bottom + 16, TEXT);
-        }
+
 
         drawCrosshair(centerX, centerY);
         drawWarnings(font, minecraft, centerX, centerY + 24, pack != null, battery, signal);

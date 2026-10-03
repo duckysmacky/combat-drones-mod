@@ -64,7 +64,8 @@ tooltip.combat_drones.drone.speed=Top speed: %s km/h
 tooltip.combat_drones.drone.health=Health: %s
 tooltip.combat_drones.drone.blast=Blast power: %s (TNT = 4)
 tooltip.combat_drones.drone.range=Signal range: %s blocks
-tooltip.combat_drones.drone.kamikaze=Explodes on any hard impact, or when shot down mid-air.
+tooltip.combat_drones.drone.kamikaze=Explodes on any hard impact (blocks or people), when shot down mid-air,
+tooltip.combat_drones.drone.kamikaze_trigger=or on left-click while a grenade is loaded (airburst).
 tooltip.combat_drones.drone.payload_slots=Payload: %s x %s (right-click the drone with one)
 tooltip.combat_drones.payload.grenade=Fragmentation Grenade
 tooltip.combat_drones.drone.bomb_bay=Bomb bay: %s light, %s medium or %s heavy (one size at a time)
@@ -168,3 +169,5 @@ message.combat_drones.mode_dji_fixed=DJI drones always fly in GPS hold
 message.combat_drones.mode_velocity=Flight mode: GPS
 entity.combat_drones.bomb.name=Bomb
 message.combat_drones.bay_holds_other=The bomb bay already holds %s: drop those first
+death.attack.combat_drones.shrapnel=%1$s was shredded by drone shrapnel
+death.attack.combat_drones.shrapnel.player=%1$s was shredded by %2$s's drone

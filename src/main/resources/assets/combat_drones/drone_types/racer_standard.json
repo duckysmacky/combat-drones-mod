@@ -5,7 +5,7 @@
   "acceleration": 0.12,
   "batteryOrFuelCapacity": 2400,
   "drainRatePerTick": 1.0,
-  "blastPower": 3.5,
+  "blastPower": 4.5,
   "payloadCapacity": 1,
   "maxHP": 10,
   "signalRange": 128,
