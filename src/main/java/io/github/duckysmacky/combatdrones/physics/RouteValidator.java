@@ -58,6 +58,18 @@ public final class RouteValidator {
         if (route.getTerminal() == null || !allowedTerminals.contains(route.getTerminal())) {
             return "message.combat_drones.route.bad_terminal";
         }
+        Route.Target target = route.getTarget();
+        if (target != null && !(Double.isFinite(target.x) && Double.isFinite(target.y) && Double.isFinite(target.z))) {
+            return "message.combat_drones.route.invalid";
+        }
+        if (route.getTerminal() == Route.TerminalAction.DESTROY) {
+            if (target == null) {
+                return "message.combat_drones.route.no_target";
+            }
+            if (Math.hypot(target.x - startX, target.z - startZ) > limits.maxLength) {
+                return "message.combat_drones.route.target_too_far";
+            }
+        }
         return null;
     }
 }

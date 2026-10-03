@@ -31,6 +31,14 @@ public final class RouteCodec {
         tag.setTag("Waypoints", points);
         tag.setString("Terminal", route.getTerminal().name());
         tag.setDouble("LoiterRadius", route.getLoiterRadius());
+        Route.Target target = route.getTarget();
+        if (target != null) {
+            NBTTagCompound targetTag = new NBTTagCompound();
+            targetTag.setDouble("X", target.x);
+            targetTag.setDouble("Y", target.y);
+            targetTag.setDouble("Z", target.z);
+            tag.setTag("Target", targetTag);
+        }
         return tag;
     }
 
@@ -48,7 +56,12 @@ public final class RouteCodec {
             }
         }
         double radius = tag.hasKey("LoiterRadius") ? tag.getDouble("LoiterRadius") : Route.DEFAULT_LOITER_RADIUS;
-        return new Route(waypoints, terminal, radius);
+        Route.Target target = null;
+        if (tag.hasKey("Target", Constants.NBT.TAG_COMPOUND)) {
+            NBTTagCompound targetTag = tag.getCompoundTag("Target");
+            target = new Route.Target(targetTag.getDouble("X"), targetTag.getDouble("Y"), targetTag.getDouble("Z"));
+        }
+        return new Route(waypoints, terminal, radius, target);
     }
 
     private static Route.Speed speedOf(String name) {
@@ -70,6 +83,13 @@ public final class RouteCodec {
             buf.writeDouble(waypoint.altitude);
             buf.writeByte(waypoint.speed.ordinal());
         }
+        Route.Target target = route.getTarget();
+        buf.writeBoolean(target != null);
+        if (target != null) {
+            buf.writeDouble(target.x);
+            buf.writeDouble(target.y);
+            buf.writeDouble(target.z);
+        }
     }
 
     public static Route read(ByteBuf buf) {
@@ -87,6 +107,7 @@ public final class RouteCodec {
             Route.Speed[] speeds = Route.Speed.values();
             waypoints.add(new Route.Waypoint(x, z, altitude, speedIndex < speeds.length ? speeds[speedIndex] : Route.Speed.FAST));
         }
-        return new Route(waypoints, terminal, loiterRadius);
+        Route.Target target = buf.readBoolean() ? new Route.Target(buf.readDouble(), buf.readDouble(), buf.readDouble()) : null;
+        return new Route(waypoints, terminal, loiterRadius, target);
     }
 }

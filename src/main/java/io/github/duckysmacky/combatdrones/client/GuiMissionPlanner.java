@@ -201,7 +201,7 @@ public class GuiMissionPlanner extends GuiScreen {
 
     private void refreshButtons() {
         PlannerOpenPacket.UnitView unit = currentUnit();
-        String pending = terminal == Route.TerminalAction.LOITER ? "" : I18n.format("gui.combat_drones.planner.pending");
+        String pending = terminal != Route.TerminalAction.LOOP ? "" : I18n.format("gui.combat_drones.planner.pending");
         terminalButton.displayString = I18n.format("gui.combat_drones.planner.terminal",
                 I18n.format("gui.combat_drones.terminal." + terminal.name().toLowerCase(Locale.ROOT))) + pending;
         terminalButton.enabled = unit != null && unit.allowedTerminals.size() > 1;

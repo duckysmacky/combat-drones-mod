@@ -57,4 +57,15 @@ class RouteValidatorTest {
         Route route = new Route(Arrays.asList(new Waypoint(30, 40, 20), new Waypoint(30, 0, 20)), TerminalAction.LOITER);
         assertEquals(90, route.length(0, 0), 1e-9);
     }
+
+    @Test
+    void destroyNeedsANearbyTarget() {
+        Route route = new Route(Collections.singletonList(new Waypoint(10, 10, 30)), TerminalAction.DESTROY);
+        assertEquals("message.combat_drones.route.no_target", RouteValidator.validate(route, 0, 0, LIMITS, MUNITION));
+        assertNull(RouteValidator.validate(route.withTarget(new Route.Target(50, 64, 50)), 0, 0, LIMITS, MUNITION));
+        assertEquals("message.combat_drones.route.target_too_far",
+                RouteValidator.validate(route.withTarget(new Route.Target(5000, 64, 0)), 0, 0, LIMITS, MUNITION));
+        assertEquals("message.combat_drones.route.invalid",
+                RouteValidator.validate(route.withTarget(new Route.Target(50, Double.NaN, 50)), 0, 0, LIMITS, MUNITION));
+    }
 }

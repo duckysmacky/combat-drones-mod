@@ -50,6 +50,8 @@ public class EntityRampUnit extends Entity {
     /** Movement lost to a collision beyond this (blocks/tick) counts as a crash. */
     private static final double CRASH_THRESHOLD = 0.1;
     private static final double RENDER_DISTANCE = 160.0;
+    /** Non-explosive units touching down slower than this share of top speed land instead of crashing. */
+    private static final double LANDING_SPEED_FRACTION = 0.75;
 
     private static final DataParameter<String> TYPE_ID = EntityDataManager.createKey(EntityRampUnit.class, DataSerializers.STRING);
     private static final DataParameter<Float> BANK = EntityDataManager.createKey(EntityRampUnit.class, DataSerializers.FLOAT);
@@ -62,6 +64,9 @@ public class EntityRampUnit extends Entity {
     private Route route = Route.empty(Route.TerminalAction.LOITER);
     private int waypointIndex;
     private double launchY;
+    /** Where Return flies back to: the launch point. NaN for units summoned without one. */
+    private double homeX = Double.NaN;
+    private double homeZ = Double.NaN;
     private double fuel;
     private float health;
     /** Keeps the unit's chunk (and the next one ahead) loaded, so it keeps flying far from any player. */
@@ -85,6 +90,8 @@ public class EntityRampUnit extends Entity {
         this.route = route;
         this.fuel = fuel;
         this.launchY = y;
+        this.homeX = x;
+        this.homeZ = z;
         setHealth(type.getMaxHP());
         setPosition(x, y, z);
         flight.position.set(x, y, z);
@@ -173,7 +180,10 @@ public class EntityRampUnit extends Entity {
         FixedWingFlight.Params params = paramsOf(type);
         // The entity position is the truth (picks up /tp and positions set after NBT load)
         flight.position.set(posX, posY, posZ);
-        RouteAutopilot.Command command = RouteAutopilot.guide(flight, route, waypointIndex, launchY, terrainFloor(), params, fuel > 0);
+        RouteAutopilot.Situation situation = new RouteAutopilot.Situation(launchY, terrainFloor(), fuel > 0,
+                fuel / type.getBatteryOrFuelCapacity(), ModConfig.lowFuelFraction, type.isArmed() && type.isImpactDetonates(),
+                strikeGroundY(), homeX, launchY - 1, homeZ);
+        RouteAutopilot.Command command = RouteAutopilot.guide(flight, route, waypointIndex, situation, params);
         waypointIndex = command.waypointIndex;
         double thrust = FixedWingFlight.step(flight, command.controls, params);
         if (command.controls.engineOn) {
@@ -191,7 +201,8 @@ public class EntityRampUnit extends Entity {
         double blocked = Math.sqrt(sq(wantedX - (posX - startX)) + sq(wantedY - (posY - startY)) + sq(wantedZ - (posZ - startZ)));
         flight.position.set(posX, posY, posZ);
         syncPresentation();
-        if (blocked > CRASH_THRESHOLD || hitsEntity(swept)) {
+        // onGround catches shallow touchdowns, which lose too little movement to count as a crash
+        if (blocked > CRASH_THRESHOLD || onGround || hitsEntity(swept)) {
             onCollision(type);
             return;
         }
@@ -225,6 +236,8 @@ public class EntityRampUnit extends Entity {
     /** Server: after a restart Forge hands back the ticket this unit held (see CombatDrones' loading callback). */
     public void adoptChunkTicket(ForgeChunkManager.Ticket ticket) {
         chunkTicket = ticket;
+        // Forge restores the ticket but not its chunks; without forcing one now the unit would never tick to do it
+        ForgeChunkManager.forceChunk(ticket, new ChunkPos(MathHelper.floor(posX) >> 4, MathHelper.floor(posZ) >> 4));
     }
 
     @Override
@@ -258,9 +271,19 @@ public class EntityRampUnit extends Entity {
         return highest + TERRAIN_CLEARANCE;
     }
 
+    /** Ground height under the last waypoint (where Dive aims), or NaN if that area isn't loaded. */
+    private double strikeGroundY() {
+        if (route.size() == 0 || waypointIndex < route.size()) {
+            return Double.NaN;
+        }
+        Route.Waypoint last = route.get(route.size() - 1);
+        BlockPos column = new BlockPos(last.x, 0, last.z);
+        return world.isBlockLoaded(column) ? world.getHeight(column).getY() : Double.NaN;
+    }
+
     private boolean hitsEntity(AxisAlignedBB box) {
         for (Entity entity : world.getEntitiesWithinAABBExcludingEntity(this, box)) {
-            if (entity.canBeCollidedWith() && entity.isEntityAlive()) {
+            if (entity.canBeCollidedWith() && entity.isEntityAlive() && !isPassenger(entity)) {
                 return true;
             }
         }
@@ -277,12 +300,15 @@ public class EntityRampUnit extends Entity {
 
     /**
      * Ran into terrain or something solid. Warheads go off; an unarmed recon UAV never detonates (architecture
-     * rule 6) and lands intact as an item; anything else is wrecked.
+     * rule 6) and lands intact as an item; other units land if they were slow enough (a Return landing, or a belly
+     * landing), and are wrecked otherwise.
      */
     private void onCollision(DroneType type) {
+        // Slow contact of any kind counts: a landing roll often ends against a bump or a block edge
+        boolean gentleTouchdown = flight.speed < LANDING_SPEED_FRACTION * type.getMaxSpeed();
         if (type.isArmed() && type.isImpactDetonates()) {
             detonate(type);
-        } else if (!type.isArmed()) {
+        } else if (!type.isArmed() || gentleTouchdown) {
             land(type);
         } else {
             setDead();
@@ -367,6 +393,8 @@ public class EntityRampUnit extends Entity {
         compound.setTag("Route", RouteCodec.toNbt(route));
         compound.setInteger("WaypointIndex", waypointIndex);
         compound.setDouble("LaunchY", launchY);
+        compound.setDouble("HomeX", homeX);
+        compound.setDouble("HomeZ", homeZ);
         compound.setDouble("Fuel", fuel);
         compound.setFloat("Health", health);
         compound.setDouble("Heading", flight.heading);
@@ -382,6 +410,8 @@ public class EntityRampUnit extends Entity {
         route = RouteCodec.fromNbt(compound.getCompoundTag("Route"), Route.TerminalAction.LOITER);
         waypointIndex = compound.getInteger("WaypointIndex");
         launchY = compound.hasKey("LaunchY") ? compound.getDouble("LaunchY") : posY;
+        homeX = compound.hasKey("HomeX") ? compound.getDouble("HomeX") : Double.NaN;
+        homeZ = compound.hasKey("HomeZ") ? compound.getDouble("HomeZ") : Double.NaN;
         fuel = compound.getDouble("Fuel");
         setHealth(compound.getFloat("Health"));
         flight.heading = compound.getDouble("Heading");

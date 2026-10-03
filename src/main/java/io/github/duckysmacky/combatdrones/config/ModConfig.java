@@ -44,6 +44,8 @@ public final class ModConfig {
     public static double maxRouteAltitude = 120.0;
     public static double maxRouteLength = 3000.0;
     public static double minLaunchFuel = 0.25;
+    public static double lowFuelFraction = 0.15;
+    public static double maxMarkDistance = 256.0;
 
     // [client]
     public static boolean invertMousePitch = false;
@@ -79,6 +81,10 @@ public final class ModConfig {
                     "Longest total route (from the ramp through every waypoint), in blocks.");
             minLaunchFuel = defaults.number("general.minLaunchFuel", minLaunchFuel, 0, 1,
                     "Share of a full tank a ramp unit needs before it may launch.");
+            lowFuelFraction = defaults.number("general.lowFuelFraction", lowFuelFraction, 0, 1,
+                    "Fuel share at which a loitering unit stops circling: munitions dive on their last waypoint, planes fly home and land.");
+            maxMarkDistance = defaults.number("general.maxMarkDistance", maxMarkDistance, 16, 1024,
+                    "How far a target can be marked with the Mission Planner, or designated from a munition's camera, in blocks.");
             droneDamageTakenMultiplier = defaults.number("general.droneDamageTakenMultiplier", droneDamageTakenMultiplier, 0, 10,
                     "Multiplies all damage drones take from attacks (weapons, arrows, melee). Lower = harder to shoot down.");
 

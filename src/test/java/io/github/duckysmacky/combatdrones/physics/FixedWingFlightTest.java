@@ -64,4 +64,29 @@ class FixedWingFlightTest {
         assertTrue(state.speed > PLANE.stallSpeed(), "a glide keeps flying speed");
         assertTrue(state.position.z > -state.position.y * 2, "a glide covers more ground than it loses height");
     }
+
+    @Test
+    void fullForwardStickDivesSteeply() {
+        State state = cruising();
+        run(state, FixedWingFlight.fromStick(1, 0, 1, true), 40);
+        assertEquals(FixedWingFlight.MAX_DIVE_PITCH_DEG, state.pitch, 1e-6);
+        assertTrue(state.position.y < -20);
+    }
+
+    @Test
+    void releasedStickLevelsOut() {
+        State state = cruising();
+        run(state, FixedWingFlight.fromStick(0.5, 1, 0.8, true), 20);
+        assertTrue(state.bank > 30 && state.pitch > 10);
+        run(state, FixedWingFlight.fromStick(0, 0, 0.8, true), 40);
+        assertEquals(0, state.bank, 1e-6);
+        assertEquals(0, state.pitch, 1e-6);
+    }
+
+    @Test
+    void stickWithoutFuelCutsTheEngine() {
+        Controls controls = FixedWingFlight.fromStick(0, 0, 1, false);
+        assertEquals(0, controls.throttle, 1e-9);
+        assertTrue(!controls.engineOn);
+    }
 }

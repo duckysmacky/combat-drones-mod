@@ -11,7 +11,10 @@ import javax.vecmath.Vector3d;
 public final class FixedWingFlight {
     static final double MAX_BANK_DEG = 45.0;
     static final double ROLL_RATE_DEG = 4.0;
+    /** Nose-up limit. */
     static final double MAX_PITCH_DEG = 30.0;
+    /** Nose-down limit: steeper than the climb, so strikes can dive onto a point. */
+    static final double MAX_DIVE_PITCH_DEG = 60.0;
     static final double PITCH_RATE_DEG = 2.0;
     static final double MAX_TURN_RATE_DEG = 4.0;
     /** Coordinated-turn "gravity" (blocks/tick²): turn rate = TURN_GRAVITY · tan(bank) / speed. */
@@ -76,6 +79,20 @@ public final class FixedWingFlight {
     private FixedWingFlight() {
     }
 
+    /**
+     * Manual flight, angle-style: the sticks set the attitude to hold (full deflection = maximum bank or pitch) and
+     * the plane levels itself when they're released.
+     *
+     * @param pitchStick -1..1, positive = nose down
+     * @param rollStick  -1..1, positive = bank right
+     * @param throttle   0..1
+     */
+    public static Controls fromStick(double pitchStick, double rollStick, double throttle, boolean hasFuel) {
+        double pitch = clamp(pitchStick, 1);
+        return new Controls(clamp(rollStick, 1) * MAX_BANK_DEG, pitch * (pitch > 0 ? MAX_DIVE_PITCH_DEG : MAX_PITCH_DEG),
+                hasFuel ? Math.max(0, Math.min(1, throttle)) : 0, hasFuel);
+    }
+
     /** Advances one tick. Returns the thrust used as a fraction of full throttle (fuel drain, engine sound). */
     public static double step(State state, Controls controls, Params params) {
         state.bank = clamp(approach(state.bank, controls.targetBank, ROLL_RATE_DEG), MAX_BANK_DEG);
@@ -85,7 +102,7 @@ public final class FixedWingFlight {
         if (stalled) {
             targetPitch = Math.max(targetPitch, 15.0); // a stalled wing drops the nose to regain speed
         }
-        state.pitch = clamp(approach(state.pitch, targetPitch, PITCH_RATE_DEG), MAX_PITCH_DEG);
+        state.pitch = Math.max(-MAX_PITCH_DEG, Math.min(MAX_DIVE_PITCH_DEG, approach(state.pitch, targetPitch, PITCH_RATE_DEG)));
 
         double turnRate = Math.toDegrees(TURN_GRAVITY * Math.tan(Math.toRadians(state.bank)) / Math.max(state.speed, 0.1));
         state.heading = wrap(state.heading + clamp(turnRate, MAX_TURN_RATE_DEG));

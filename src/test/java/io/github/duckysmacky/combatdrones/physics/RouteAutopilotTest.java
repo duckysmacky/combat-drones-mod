@@ -118,4 +118,64 @@ class RouteAutopilotTest {
         }
         assertTrue(state.position.y < ORIGIN_Y - 10);
     }
+
+    private static RouteAutopilot.Situation situation(double fuelFraction, boolean warhead) {
+        return new RouteAutopilot.Situation(ORIGIN_Y, 0, true, fuelFraction, 0.15, warhead, ORIGIN_Y, 0, ORIGIN_Y, 0);
+    }
+
+    /** Flies until the plane reaches the ground plane at {@code groundY}; returns where it touched, or null. */
+    private static FixedWingFlight.State flyToGround(FixedWingFlight.State state, Route route, RouteAutopilot.Situation situation,
+                                                     double groundY, int maxTicks) {
+        int index = 0;
+        for (int tick = 0; tick < maxTicks; tick++) {
+            RouteAutopilot.Command command = RouteAutopilot.guide(state, route, index, situation, PLANE);
+            index = command.waypointIndex;
+            FixedWingFlight.step(state, command.controls, PLANE);
+            if (state.position.y <= groundY) {
+                return state;
+            }
+        }
+        return null;
+    }
+
+    @Test
+    void diveHitsTheGroundUnderTheLastWaypoint() {
+        FixedWingFlight.State state = launched();
+        Route route = new Route(Collections.singletonList(new Waypoint(0, 150, 40)), TerminalAction.DIVE);
+        FixedWingFlight.State impact = flyToGround(state, route, situation(1, true), ORIGIN_Y, 2000);
+        assertTrue(impact != null, "should dive into the ground");
+        assertTrue(Math.hypot(impact.position.x, impact.position.z - 150) < 3, "should hit within 3 blocks of the point, hit " + impact.position);
+    }
+
+    @Test
+    void destroyHitsTheMarkedTarget() {
+        FixedWingFlight.State state = launched();
+        Route route = new Route(Collections.singletonList(new Waypoint(0, 100, 40)), TerminalAction.DESTROY)
+                .withTarget(new Route.Target(120, ORIGIN_Y - 5, 220));
+        FixedWingFlight.State impact = flyToGround(state, route, situation(1, true), ORIGIN_Y - 5, 3000);
+        assertTrue(impact != null, "should reach the target");
+        assertTrue(Math.hypot(impact.position.x - 120, impact.position.z - 220) < 3, "should hit within 3 blocks of the target, hit " + impact.position);
+    }
+
+    @Test
+    void lowFuelEndsTheLoiter() {
+        Route route = route(0, 10, 30);
+        FixedWingFlight.State munition = launched();
+        munition.position.set(0, ORIGIN_Y + 30, 10);
+        assertEquals(RouteAutopilot.Phase.STRIKE, RouteAutopilot.guide(munition, route, 1, situation(0.1, true), PLANE).phase);
+        assertEquals(RouteAutopilot.Phase.LOITER, RouteAutopilot.guide(munition, route, 1, situation(0.5, true), PLANE).phase);
+        FixedWingFlight.State gunship = launched();
+        gunship.position.set(0, ORIGIN_Y + 30, 10);
+        assertEquals(RouteAutopilot.Phase.LAND, RouteAutopilot.guide(gunship, route, 1, situation(0.1, false), PLANE).phase);
+    }
+
+    @Test
+    void returnLandsSlowlyNearHome() {
+        FixedWingFlight.State state = launched();
+        Route route = new Route(Collections.singletonList(new Waypoint(300, 300, 40)), TerminalAction.RETURN);
+        FixedWingFlight.State touchdown = flyToGround(state, route, situation(1, false), ORIGIN_Y, 4000);
+        assertTrue(touchdown != null, "should come down");
+        assertTrue(Math.hypot(touchdown.position.x, touchdown.position.z) < 40, "should land near home");
+        assertTrue(touchdown.speed < 0.75 * PLANE.maxSpeed, "should touch down slowly, was " + touchdown.speed);
+    }
 }

@@ -62,19 +62,48 @@ public final class Route {
         }
     }
 
+    /** A fixed point to strike (Destroy): captured when marked, never a moving entity. */
+    public static final class Target {
+        public final double x;
+        /** Absolute block Y. NaN when picked on the map, until the server resolves the ground height. */
+        public final double y;
+        public final double z;
+
+        public Target(double x, double y, double z) {
+            this.x = x;
+            this.y = y;
+            this.z = z;
+        }
+    }
+
     private final List<Waypoint> waypoints;
     private final TerminalAction terminal;
     /** Orbit radius around the last waypoint for LOITER / LOOP endings, in blocks. */
     private final double loiterRadius;
+    private final Target target;
 
     public Route(List<Waypoint> waypoints, TerminalAction terminal) {
         this(waypoints, terminal, DEFAULT_LOITER_RADIUS);
     }
 
     public Route(List<Waypoint> waypoints, TerminalAction terminal, double loiterRadius) {
+        this(waypoints, terminal, loiterRadius, null);
+    }
+
+    public Route(List<Waypoint> waypoints, TerminalAction terminal, double loiterRadius, Target target) {
         this.waypoints = Collections.unmodifiableList(new ArrayList<>(waypoints));
         this.terminal = terminal;
         this.loiterRadius = loiterRadius;
+        this.target = target;
+    }
+
+    /** Strike point for Destroy, or null if none is marked. */
+    public Target getTarget() {
+        return target;
+    }
+
+    public Route withTarget(Target newTarget) {
+        return new Route(waypoints, terminal, loiterRadius, newTarget);
     }
 
     public double getLoiterRadius() {
