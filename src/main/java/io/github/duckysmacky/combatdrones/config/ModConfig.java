@@ -9,6 +9,7 @@ import io.github.duckysmacky.combatdrones.type.BombType;
 import io.github.duckysmacky.combatdrones.type.DroneType;
 import io.github.duckysmacky.combatdrones.type.DroneTypes;
 
+import javax.annotation.Nullable;
 import java.io.File;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -28,6 +29,8 @@ import java.util.Map;
  */
 public final class ModConfig {
     public static final String FILE_NAME = CombatDrones.MOD_ID + ".toml";
+    /** Keys from older versions, removed from existing files so they don't look like live settings. */
+    private static final String[] RETIRED_KEYS = {"general.bombBlastPower"};
 
     // [general]
     public static boolean blockDamageEnabled = true;
@@ -88,6 +91,12 @@ public final class ModConfig {
                     + "capacity (with a Light pack) and drain in charge units (full-throttle flight time = capacity / drain ticks), blastPower on the vanilla "
                     + "scale (TNT = 4), maxHP like mob health, signalRange and motorSoundRange in blocks.");
 
+            for (String retired : RETIRED_KEYS) {
+                if (config.contains(retired)) {
+                    config.remove(retired);
+                    defaults.changed = true;
+                }
+            }
             if (defaults.changed) {
                 config.save();
             }
@@ -119,7 +128,45 @@ public final class ModConfig {
         }
     }
 
-    /** Reads values, writing defaults (with comments) for anything missing or of the wrong type. */
+    private static final String DEFAULT_MARK = "Default: ";
+
+    /**
+     * Whether a stored value should follow the (possibly new) default: yes if it still equals the default recorded
+     * when it was written, i.e. nobody edited it. Files written before defaults were recorded have no record; for
+     * those, {@code legacyFollows} decides (generated stat tables yes, hand-set options no).
+     */
+    static boolean followsDefault(Object stored, @Nullable String recordedDefault, boolean legacyFollows) {
+        if (recordedDefault == null) {
+            return legacyFollows;
+        }
+        return sameValue(stored, recordedDefault);
+    }
+
+    static boolean sameValue(Object stored, String text) {
+        if (stored instanceof Number) {
+            try {
+                return Math.abs(((Number) stored).doubleValue() - Double.parseDouble(text)) < 1e-9;
+            } catch (NumberFormatException e) {
+                return false;
+            }
+        }
+        return String.valueOf(stored).equals(text);
+    }
+
+    /** The default recorded at the end of an entry's comment ("... Default: 0.7"), or null. */
+    @Nullable
+    static String recordedDefault(@Nullable String comment) {
+        if (comment == null) {
+            return null;
+        }
+        int index = comment.lastIndexOf(DEFAULT_MARK);
+        return index < 0 ? null : comment.substring(index + DEFAULT_MARK.length()).trim();
+    }
+
+    /**
+     * Reads values, writing defaults (with comments) for anything missing or of the wrong type. Every entry's comment
+     * records its default, so changed defaults in a mod update reach values the admin never touched.
+     */
     private static final class Defaults {
         private final CommentedFileConfig config;
         boolean changed;
@@ -135,49 +182,51 @@ public final class ModConfig {
             }
         }
 
-        boolean get(String path, boolean fallback, String comment) {
-            Object value = config.get(path);
-            if (value instanceof Boolean) {
-                return (Boolean) value;
-            }
-            reset(path, fallback, comment);
-            return fallback;
+        boolean get(String path, boolean fallback, String description) {
+            return (Boolean) track(path, fallback, description, Boolean.class, false);
         }
 
-        double number(String path, double fallback, double min, double max, String comment) {
-            Object value = config.get(path);
-            if (value instanceof Number) {
-                double number = ((Number) value).doubleValue();
-                if (number >= min && number <= max) {
-                    return number;
-                }
-                CombatDrones.logger.error("{} = {} in {} is outside {}..{}, using {}", path, number, FILE_NAME, min, max, fallback);
-                return fallback;
+        double number(String path, double fallback, double min, double max, @Nullable String description) {
+            // Option knobs carry a description; tables of generated numbers (batteries, bombs) don't
+            double number = ((Number) track(path, fallback, description, Number.class, description == null)).doubleValue();
+            if (number >= min && number <= max) {
+                return number;
             }
-            reset(path, fallback, comment);
+            CombatDrones.logger.error("{} = {} in {} is outside {}..{}, using {}", path, number, FILE_NAME, min, max, fallback);
             return fallback;
         }
 
         Number stat(String path, Number fallback) {
-            Object value = config.get(path);
-            if (value instanceof Number) {
-                return (Number) value;
-            }
             // Float fields would otherwise be written as e.g. 1.600000023841858
             Number clean = fallback instanceof Float ? Double.valueOf(fallback.toString()) : fallback;
-            reset(path, clean, null);
-            return clean;
+            return (Number) track(path, clean, null, Number.class, true);
         }
 
-        private void reset(String path, Object value, String comment) {
-            if (config.contains(path)) {
-                CombatDrones.logger.error("{} in {} has the wrong type, resetting it to {}", path, FILE_NAME, value);
+        private Object track(String path, Object fallback, @Nullable String description, Class<?> type, boolean legacyFollows) {
+            Object value = config.get(path);
+            boolean valid = type.isInstance(value);
+            String recorded = recordedDefault(config.getComment(path));
+            String comment = (description == null ? "" : description + " ") + DEFAULT_MARK + fallback;
+            if (valid && !followsDefault(value, recorded, legacyFollows)) {
+                setComment(path, comment);
+                return value;
             }
-            config.set(path, value);
-            if (comment != null) {
+            if (value != null && !valid) {
+                CombatDrones.logger.error("{} in {} has the wrong type, resetting it to {}", path, FILE_NAME, fallback);
+            }
+            if (!valid || !sameValue(value, String.valueOf(fallback))) {
+                config.set(path, fallback);
+                changed = true;
+            }
+            setComment(path, comment);
+            return fallback;
+        }
+
+        private void setComment(String path, String comment) {
+            if (!comment.equals(config.getComment(path))) {
                 config.setComment(path, comment);
+                changed = true;
             }
-            changed = true;
         }
     }
 }

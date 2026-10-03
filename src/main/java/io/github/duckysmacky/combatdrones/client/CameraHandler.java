@@ -40,7 +40,7 @@ public final class CameraHandler {
             PilotController.updateGimbal();
             // Gimbal-stabilized: follows the heading, pilot-controlled tilt (straight down for bombing/scouting),
             // never rolls with the airframe. FPV drones only get their fixed forward camera.
-            euler = new double[] {HandFlownFlight.toEuler(view)[0], PilotController.getGimbalPitch(), 0};
+            euler = new double[] {HandFlownFlight.headingYaw(view), PilotController.getGimbalPitch(), 0};
         } else {
             view.mul(CAMERA_UPTILT);
             euler = HandFlownFlight.toEuler(view);

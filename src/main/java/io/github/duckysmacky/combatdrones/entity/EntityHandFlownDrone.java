@@ -432,7 +432,10 @@ public class EntityHandFlownDrone extends Entity {
                     ? "message.combat_drones.signal_lost" : "message.combat_drones.link_lost"), true);
         }
         if (reason == LinkLoss.SIGNAL) {
-            driftInput = lastInput;
+            // DJI mouse yaw is a momentary turn, not a held stick: don't let a drifting drone spin forever
+            driftInput = lastInput.mode == HandFlownFlight.Mode.VELOCITY
+                    ? new HandFlownFlight.Input(lastInput.throttle, lastInput.vertical, lastInput.pitch, lastInput.roll, 0, lastInput.mode, lastInput.motorsOn)
+                    : lastInput;
         }
         pilot = null;
         inputQueue.clear();

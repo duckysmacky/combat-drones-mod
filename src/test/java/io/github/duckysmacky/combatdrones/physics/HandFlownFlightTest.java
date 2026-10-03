@@ -140,8 +140,8 @@ class HandFlownFlightTest {
     void velocityModeStrafesRelativeToHeading() {
         State state = runDji(new State(), velocity(0, 1, 0, 0), 30);
         assertTrue(state.velocity.x < -0.5, "strafe right should move toward -X at yaw 0");
-        // After yawing right 90 degrees, forward is -X too
-        State turned = runDji(new State(), velocity(0, 0, 0, 1), 15);
+        // After yawing right 90 degrees (3 ticks at full rate), forward is -X too
+        State turned = runDji(new State(), velocity(0, 0, 0, 1), 3);
         runDji(turned, velocity(1, 0, 0, 0), 30);
         assertTrue(turned.velocity.x < -0.5);
     }
@@ -157,6 +157,24 @@ class HandFlownFlightTest {
             ticksToStop++;
         }
         assertTrue(ticksToStop <= 14, "braking from top speed should take well under a second, took " + ticksToStop);
+    }
+
+    @Test
+    void leaningIntoMovementNeverTurnsTheHeading() {
+        State state = new State();
+        for (int tick = 0; tick < 60; tick++) {
+            // forward + strafe, then strafe only, then stop: every combination of lean
+            Input input = tick < 20 ? velocity(1, 1, 0, 0) : tick < 40 ? velocity(0, -1, 0, 0) : HandFlownFlight.Input.VELOCITY_HOLD;
+            HandFlownFlight.step(state, input, DJI);
+            assertEquals(0, HandFlownFlight.headingYaw(state.orientation), 1e-6);
+        }
+        assertTrue(HandFlownFlight.upOf(state.orientation).y > 0.99, "should level out once stopped");
+    }
+
+    @Test
+    void headingYawMatchesMinecraftYaw() {
+        assertEquals(135, HandFlownFlight.headingYaw(HandFlownFlight.fromEuler(135, 20, 0)), 1e-6);
+        assertEquals(-60, HandFlownFlight.headingYaw(HandFlownFlight.fromEuler(-60, 0, -15)), 1e-6);
     }
 
     @Test

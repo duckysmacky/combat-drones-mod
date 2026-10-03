@@ -33,6 +33,8 @@ public final class HandFlownFlight {
     static final double HOVER_BRAKE = 0.1;
     /** VELOCITY: how far the airframe visibly leans into its acceleration. Cosmetic; the physics is GPS-assisted. */
     static final double VELOCITY_MAX_TILT_DEG = 25.0;
+    /** VELOCITY: yaw rate at full input. High because the mouse maps 1:1 onto it (like vanilla mouse look). */
+    static final double VELOCITY_YAW_RATE_DEG = 30.0;
     /** VELOCITY: speeding up uses this share of the type's acceleration; braking uses all of it (quick stops). */
     static final double VELOCITY_ACCEL_FRACTION = 0.35;
 
@@ -172,14 +174,16 @@ public final class HandFlownFlight {
      * only visual, leaning into the acceleration so the drone and its non-gimballed parts look right.
      */
     private static double stepVelocity(State state, Input input, Params params) {
-        // Yaw turns the airframe directly (not through the tilt easing), so the turn rate is the full YAW_RATE_DEG
+        // Heading is kept as a pure yaw (twist about world up), separate from the lean, so leaning into a strafe can
+        // never turn the drone or the camera that follows its heading
+        Quat4d heading = headingTwist(state.orientation);
         if (input.yaw != 0) {
             Quat4d yaw = new Quat4d();
-            yaw.set(new AxisAngle4d(UP, Math.toRadians(-input.yaw * YAW_RATE_DEG)));
-            yaw.mul(state.orientation);
-            state.orientation.set(yaw);
+            yaw.set(new AxisAngle4d(UP, Math.toRadians(-input.yaw * VELOCITY_YAW_RATE_DEG)));
+            yaw.mul(heading);
+            heading = yaw;
+            heading.normalize();
         }
-        Quat4d heading = headingOf(state.orientation);
         Vector3d forward = rotate(heading, FORWARD);
         Vector3d right = rotate(heading, RIGHT);
 
@@ -227,13 +231,20 @@ public final class HandFlownFlight {
         }
         state.position.add(velocity);
 
-        // Visual lean into the acceleration, expressed relative to the heading
-        double leanForward = deltaLength > 0 ? (deltaX * forward.x + deltaZ * forward.z) / deltaLength * effort : 0;
-        double leanRight = deltaLength > 0 ? (deltaX * right.x + deltaZ * right.z) / deltaLength * effort : 0;
-        Quat4d target = new Quat4d(heading);
-        rotateBody(target, RIGHT, -leanForward * VELOCITY_MAX_TILT_DEG);
-        rotateBody(target, FORWARD, leanRight * VELOCITY_MAX_TILT_DEG);
-        state.orientation.set(slerp(state.orientation, target, LEVEL_RATE));
+        // Visual lean into the acceleration: a swing about the horizontal axis perpendicular to it (tips the top toward
+        // the acceleration), eased on its own and recombined with the exact heading
+        Quat4d targetSwing = new Quat4d(0, 0, 0, 1);
+        if (deltaLength > 1e-9) {
+            Vector3d axis = new Vector3d(deltaZ / deltaLength, 0, -deltaX / deltaLength); // UP x direction
+            targetSwing.set(new AxisAngle4d(axis, Math.toRadians(effort * VELOCITY_MAX_TILT_DEG)));
+        }
+        Quat4d currentSwing = new Quat4d(state.orientation);
+        Quat4d inverseTwist = headingTwist(state.orientation);
+        inverseTwist.inverse();
+        currentSwing.mul(inverseTwist);
+        Quat4d swing = slerp(currentSwing, targetSwing, LEVEL_RATE);
+        swing.mul(heading);
+        state.orientation.set(swing);
         state.orientation.normalize();
 
         return Math.min(1, (lift + effort * params.acceleration) / params.thrustAccel);
@@ -261,6 +272,26 @@ public final class HandFlownFlight {
     private static double climbAccel(double verticalSpeed, double vertical, Params params) {
         double targetSpeed = vertical * HOVER_MAX_CLIMB;
         return GRAVITY + params.drag * verticalSpeed + HOVER_CLIMB_GAIN * (targetSpeed - verticalSpeed);
+    }
+
+    /**
+     * The heading part of an orientation: its twist about world up, in the decomposition orientation = swing * twist
+     * where the swing tilts about a horizontal axis. Unlike {@link #headingOf}, a combined pitch + roll lean doesn't
+     * leak into it.
+     */
+    static Quat4d headingTwist(Quat4d orientation) {
+        Quat4d twist = new Quat4d(0, orientation.y, 0, orientation.w);
+        if (Math.abs(twist.y) < 1e-12 && Math.abs(twist.w) < 1e-12) {
+            return new Quat4d(0, 0, 0, 1); // flipped exactly upside down: heading undefined
+        }
+        twist.normalize();
+        return twist;
+    }
+
+    /** Minecraft yaw (degrees) of {@link #headingTwist}: a stable heading for cameras and compasses. */
+    public static double headingYaw(Quat4d orientation) {
+        Quat4d twist = headingTwist(orientation);
+        return wrapDegrees(-Math.toDegrees(2 * Math.atan2(twist.y, twist.w)));
     }
 
     /** Yaw-only rotation matching the horizontal direction of the body's forward axis. */

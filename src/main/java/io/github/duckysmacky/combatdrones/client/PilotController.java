@@ -45,8 +45,10 @@ public final class PilotController {
     private static final double LOW_SIGNAL_BEEP = 0.3;
     /** FPV modes the mode key cycles through (VELOCITY belongs to DJI drones only). */
     private static final HandFlownFlight.Mode[] FPV_MODES = {HandFlownFlight.Mode.ACRO, HandFlownFlight.Mode.ANGLE, HandFlownFlight.Mode.HOVER};
-    /** DJI: degrees of mouse turn in one tick that equal full yaw rate. */
-    private static final double DJI_MOUSE_FULL_YAW = 6.0;
+    /** DJI: degrees of mouse turn that equal full yaw input; matches the physics yaw rate, so mouse look is 1:1. */
+    private static final double DJI_MOUSE_FULL_YAW = 30.0;
+    /** DJI: share of the full yaw rate the left/right arrows turn at (6 deg/tick). */
+    private static final double DJI_ARROW_YAW = 0.2;
     /** DJI gimbal limits (vanilla pitch convention: positive = looking down) and arrow-key tilt speed. */
     private static final float GIMBAL_UP_LIMIT = -20.0F;
     private static final float GIMBAL_DOWN_LIMIT = 90.0F;
@@ -272,7 +274,7 @@ public final class PilotController {
      */
     private static HandFlownFlight.Input readDjiInput(GameSettings settings, double mouseX) {
         // Gimbal tilt (mouse Y, up/down arrows) is handled per frame in updateGimbal, not here
-        double yaw = clamp(mouseX / DJI_MOUSE_FULL_YAW + axis(DroneKeys.ROLL_RIGHT.isKeyDown(), DroneKeys.ROLL_LEFT.isKeyDown()));
+        double yaw = clamp(mouseX / DJI_MOUSE_FULL_YAW + DJI_ARROW_YAW * axis(DroneKeys.ROLL_RIGHT.isKeyDown(), DroneKeys.ROLL_LEFT.isKeyDown()));
         double forward = axis(settings.keyBindForward.isKeyDown(), settings.keyBindBack.isKeyDown());
         double strafe = axis(settings.keyBindRight.isKeyDown(), settings.keyBindLeft.isKeyDown());
         double vertical = axis(settings.keyBindJump.isKeyDown(), settings.keyBindSneak.isKeyDown());
