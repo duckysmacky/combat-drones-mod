@@ -1,16 +1,26 @@
 package io.github.duckysmacky.combatdrones;
 
+import io.github.duckysmacky.combatdrones.entity.EntityHandFlownDrone;
+import io.github.duckysmacky.combatdrones.item.ItemDrone;
+import io.github.duckysmacky.combatdrones.item.ItemRemote;
 import io.github.duckysmacky.combatdrones.type.DroneType;
 import io.github.duckysmacky.combatdrones.type.DroneTypes;
 import net.minecraft.block.Block;
 import net.minecraft.block.material.Material;
 import net.minecraft.creativetab.CreativeTabs;
 import net.minecraft.item.Item;
+import net.minecraft.inventory.EntityEquipmentSlot;
+import net.minecraft.init.SoundEvents;
+import net.minecraft.item.ItemArmor;
 import net.minecraft.item.ItemBlock;
 import net.minecraft.item.ItemStack;
+import net.minecraft.util.ResourceLocation;
+import net.minecraftforge.common.util.EnumHelper;
 import net.minecraftforge.event.RegistryEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import net.minecraftforge.fml.common.registry.EntityEntry;
+import net.minecraftforge.fml.common.registry.EntityEntryBuilder;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -24,6 +34,10 @@ public final class ModContent {
             return new ItemStack(fpvRemote);
         }
     };
+
+    /** Cosmetic helmet: no protection, never wears out. Wearing it is what lets a player enter FPV. */
+    private static final ItemArmor.ArmorMaterial GOGGLES_MATERIAL = EnumHelper.addArmorMaterial(
+            CombatDrones.MOD_ID + ":goggles", CombatDrones.MOD_ID + ":goggles", 0, new int[] {0, 0, 0, 0}, 0, SoundEvents.ITEM_ARMOR_EQUIP_LEATHER, 0.0F);
 
     /** Every registered item, in creative-tab order. The client registers one model per entry. */
     public static final List<Item> ITEMS = new ArrayList<>();
@@ -58,8 +72,8 @@ public final class ModContent {
     public static void registerItems(RegistryEvent.Register<Item> event) {
         register(event, new ItemBlock(launchRamp).setRegistryName(launchRamp.getRegistryName()));
         register(event, new ItemBlock(rearmStation).setRegistryName(rearmStation.getRegistryName()));
-        fpvRemote = register(event, simpleItem("fpv_remote").setMaxStackSize(1));
-        fpvGoggles = register(event, simpleItem("fpv_goggles").setMaxStackSize(1));
+        fpvRemote = register(event, named(new ItemRemote(), "fpv_remote"));
+        fpvGoggles = register(event, named(new ItemArmor(GOGGLES_MATERIAL, 0, EntityEquipmentSlot.HEAD), "fpv_goggles"));
         missionPlanner = register(event, simpleItem("mission_planner").setMaxStackSize(1));
         lightBattery = register(event, simpleItem("light_battery").setMaxStackSize(1));
         standardBattery = register(event, simpleItem("standard_battery").setMaxStackSize(1));
@@ -71,8 +85,19 @@ public final class ModContent {
         rifleRounds = register(event, simpleItem("rifle_rounds"));
         // One placeable item per data-defined type; the registry name is the type ID
         for (DroneType type : DroneTypes.all()) {
-            register(event, simpleItem(type.getId()).setMaxStackSize(1));
+            register(event, named(new ItemDrone(type.getId()), type.getId()));
         }
+    }
+
+    @SubscribeEvent
+    public static void registerEntities(RegistryEvent.Register<EntityEntry> event) {
+        // Update every tick: FPV pilots and spectators need smooth motion, not the default 3-tick cadence
+        event.getRegistry().register(EntityEntryBuilder.create()
+                .entity(EntityHandFlownDrone.class)
+                .id(new ResourceLocation(CombatDrones.MOD_ID, "hand_flown_drone"), 0)
+                .name(CombatDrones.MOD_ID + ".hand_flown_drone")
+                .tracker(160, 1, false)
+                .build());
     }
 
     private static Block simpleBlock(String name) {
@@ -81,7 +106,11 @@ public final class ModContent {
     }
 
     private static Item simpleItem(String name) {
-        return new Item().setRegistryName(CombatDrones.MOD_ID, name).setTranslationKey(CombatDrones.MOD_ID + "." + name).setCreativeTab(TAB);
+        return named(new Item(), name);
+    }
+
+    private static Item named(Item item, String name) {
+        return item.setRegistryName(CombatDrones.MOD_ID, name).setTranslationKey(CombatDrones.MOD_ID + "." + name).setCreativeTab(TAB);
     }
 
     private static Item register(RegistryEvent.Register<Item> event, Item item) {

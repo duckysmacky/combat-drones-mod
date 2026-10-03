@@ -24,3 +24,8 @@ item.combat_drones.recon_uav.name=Recon UAV
 
 tile.combat_drones.launch_ramp.name=Launch Ramp
 tile.combat_drones.rearm_station.name=Rearm Station
+
+item.combat_drones.fpv_remote.linked=Linked: %s
+item.combat_drones.fpv_remote.not_linked=Not linked. Right-click a drone to link.
+message.combat_drones.linked=Remote linked to %s
+message.combat_drones.owned_by_other=This drone belongs to someone else
