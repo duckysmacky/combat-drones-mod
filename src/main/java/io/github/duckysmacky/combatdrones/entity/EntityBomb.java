@@ -1,10 +1,13 @@
 package io.github.duckysmacky.combatdrones.entity;
 
-import io.github.duckysmacky.combatdrones.config.ModConfig;
+import io.github.duckysmacky.combatdrones.type.BombType;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.MoverType;
 import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.network.datasync.DataParameter;
+import net.minecraft.network.datasync.DataSerializers;
+import net.minecraft.network.datasync.EntityDataManager;
 import net.minecraft.world.World;
 import net.minecraft.world.WorldServer;
 
@@ -16,6 +19,8 @@ import java.util.UUID;
  * it can never sit live on the ground forever.
  */
 public class EntityBomb extends Entity {
+    /** {@link BombType} ordinal, synced so clients render the right bomb. */
+    private static final DataParameter<Integer> BOMB_TYPE = EntityDataManager.createKey(EntityBomb.class, DataSerializers.VARINT);
     private static final double GRAVITY = 0.04;
     private static final double DRAG = 0.98;
     private static final int FUSE_TICKS = 200;
@@ -31,8 +36,9 @@ public class EntityBomb extends Entity {
         setSize(0.3F, 0.3F);
     }
 
-    public EntityBomb(World world, double x, double y, double z, double motionX, double motionY, double motionZ, @Nullable UUID owner) {
+    public EntityBomb(World world, BombType type, double x, double y, double z, double motionX, double motionY, double motionZ, @Nullable UUID owner) {
         this(world);
+        dataManager.set(BOMB_TYPE, type.ordinal());
         setPosition(x, y, z);
         this.motionX = motionX;
         this.motionY = motionY;
@@ -42,6 +48,12 @@ public class EntityBomb extends Entity {
 
     @Override
     protected void entityInit() {
+        dataManager.register(BOMB_TYPE, BombType.MEDIUM.ordinal());
+    }
+
+    public BombType getBombType() {
+        BombType type = BombType.byIndex(dataManager.get(BOMB_TYPE));
+        return type != null ? type : BombType.MEDIUM;
     }
 
     @Override
@@ -74,7 +86,7 @@ public class EntityBomb extends Entity {
     private void explode() {
         setDead();
         EntityLivingBase blame = owner != null ? world.getPlayerEntityByUUID(owner) : null;
-        DroneExplosion.detonate((WorldServer) world, this, blame, posX, posY, posZ, (float) ModConfig.bombBlastPower);
+        DroneExplosion.detonate((WorldServer) world, this, blame, posX, posY, posZ, (float) getBombType().getBlastPower());
     }
 
     @Override
@@ -83,11 +95,14 @@ public class EntityBomb extends Entity {
             compound.setUniqueId("Owner", owner);
         }
         compound.setInteger("Age", age);
+        compound.setInteger("BombType", getBombType().ordinal());
     }
 
     @Override
     protected void readEntityFromNBT(NBTTagCompound compound) {
         owner = compound.hasUniqueId("Owner") ? compound.getUniqueId("Owner") : null;
         age = compound.getInteger("Age");
+        BombType type = compound.hasKey("BombType") ? BombType.byIndex(compound.getInteger("BombType")) : null;
+        dataManager.set(BOMB_TYPE, (type != null ? type : BombType.MEDIUM).ordinal());
     }
 }

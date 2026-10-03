@@ -18,7 +18,6 @@ public class DroneStatePacket implements IMessage {
     private int sequence;
     private final HandFlownFlight.State state = new HandFlownFlight.State();
     private float batteryFraction;
-    private int payload;
 
     public DroneStatePacket() {
     }
@@ -31,15 +30,10 @@ public class DroneStatePacket implements IMessage {
         state.velocity.set(source.velocity);
         state.orientation.set(source.orientation);
         batteryFraction = (float) drone.getChargeFraction();
-        payload = drone.getPayloadCount();
     }
 
     public float getBatteryFraction() {
         return batteryFraction;
-    }
-
-    public int getPayload() {
-        return payload;
     }
 
     public int getDroneId() {
@@ -62,7 +56,6 @@ public class DroneStatePacket implements IMessage {
         state.velocity.set(buf.readDouble(), buf.readDouble(), buf.readDouble());
         state.orientation.set(buf.readDouble(), buf.readDouble(), buf.readDouble(), buf.readDouble());
         batteryFraction = buf.readFloat();
-        payload = buf.readByte();
     }
 
     @Override
@@ -80,7 +73,6 @@ public class DroneStatePacket implements IMessage {
         buf.writeDouble(state.orientation.z);
         buf.writeDouble(state.orientation.w);
         buf.writeFloat(batteryFraction);
-        buf.writeByte(payload);
     }
 
     public static class Handler implements IMessageHandler<DroneStatePacket, IMessage> {

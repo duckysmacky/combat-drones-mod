@@ -4,11 +4,13 @@ import io.github.duckysmacky.combatdrones.entity.EntityBomb;
 import io.github.duckysmacky.combatdrones.entity.EntityHandFlownDrone;
 import io.github.duckysmacky.combatdrones.item.ItemBattery;
 import io.github.duckysmacky.combatdrones.item.ItemBlockWithTooltip;
+import io.github.duckysmacky.combatdrones.item.ItemBomb;
 import io.github.duckysmacky.combatdrones.item.ItemDrone;
 import io.github.duckysmacky.combatdrones.item.ItemGoggles;
 import io.github.duckysmacky.combatdrones.item.ItemRemote;
 import io.github.duckysmacky.combatdrones.item.ItemWithTooltip;
 import io.github.duckysmacky.combatdrones.type.BatteryPack;
+import io.github.duckysmacky.combatdrones.type.BombType;
 import io.github.duckysmacky.combatdrones.type.DroneType;
 import io.github.duckysmacky.combatdrones.type.DroneTypes;
 import net.minecraft.block.Block;
@@ -57,7 +59,9 @@ public final class ModContent {
     public static Item fpvGoggles;
     public static Item missionPlanner;
     public static Item fragGrenade;
+    public static Item bombLight;
     public static Item bomb;
+    public static Item bombHeavy;
     public static Item rocket;
     public static Item rifleRounds;
 
@@ -84,7 +88,9 @@ public final class ModContent {
         heavyBattery = register(event, named(new ItemBattery(BatteryPack.HEAVY), BatteryPack.HEAVY.itemName()));
         fuelCan = register(event, simpleItem("fuel_can").setMaxStackSize(1));
         fragGrenade = register(event, simpleItem("frag_grenade").setMaxStackSize(16));
-        bomb = register(event, simpleItem("bomb").setMaxStackSize(4));
+        bombLight = register(event, named(new ItemBomb(BombType.LIGHT, 64), BombType.LIGHT.itemName()));
+        bomb = register(event, named(new ItemBomb(BombType.MEDIUM, 32), BombType.MEDIUM.itemName()));
+        bombHeavy = register(event, named(new ItemBomb(BombType.HEAVY, 16), BombType.HEAVY.itemName()));
         rocket = register(event, simpleItem("rocket").setMaxStackSize(16));
         rifleRounds = register(event, simpleItem("rifle_rounds"));
         // One placeable item per data-defined type; the registry name is the type ID
@@ -108,6 +114,17 @@ public final class ModContent {
                 .name(CombatDrones.MOD_ID + ".bomb")
                 .tracker(160, 1, true)
                 .build());
+    }
+
+    public static Item bombItem(BombType type) {
+        switch (type) {
+            case LIGHT:
+                return bombLight;
+            case HEAVY:
+                return bombHeavy;
+            default:
+                return bomb;
+        }
     }
 
     public static Item batteryItem(BatteryPack pack) {

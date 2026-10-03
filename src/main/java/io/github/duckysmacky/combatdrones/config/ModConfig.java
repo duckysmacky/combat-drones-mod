@@ -5,6 +5,7 @@ import com.electronwill.nightconfig.core.file.CommentedFileConfig;
 import com.electronwill.nightconfig.toml.TomlFormat;
 import io.github.duckysmacky.combatdrones.CombatDrones;
 import io.github.duckysmacky.combatdrones.type.BatteryPack;
+import io.github.duckysmacky.combatdrones.type.BombType;
 import io.github.duckysmacky.combatdrones.type.DroneType;
 import io.github.duckysmacky.combatdrones.type.DroneTypes;
 
@@ -20,6 +21,7 @@ import java.util.Map;
  *   <li>{@code [general]}: global server balance knobs.</li>
  *   <li>{@code [client]}: options for your own client only; a server ignores them.</li>
  *   <li>{@code [batteries.<size>]}: battery pack capacity and weight multipliers, synced to clients.</li>
+ *   <li>{@code [bombs.<size>]}: bomb bay size, blast power and weight, synced to clients.</li>
  *   <li>{@code [drones.<id>]}: per-type balance stats, defaulting to the bundled drone type data. The server's
  *       values are synced to clients on login.</li>
  * </ul>
@@ -31,7 +33,6 @@ public final class ModConfig {
     public static boolean blockDamageEnabled = true;
     public static double grenadeBlastBonus = 2.0;
     public static double droneDamageTakenMultiplier = 1.0;
-    public static double bombBlastPower = 5.0;
 
     // [client]
     public static boolean invertMousePitch = false;
@@ -50,8 +51,6 @@ public final class ModConfig {
             blockDamageEnabled = defaults.get("general.blockDamageEnabled", blockDamageEnabled, "Whether drone and munition explosions break blocks.");
             grenadeBlastBonus = defaults.number("general.grenadeBlastBonus", grenadeBlastBonus, 0, 20,
                     "Extra blast power per Fragmentation Grenade attached to a racer (vanilla TNT = 4).");
-            bombBlastPower = defaults.number("general.bombBlastPower", bombBlastPower, 0, 20,
-                    "Blast power of a Bomb dropped from a DJI Drone (vanilla TNT = 4).");
             droneDamageTakenMultiplier = defaults.number("general.droneDamageTakenMultiplier", droneDamageTakenMultiplier, 0, 10,
                     "Multiplies all damage drones take from attacks (weapons, arrows, melee). Lower = harder to shoot down.");
 
@@ -66,6 +65,13 @@ public final class ModConfig {
                         defaults.number(table + ".performanceMultiplier", pack.getDefaultPerformanceMultiplier(), 0.1, 2, null));
             }
 
+            for (BombType bomb : BombType.values()) {
+                String table = "bombs." + bomb.key();
+                bomb.set((int) defaults.number(table + ".bayUnits", bomb.getDefaultBayUnits(), 1, 16, null),
+                        defaults.number(table + ".blastPower", bomb.getDefaultBlastPower(), 0, 20, null),
+                        defaults.number(table + ".weightPerBomb", bomb.getDefaultWeight(), 0, 0.5, null));
+            }
+
             for (DroneType type : DroneTypes.all()) {
                 applyDroneTable(defaults, type);
             }
@@ -76,6 +82,8 @@ public final class ModConfig {
             defaults.comment("client", "Options for your own client only.");
             defaults.comment("batteries", "Battery pack sizes for hand-flown drones. capacityMultiplier scales a drone's base capacity "
                     + "(defined for a Light pack); performanceMultiplier scales its top speed and acceleration (pack weight).");
+            defaults.comment("bombs", "Bombs for DJI-style drones. bayUnits: space taken in a drone's bomb bay (its payloadCapacity); "
+                    + "blastPower: vanilla scale (TNT = 4); weightPerBomb: share of top speed and acceleration lost per bomb carried.");
             defaults.comment("drones", "Per-drone-type stats. Units: speed in blocks/tick (1 = 72 km/h), acceleration in blocks/tick², "
                     + "capacity (with a Light pack) and drain in charge units (full-throttle flight time = capacity / drain ticks), blastPower on the vanilla "
                     + "scale (TNT = 4), maxHP like mob health, signalRange and motorSoundRange in blocks.");

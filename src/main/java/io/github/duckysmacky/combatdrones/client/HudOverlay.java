@@ -4,6 +4,7 @@ import io.github.duckysmacky.combatdrones.CombatDrones;
 import io.github.duckysmacky.combatdrones.entity.EntityHandFlownDrone;
 import io.github.duckysmacky.combatdrones.physics.HandFlownFlight;
 import io.github.duckysmacky.combatdrones.type.BatteryPack;
+import io.github.duckysmacky.combatdrones.type.BombType;
 import io.github.duckysmacky.combatdrones.type.DroneType;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
@@ -129,14 +130,29 @@ public final class HudOverlay {
         drawText(font, throttle, left, bottom + 16, TEXT);
         float health = drone.getHealthFraction();
         drawText(font, I18n.format("hud.combat_drones.health", percent(health)), left, bottom + 16 + LINE, health < 0.5F ? WARNING : TEXT);
-        if (type.getPayload() != null && type.getPayloadCapacity() > 0) {
-            String payload = I18n.format("hud.combat_drones.payload." + type.getPayload().name().toLowerCase(Locale.ROOT),
-                    drone.getKnownPayload(), type.getPayloadCapacity());
+        String payload = payloadText(drone, type);
+        if (payload != null) {
             drawText(font, payload, right - font.getStringWidth(payload), bottom + 16, TEXT);
         }
 
         drawCrosshair(centerX, centerY);
         drawWarnings(font, minecraft, centerX, centerY + 24, pack != null, battery, signal);
+    }
+
+    /** Grenade count, the loaded bomb size and count, or null for drones without payload slots. */
+    private static String payloadText(EntityHandFlownDrone drone, DroneType type) {
+        if (type.getPayload() == null || type.getPayloadCapacity() == 0) {
+            return null;
+        }
+        if (type.getPayload() == DroneType.PayloadKind.GRENADE) {
+            return I18n.format("hud.combat_drones.payload.grenade", drone.getPayloadCount(), type.getPayloadCapacity());
+        }
+        BombType bomb = drone.getPayloadBomb();
+        if (bomb == null) {
+            return I18n.format("hud.combat_drones.payload.bay_empty");
+        }
+        return I18n.format("hud.combat_drones.payload.bomb", I18n.format("hud.combat_drones.bomb." + bomb.key()),
+                drone.getPayloadCount(), EntityHandFlownDrone.payloadCapacity(type, bomb));
     }
 
     /**

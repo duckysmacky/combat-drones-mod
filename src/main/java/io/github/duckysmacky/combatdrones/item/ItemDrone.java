@@ -3,6 +3,7 @@ package io.github.duckysmacky.combatdrones.item;
 import io.github.duckysmacky.combatdrones.client.DroneKeys;
 import io.github.duckysmacky.combatdrones.client.Tooltips;
 import io.github.duckysmacky.combatdrones.entity.EntityHandFlownDrone;
+import io.github.duckysmacky.combatdrones.type.BombType;
 import io.github.duckysmacky.combatdrones.type.DroneType;
 import io.github.duckysmacky.combatdrones.type.DroneTypes;
 import net.minecraft.client.gui.GuiScreen;
@@ -65,7 +66,11 @@ public class ItemDrone extends Item {
         if (type.isImpactDetonates()) {
             tooltip.add(TextFormatting.GRAY + I18n.format("tooltip.combat_drones.drone.kamikaze"));
         }
-        if (type.getPayload() != null && type.getPayloadCapacity() > 0) {
+        if (type.getPayload() == DroneType.PayloadKind.BOMB && type.getPayloadCapacity() > 0) {
+            tooltip.add(TextFormatting.GRAY + I18n.format("tooltip.combat_drones.drone.bomb_bay",
+                    BombType.LIGHT.capacityIn(type.getPayloadCapacity()), BombType.MEDIUM.capacityIn(type.getPayloadCapacity()),
+                    BombType.HEAVY.capacityIn(type.getPayloadCapacity())));
+        } else if (type.getPayload() != null && type.getPayloadCapacity() > 0) {
             tooltip.add(TextFormatting.GRAY + I18n.format("tooltip.combat_drones.drone.payload_slots", type.getPayloadCapacity(),
                     I18n.format("tooltip.combat_drones.payload." + type.getPayload().name().toLowerCase(Locale.ROOT))));
         } else if (handFlown && type.isImpactDetonates()) {

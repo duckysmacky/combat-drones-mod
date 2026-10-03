@@ -2,6 +2,7 @@ package io.github.duckysmacky.combatdrones.network;
 
 import io.github.duckysmacky.combatdrones.client.ClientPacketHandlers;
 import io.github.duckysmacky.combatdrones.type.BatteryPack;
+import io.github.duckysmacky.combatdrones.type.BombType;
 import io.github.duckysmacky.combatdrones.type.DroneType;
 import io.netty.buffer.ByteBuf;
 import net.minecraftforge.fml.common.FMLCommonHandler;
@@ -14,11 +15,14 @@ import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-/** Server to client on login: every drone type as JSON keyed by ID, plus battery pack multipliers. */
+/** Server to client on login: every drone type as JSON keyed by ID, plus battery pack and bomb values. */
 public class TypeSyncPacket implements IMessage {
     private final Map<String, String> typesJson = new LinkedHashMap<>();
     private final double[] packCapacity = new double[BatteryPack.values().length];
     private final double[] packPerformance = new double[BatteryPack.values().length];
+    private final int[] bombBayUnits = new int[BombType.values().length];
+    private final double[] bombBlast = new double[BombType.values().length];
+    private final double[] bombWeight = new double[BombType.values().length];
 
     public TypeSyncPacket() {
     }
@@ -31,12 +35,20 @@ public class TypeSyncPacket implements IMessage {
             packCapacity[pack.ordinal()] = pack.getCapacityMultiplier();
             packPerformance[pack.ordinal()] = pack.getPerformanceMultiplier();
         }
+        for (BombType bomb : BombType.values()) {
+            bombBayUnits[bomb.ordinal()] = bomb.getBayUnits();
+            bombBlast[bomb.ordinal()] = bomb.getBlastPower();
+            bombWeight[bomb.ordinal()] = bomb.getWeight();
+        }
     }
 
-    /** Client side: adopt the server's battery pack multipliers. */
-    public void applyBatteryPacks() {
+    /** Client side: adopt the server's battery pack and bomb values. */
+    public void applyEquipment() {
         for (BatteryPack pack : BatteryPack.values()) {
             pack.setMultipliers(packCapacity[pack.ordinal()], packPerformance[pack.ordinal()]);
+        }
+        for (BombType bomb : BombType.values()) {
+            bomb.set(bombBayUnits[bomb.ordinal()], bombBlast[bomb.ordinal()], bombWeight[bomb.ordinal()]);
         }
     }
 
@@ -55,6 +67,11 @@ public class TypeSyncPacket implements IMessage {
             packCapacity[index] = Math.max(0.1, Math.min(10, buf.readDouble()));
             packPerformance[index] = Math.max(0.1, Math.min(2, buf.readDouble()));
         }
+        for (int index = 0; index < bombBayUnits.length; index++) {
+            bombBayUnits[index] = Math.max(1, Math.min(16, buf.readInt()));
+            bombBlast[index] = Math.max(0, Math.min(20, buf.readDouble()));
+            bombWeight[index] = Math.max(0, Math.min(0.5, buf.readDouble()));
+        }
     }
 
     @Override
@@ -67,6 +84,11 @@ public class TypeSyncPacket implements IMessage {
         for (int index = 0; index < packCapacity.length; index++) {
             buf.writeDouble(packCapacity[index]);
             buf.writeDouble(packPerformance[index]);
+        }
+        for (int index = 0; index < bombBayUnits.length; index++) {
+            buf.writeInt(bombBayUnits[index]);
+            buf.writeDouble(bombBlast[index]);
+            buf.writeDouble(bombWeight[index]);
         }
     }
 
