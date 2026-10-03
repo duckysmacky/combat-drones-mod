@@ -7,6 +7,7 @@ import io.github.duckysmacky.combatdrones.network.ControlInputPacket;
 import io.github.duckysmacky.combatdrones.network.ModNetwork;
 import io.github.duckysmacky.combatdrones.network.TogglePilotPacket;
 import io.github.duckysmacky.combatdrones.physics.HandFlownFlight;
+import io.github.duckysmacky.combatdrones.type.DroneType;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.entity.EntityPlayerSP;
 import net.minecraft.client.settings.GameSettings;
@@ -120,11 +121,18 @@ public final class PilotController {
         player.prevRotationPitch = 0;
         heldYaw = player.rotationYaw;
         heldPitch = 0;
-        throttle = 0;
         stickPitch = 0;
         stickRoll = 0;
-        mode = HandFlownFlight.Mode.ACRO;
         motorsOn = drone.areMotorsOn();
+        // A drone left running is hovering in place: pick it up in Hover so it doesn't drop on takeover
+        mode = motorsOn ? HandFlownFlight.Mode.HOVER : HandFlownFlight.Mode.ACRO;
+        throttle = motorsOn ? hoverThrottle() : 0;
+    }
+
+    /** Throttle that exactly cancels gravity for the current drone type. */
+    private static double hoverThrottle() {
+        DroneType type = drone.getDroneType();
+        return type == null ? 0 : HandFlownFlight.GRAVITY / (HandFlownFlight.GRAVITY + type.getAcceleration());
     }
 
     private static void stop(Minecraft minecraft, EntityPlayerSP player) {
@@ -148,8 +156,14 @@ public final class PilotController {
 
         if (DroneKeys.FLIGHT_MODE.isPressed()) {
             HandFlownFlight.Mode[] modes = HandFlownFlight.Mode.values();
+            if (mode == HandFlownFlight.Mode.HOVER) {
+                throttle = hoverThrottle(); // leaving altitude hold: start from a throttle that keeps it level
+            }
             mode = modes[(mode.ordinal() + 1) % modes.length];
             status(player, "message.combat_drones.mode_" + mode.name().toLowerCase(Locale.ROOT));
+        }
+        if (DroneKeys.CAMERA.isPressed()) {
+            status(player, "message.combat_drones.camera_" + CameraHandler.cycleCameraMode().name().toLowerCase(Locale.ROOT));
         }
         if (DroneKeys.MOTORS.isPressed()) {
             motorsOn = !motorsOn;

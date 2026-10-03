@@ -8,7 +8,7 @@
   "drainRatePerTick": 1.0,
   "blastPower": 0,
   "payloadCapacity": 8,
-  "maxHP": 24,
+  "maxHP": 40,
   "signalRange": 128,
   "weaponType": "ROCKET_POD"
 }

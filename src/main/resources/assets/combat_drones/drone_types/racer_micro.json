@@ -7,9 +7,9 @@
   "acceleration": 0.16,
   "batteryOrFuelCapacity": 1800,
   "drainRatePerTick": 1.0,
-  "blastPower": 1.5,
+  "blastPower": 3.0,
   "payloadCapacity": 0,
-  "maxHP": 2,
+  "maxHP": 8,
   "signalRange": 96,
   "impactDetonates": true
 }

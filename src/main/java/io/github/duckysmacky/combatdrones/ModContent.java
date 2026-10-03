@@ -1,18 +1,19 @@
 package io.github.duckysmacky.combatdrones;
 
 import io.github.duckysmacky.combatdrones.entity.EntityHandFlownDrone;
+import io.github.duckysmacky.combatdrones.item.ItemBlockWithTooltip;
 import io.github.duckysmacky.combatdrones.item.ItemDrone;
+import io.github.duckysmacky.combatdrones.item.ItemGoggles;
 import io.github.duckysmacky.combatdrones.item.ItemRemote;
+import io.github.duckysmacky.combatdrones.item.ItemWithTooltip;
 import io.github.duckysmacky.combatdrones.type.DroneType;
 import io.github.duckysmacky.combatdrones.type.DroneTypes;
 import net.minecraft.block.Block;
 import net.minecraft.block.material.Material;
 import net.minecraft.creativetab.CreativeTabs;
-import net.minecraft.item.Item;
 import net.minecraft.init.SoundEvents;
-import net.minecraft.inventory.EntityEquipmentSlot;
+import net.minecraft.item.Item;
 import net.minecraft.item.ItemArmor;
-import net.minecraft.item.ItemBlock;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.ResourceLocation;
 import net.minecraftforge.common.util.EnumHelper;
@@ -70,10 +71,10 @@ public final class ModContent {
     // Forge fires the block registry event before the item one, so the blocks exist here
     @SubscribeEvent
     public static void registerItems(RegistryEvent.Register<Item> event) {
-        register(event, new ItemBlock(launchRamp).setRegistryName(launchRamp.getRegistryName()));
-        register(event, new ItemBlock(rearmStation).setRegistryName(rearmStation.getRegistryName()));
+        register(event, new ItemBlockWithTooltip(launchRamp));
+        register(event, new ItemBlockWithTooltip(rearmStation));
         fpvRemote = register(event, named(new ItemRemote(), "fpv_remote"));
-        fpvGoggles = register(event, named(new ItemArmor(GOGGLES_MATERIAL, 0, EntityEquipmentSlot.HEAD), "fpv_goggles"));
+        fpvGoggles = register(event, named(new ItemGoggles(GOGGLES_MATERIAL), "fpv_goggles"));
         missionPlanner = register(event, simpleItem("mission_planner").setMaxStackSize(1));
         lightBattery = register(event, simpleItem("light_battery").setMaxStackSize(1));
         standardBattery = register(event, simpleItem("standard_battery").setMaxStackSize(1));
@@ -106,7 +107,7 @@ public final class ModContent {
     }
 
     private static Item simpleItem(String name) {
-        return named(new Item(), name);
+        return named(new ItemWithTooltip(), name);
     }
 
     private static Item named(Item item, String name) {

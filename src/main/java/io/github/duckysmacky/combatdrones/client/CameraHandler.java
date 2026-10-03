@@ -24,7 +24,22 @@ public final class CameraHandler {
     /** Racing quads tilt the camera up so it looks ahead while the drone pitches forward to fly. */
     private static final Quat4d CAMERA_UPTILT = HandFlownFlight.fromEuler(0, -20, 0);
 
+    public enum CameraMode {
+        /** Body-fixed FPV camera: rolls and pitches with the drone. */
+        FORWARD,
+        /** Stabilized straight-down view following the drone's heading: a map-like overview, best in Hover. */
+        DOWN
+    }
+
+    private static CameraMode cameraMode = CameraMode.FORWARD;
+
     private CameraHandler() {
+    }
+
+    /** Switches to the next camera mode and returns it. The choice sticks across flights. */
+    public static CameraMode cycleCameraMode() {
+        cameraMode = CameraMode.values()[(cameraMode.ordinal() + 1) % CameraMode.values().length];
+        return cameraMode;
     }
 
     @SubscribeEvent
@@ -36,8 +51,13 @@ public final class CameraHandler {
         // Vanilla would interpolate the entity's yaw/pitch fields; use the predicted quaternion instead (no gimbal
         // issues, and it carries roll)
         Quat4d view = HandFlownFlight.slerp(drone.prevOrientation, drone.getFlightState().orientation, event.getRenderPartialTicks());
-        view.mul(CAMERA_UPTILT);
-        double[] euler = HandFlownFlight.toEuler(view);
+        double[] euler;
+        if (cameraMode == CameraMode.DOWN) {
+            euler = new double[] {HandFlownFlight.toEuler(view)[0], 90, 0};
+        } else {
+            view.mul(CAMERA_UPTILT);
+            euler = HandFlownFlight.toEuler(view);
+        }
         event.setYaw((float) euler[0] + 180.0F); // vanilla's camera yaw convention is offset by 180
         event.setPitch((float) euler[1]);
         event.setRoll((float) euler[2]);

@@ -14,6 +14,7 @@ public final class DroneKeys {
     /** Cycles Acro, Angle, Hover. */
     public static final KeyBinding FLIGHT_MODE = new KeyBinding("key.combat_drones.flight_mode", Keyboard.KEY_H, CATEGORY);
     public static final KeyBinding MOTORS = new KeyBinding("key.combat_drones.motors", Keyboard.KEY_N, CATEGORY);
+    public static final KeyBinding CAMERA = new KeyBinding("key.combat_drones.camera", Keyboard.KEY_B, CATEGORY);
 
     // Keyboard alternative to the mouse for pitch/roll; both can be used at once
     public static final KeyBinding PITCH_FORWARD = new KeyBinding("key.combat_drones.pitch_forward", Keyboard.KEY_UP, CATEGORY);
@@ -21,7 +22,7 @@ public final class DroneKeys {
     public static final KeyBinding ROLL_LEFT = new KeyBinding("key.combat_drones.roll_left", Keyboard.KEY_LEFT, CATEGORY);
     public static final KeyBinding ROLL_RIGHT = new KeyBinding("key.combat_drones.roll_right", Keyboard.KEY_RIGHT, CATEGORY);
 
-    static final KeyBinding[] ALL = {TOGGLE_FPV, FLIGHT_MODE, MOTORS, PITCH_FORWARD, PITCH_BACK, ROLL_LEFT, ROLL_RIGHT};
+    static final KeyBinding[] ALL = {TOGGLE_FPV, FLIGHT_MODE, MOTORS, CAMERA, PITCH_FORWARD, PITCH_BACK, ROLL_LEFT, ROLL_RIGHT};
 
     private DroneKeys() {
     }

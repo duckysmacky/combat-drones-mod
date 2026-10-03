@@ -8,6 +8,6 @@
   "drainRatePerTick": 1.0,
   "blastPower": 0,
   "payloadCapacity": 1,
-  "maxHP": 12,
+  "maxHP": 24,
   "signalRange": 128
 }

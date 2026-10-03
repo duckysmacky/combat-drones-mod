@@ -52,7 +52,9 @@ public final class HandFlownFlight {
 
     /** Pilot intent for one tick. Axes are already clamped by whoever builds it. */
     public static final class Input {
-        public static final Input IDLE = new Input(0, 0, 0, 0, 0, Mode.ANGLE, false);
+        public static final Input MOTORS_OFF = new Input(0, 0, 0, 0, 0, Mode.ANGLE, false);
+        /** Neutral sticks in HOVER: what an unattended drone with running motors flies (position/altitude hold). */
+        public static final Input HOLD_POSITION = new Input(0, 0, 0, 0, 0, Mode.HOVER, true);
 
         /** 0..1, held level (ACRO/ANGLE). */
         public final double throttle;

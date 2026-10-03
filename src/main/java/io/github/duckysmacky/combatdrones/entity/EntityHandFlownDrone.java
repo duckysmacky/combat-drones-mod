@@ -58,7 +58,6 @@ public class EntityHandFlownDrone extends Entity {
     private static final DataParameter<Boolean> MOTORS_ON = EntityDataManager.createKey(EntityHandFlownDrone.class, DataSerializers.BOOLEAN);
     /** Inputs the server holds ahead of simulation; anything beyond this is dropped (per-drone rate limit). */
     private static final int MAX_QUEUED_INPUTS = 3;
-    private static final HandFlownFlight.Input MOTORS_OFF = new HandFlownFlight.Input(0, 0, 0, 0, 0, HandFlownFlight.Mode.ANGLE, false);
 
     protected final HandFlownFlight.State flightState = new HandFlownFlight.State();
     @Nullable
@@ -70,7 +69,7 @@ public class EntityHandFlownDrone extends Entity {
     @Nullable
     private EntityPlayerMP pilot;
     private final ArrayDeque<InputFrame> inputQueue = new ArrayDeque<>();
-    private HandFlownFlight.Input lastInput = MOTORS_OFF;
+    private HandFlownFlight.Input lastInput = HandFlownFlight.Input.MOTORS_OFF;
     private int lastQueuedSequence = Integer.MIN_VALUE;
     protected int lastProcessedSequence;
 
@@ -161,12 +160,12 @@ public class EntityHandFlownDrone extends Entity {
     }
 
     /**
-     * One queued input per tick, in order; if the client fell behind, repeat its last intent. Unpiloted drones
-     * have their motors off and fall.
+     * One queued input per tick, in order; if the client fell behind, repeat its last intent. A drone nobody is
+     * flying keeps its motors as they were: running means it holds position in hover, off means it falls.
      */
     private HandFlownFlight.Input nextInput() {
         if (pilot == null) {
-            return MOTORS_OFF;
+            return unattendedInput();
         }
         InputFrame frame = inputQueue.poll();
         if (frame != null) {
@@ -174,6 +173,10 @@ public class EntityHandFlownDrone extends Entity {
             lastProcessedSequence = frame.sequence;
         }
         return lastInput;
+    }
+
+    private HandFlownFlight.Input unattendedInput() {
+        return areMotorsOn() ? HandFlownFlight.Input.HOLD_POSITION : HandFlownFlight.Input.MOTORS_OFF;
     }
 
     /** Server: accept a control input from the network. Only the current pilot's inputs count. */
@@ -216,7 +219,8 @@ public class EntityHandFlownDrone extends Entity {
     private void setPilot(EntityPlayerMP player) {
         pilot = player;
         inputQueue.clear();
-        lastInput = MOTORS_OFF;
+        // Until the pilot's first input arrives, keep doing what the drone was already doing
+        lastInput = unattendedInput();
         lastQueuedSequence = Integer.MIN_VALUE;
         dataManager.set(PILOT_ID, player.getEntityId());
     }
@@ -227,7 +231,6 @@ public class EntityHandFlownDrone extends Entity {
         }
         pilot = null;
         inputQueue.clear();
-        lastInput = MOTORS_OFF;
         dataManager.set(PILOT_ID, -1);
     }
 
@@ -581,6 +584,11 @@ public class EntityHandFlownDrone extends Entity {
         compound.setDouble("QY", orientation.y);
         compound.setDouble("QZ", orientation.z);
         compound.setDouble("QW", orientation.w);
+        // Motors and momentum persist so an unattended hovering drone is still airborne after a reload
+        compound.setBoolean("MotorsOn", areMotorsOn());
+        compound.setDouble("VX", flightState.velocity.x);
+        compound.setDouble("VY", flightState.velocity.y);
+        compound.setDouble("VZ", flightState.velocity.z);
     }
 
     @Override
@@ -593,5 +601,7 @@ public class EntityHandFlownDrone extends Entity {
         if (flightState.orientation.w == 0 && flightState.orientation.x == 0 && flightState.orientation.y == 0 && flightState.orientation.z == 0) {
             flightState.orientation.set(0, 0, 0, 1);
         }
+        dataManager.set(MOTORS_ON, compound.getBoolean("MotorsOn"));
+        flightState.velocity.set(compound.getDouble("VX"), compound.getDouble("VY"), compound.getDouble("VZ"));
     }
 }

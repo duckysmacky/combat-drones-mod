@@ -6,9 +6,9 @@
   "acceleration": 0.15,
   "batteryOrFuelCapacity": 3600,
   "drainRatePerTick": 1.0,
-  "blastPower": 3.0,
+  "blastPower": 4.0,
   "payloadCapacity": 0,
-  "maxHP": 6,
+  "maxHP": 12,
   "defaultCruiseAltitude": 40,
   "controlScheme": "STICK"
 }
