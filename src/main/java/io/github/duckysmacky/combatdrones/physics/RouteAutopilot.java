@@ -114,7 +114,8 @@ public final class RouteAutopilot {
         }
         boolean lowFuel = situation.fuelFraction < situation.lowFuelFraction;
         // Loop: start over from the first waypoint, until fuel runs low (then the terminal handling below sends it home)
-        if (index >= route.size() && route.getTerminal() == Route.TerminalAction.LOOP && !lowFuel) {
+        // (A one-waypoint loop has nothing to go round: it circles that waypoint instead, like Loiter.)
+        if (index >= route.size() && route.getTerminal() == Route.TerminalAction.LOOP && route.size() > 1 && !lowFuel) {
             index = 0;
         }
         if (index < route.size()) {

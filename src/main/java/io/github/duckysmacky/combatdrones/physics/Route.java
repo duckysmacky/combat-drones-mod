@@ -11,7 +11,7 @@ import java.util.List;
 public final class Route {
     /**
      * What a unit does once its waypoints are done. Munitions: LOITER / DIVE / DESTROY; gunship planes: LOITER /
-     * RETURN; recon: LOOP / RETURN (see {@link RouteValidator#allowedTerminals}).
+     * RETURN; recon: LOITER / LOOP / RETURN (see {@link RouteValidator#allowedTerminals}).
      */
     public enum TerminalAction { LOITER, DIVE, DESTROY, RETURN, LOOP }
 

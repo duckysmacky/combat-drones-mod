@@ -292,6 +292,7 @@ public class EntityRampUnit extends Entity {
             onCollision(type);
             return;
         }
+        ReconIntel.sweep(this, type);
         updateChunkLoading();
     }
 
@@ -580,16 +581,16 @@ public class EntityRampUnit extends Entity {
     }
 
     /**
-     * Ran into terrain or something solid. Warheads go off; an unarmed recon UAV never detonates (architecture
-     * rule 6) and lands intact as an item; other units land if they were slow enough (a Return landing, or a belly
-     * landing). A hard crash goes off with the type's blastPower (a gunship's fuel and ammo), or just wrecks it.
+     * Ran into terrain or something solid. Warheads go off; every other unit lands intact as an item if it was slow
+     * enough (a Return landing, or a belly landing). A hard crash goes off with the type's blastPower (a gunship's
+     * fuel and ammo, the recon UAV's fuel), or just wrecks it.
      */
     private void onCollision(DroneType type) {
         // Slow contact of any kind counts: a landing roll often ends against a bump or a block edge
         boolean gentleTouchdown = flight.speed < LANDING_SPEED_FRACTION * type.getMaxSpeed();
         if (type.isArmed() && type.isImpactDetonates()) {
             detonate(type);
-        } else if (!type.isArmed() || gentleTouchdown) {
+        } else if (gentleTouchdown) {
             land(type);
         } else {
             detonate(type);
@@ -629,7 +630,7 @@ public class EntityRampUnit extends Entity {
             DroneType type = getDroneType();
             if (health > 0) {
                 DamageEffects.hit(this);
-            } else if (type != null && type.isArmed() && type.getBlastPower() > 0) {
+            } else if (type != null && type.getBlastPower() > 0) {
                 detonate(type); // a warhead shot down goes off in the air
             } else {
                 setDead();

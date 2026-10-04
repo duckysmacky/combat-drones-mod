@@ -224,4 +224,24 @@ class RouteAutopilotTest {
         RouteAutopilot.Phase phase = RouteAutopilot.guide(state, route, 1, situation(0.1, false), PLANE).phase;
         assertEquals(RouteAutopilot.Phase.RETURN, phase);
     }
+
+    @Test
+    void singleWaypointLoopCirclesAtTheLoiterRadius() {
+        FixedWingFlight.State state = launched();
+        Route route = new Route(Collections.singletonList(new Waypoint(0, 80, 20)), TerminalAction.LOOP, 50);
+        int index = 0;
+        double nearest = Double.MAX_VALUE;
+        double farthest = 0;
+        for (int tick = 0; tick < 2000; tick++) {
+            RouteAutopilot.Command command = RouteAutopilot.guide(state, route, index, situation(1, false), PLANE);
+            index = command.waypointIndex;
+            FixedWingFlight.step(state, command.controls, PLANE);
+            if (tick > 1400) {
+                double distance = Math.hypot(state.position.x, state.position.z - 80);
+                nearest = Math.min(nearest, distance);
+                farthest = Math.max(farthest, distance);
+            }
+        }
+        assertTrue(nearest > 38 && farthest < 62, "should circle at about 50 blocks, was " + nearest + ".." + farthest);
+    }
 }

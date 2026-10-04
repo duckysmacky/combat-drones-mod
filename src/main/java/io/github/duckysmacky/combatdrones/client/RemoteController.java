@@ -3,10 +3,12 @@ package io.github.duckysmacky.combatdrones.client;
 import io.github.duckysmacky.combatdrones.CombatDrones;
 import io.github.duckysmacky.combatdrones.ModSounds;
 import io.github.duckysmacky.combatdrones.entity.EntityRampUnit;
+import io.github.duckysmacky.combatdrones.entity.Raytrace;
 import io.github.duckysmacky.combatdrones.config.ModConfig;
 import io.github.duckysmacky.combatdrones.network.DesignatePacket;
 import io.github.duckysmacky.combatdrones.network.ModNetwork;
 import io.github.duckysmacky.combatdrones.network.PlaneInputPacket;
+import io.github.duckysmacky.combatdrones.network.ReconLookPacket;
 import io.github.duckysmacky.combatdrones.network.TogglePilotPacket;
 import io.github.duckysmacky.combatdrones.type.DroneType;
 import net.minecraft.client.Minecraft;
@@ -15,6 +17,8 @@ import net.minecraft.client.entity.EntityPlayerSP;
 import net.minecraft.client.gui.GuiIngameMenu;
 import net.minecraft.entity.Entity;
 import net.minecraft.util.MovementInput;
+import net.minecraft.util.math.MathHelper;
+import net.minecraft.util.math.RayTraceResult;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.util.text.TextComponentTranslation;
 import net.minecraftforge.client.event.InputUpdateEvent;
@@ -38,10 +42,12 @@ import javax.annotation.Nullable;
  */
 @Mod.EventBusSubscriber(modid = CombatDrones.MOD_ID, value = Side.CLIENT)
 public final class RemoteController {
-    /** Look limits relative to the nose (vanilla pitch convention: positive = down). */
-    private static final float LOOK_YAW_LIMIT = 150.0F;
+    /** Camera tilt limits (vanilla pitch convention: positive = down); it pans all the way round. */
     private static final float LOOK_UP_LIMIT = -30.0F;
-    private static final float LOOK_DOWN_LIMIT = 85.0F;
+    private static final float LOOK_DOWN_LIMIT = 90.0F;
+    /** How far the camera looks for something to hold on to when you aim it. */
+    private static final double ANCHOR_RANGE = 256.0;
+    private static final int MAX_ZOOM = 8;
     /** Mouse pushes a virtual stick (degrees -> stick units) that springs back to centre, like FPV angle mode. */
     private static final double MOUSE_STICK_GAIN = 1.0 / 15.0;
     private static final double STICK_SPRING = 0.1;
@@ -57,8 +63,16 @@ public final class RemoteController {
     private static EntityRampUnit unit;
     private static float heldYaw;
     private static float heldPitch;
-    private static float lookYaw;
-    private static float lookPitch;
+    /** Look camera direction in world terms (not relative to the unit), so it doesn't swing when the unit turns. */
+    private static float cameraYaw;
+    private static float cameraPitch;
+    /** What the camera holds on to between mouse movements: an entity (followed live) or a fixed point. */
+    @Nullable
+    private static Entity anchorEntity;
+    @Nullable
+    private static Vec3d anchorPoint;
+    /** Camera zoom in look modes: 1, 2, 4 or 8 times. */
+    private static int zoom = 1;
     /** Mouse movement gathered per frame, handed to the stick once per tick. */
     private static double pendingMouseX;
     private static double pendingMouseY;
@@ -98,12 +112,16 @@ public final class RemoteController {
         return throttle;
     }
 
-    public static float getLookYaw() {
-        return lookYaw;
+    public static int getZoom() {
+        return zoom;
     }
 
-    public static float getLookPitch() {
-        return lookPitch;
+    public static float getCameraYaw() {
+        return cameraYaw;
+    }
+
+    public static float getCameraPitch() {
+        return cameraPitch;
     }
 
     @Nullable
@@ -121,8 +139,9 @@ public final class RemoteController {
         }
         unitId = id;
         control = underControl;
-        lookYaw = 0;
-        lookPitch = 10;
+        anchorEntity = null;
+        anchorPoint = null;
+        zoom = 1;
         stickPitch = 0;
         stickRoll = 0;
         throttle = START_THROTTLE;
@@ -161,6 +180,15 @@ public final class RemoteController {
             player.prevRotationPitch = 0;
             heldYaw = player.rotationYaw;
             heldPitch = 0;
+            cameraYaw = unit.rotationYaw;
+            cameraPitch = 10;
+        }
+        if (unit != null && !control && unit.ticksExisted % 2 == 0) {
+            DroneType type = unit.getDroneType();
+            if (type != null && type.isSensor()) {
+                // Where the camera points; the server works out what's under the crosshair for the lock
+                ModNetwork.CHANNEL.sendToServer(new ReconLookPacket(unitId, Vec3d.fromPitchYaw(cameraPitch, cameraYaw)));
+            }
         }
         if (unit != null && isStickControl()) {
             sendStick(minecraft);
@@ -221,10 +249,12 @@ public final class RemoteController {
     }
 
     /**
-     * Per rendered frame (from the camera hook): consume mouse movement. In look modes it turns the camera at once
-     * (per tick would look steppy); under stick control it's saved for the next tick's stick input.
+     * Per rendered frame (from the camera hook): consume mouse movement. Under stick control it's saved for the next
+     * tick's stick input. In look modes the camera turns at once (per tick would look steppy) and then holds on to
+     * whatever is under the crosshair: an entity it hits is followed, a block stays put, so the view doesn't drift
+     * away from the target while the unit flies on. Pointing at the sky just keeps the direction.
      */
-    public static void updateLook() {
+    public static void updateLook(float partialTicks) {
         EntityPlayerSP player = Minecraft.getMinecraft().player;
         if (player == null || unit == null) {
             return;
@@ -240,8 +270,46 @@ public final class RemoteController {
             pendingMouseY += mouseY;
             return;
         }
-        lookYaw = Math.max(-LOOK_YAW_LIMIT, Math.min(LOOK_YAW_LIMIT, lookYaw + mouseX));
-        lookPitch = Math.max(LOOK_UP_LIMIT, Math.min(LOOK_DOWN_LIMIT, lookPitch + mouseY));
+        Vec3d eye = new Vec3d(unit.prevPosX + (unit.posX - unit.prevPosX) * partialTicks,
+                unit.prevPosY + (unit.posY - unit.prevPosY) * partialTicks + unit.getEyeHeight(),
+                unit.prevPosZ + (unit.posZ - unit.prevPosZ) * partialTicks);
+        if (mouseX != 0 || mouseY != 0) {
+            // Finer aim when zoomed in
+            cameraYaw = MathHelper.wrapDegrees(cameraYaw + mouseX / zoom);
+            cameraPitch = Math.max(LOOK_UP_LIMIT, Math.min(LOOK_DOWN_LIMIT, cameraPitch + mouseY / zoom));
+            reanchor(eye);
+            return;
+        }
+        if (anchorEntity != null && (anchorEntity.isDead || anchorEntity.world != unit.world)) {
+            anchorEntity = null;
+        }
+        Vec3d target = anchorEntity != null
+                ? new Vec3d(anchorEntity.lastTickPosX + (anchorEntity.posX - anchorEntity.lastTickPosX) * partialTicks,
+                        anchorEntity.lastTickPosY + (anchorEntity.posY - anchorEntity.lastTickPosY) * partialTicks + anchorEntity.height / 2,
+                        anchorEntity.lastTickPosZ + (anchorEntity.posZ - anchorEntity.lastTickPosZ) * partialTicks)
+                : anchorPoint;
+        if (target == null) {
+            return;
+        }
+        Vec3d toTarget = target.subtract(eye);
+        double horizontal = Math.sqrt(toTarget.x * toTarget.x + toTarget.z * toTarget.z);
+        float pitch = (float) -Math.toDegrees(Math.atan2(toTarget.y, horizontal));
+        if (pitch < LOOK_UP_LIMIT) {
+            // The target has gone above what the belly gimbal can tilt to: let go of it
+            anchorEntity = null;
+            anchorPoint = null;
+            return;
+        }
+        cameraYaw = (float) Math.toDegrees(Math.atan2(-toTarget.x, toTarget.z));
+        cameraPitch = Math.min(LOOK_DOWN_LIMIT, pitch);
+    }
+
+    /** Picks what's under the crosshair to hold on to: an entity, else the block it hits, else nothing. */
+    private static void reanchor(Vec3d eye) {
+        Vec3d end = eye.add(Vec3d.fromPitchYaw(cameraPitch, cameraYaw).scale(ANCHOR_RANGE));
+        RayTraceResult hit = Raytrace.firstResult(unit.world, eye, end, unit);
+        anchorEntity = hit != null ? hit.entityHit : null;
+        anchorPoint = hit != null && hit.entityHit == null ? hit.hitVec : null;
     }
 
     /** Mouse movement since the last call, in degrees (x right, y down), for the stick. */
@@ -285,10 +353,14 @@ public final class RemoteController {
     public static void onMouse(MouseEvent event) {
         if (unitId >= 0 && (event.getButton() != -1 || event.getDwheel() != 0)) {
             event.setCanceled(true);
+            // Wheel zooms the look camera (stick flight keeps the plain forward view)
+            if (event.getDwheel() != 0 && !isStickControl()) {
+                zoom = event.getDwheel() > 0 ? Math.min(MAX_ZOOM, zoom * 2) : Math.max(1, zoom / 2);
+            }
             // Click-designate: strike whatever the camera is looking at; the server traces it from the unit
             if (event.getButton() == 0 && event.isButtonstate() && control && unit != null
                     && scheme() == DroneType.ControlScheme.CLICK_DESIGNATE) {
-                Vec3d direction = Vec3d.fromPitchYaw(lookPitch, unit.rotationYaw + lookYaw);
+                Vec3d direction = Vec3d.fromPitchYaw(cameraPitch, cameraYaw);
                 ModNetwork.CHANNEL.sendToServer(new DesignatePacket(unitId, direction));
             }
         }

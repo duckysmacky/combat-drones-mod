@@ -26,7 +26,7 @@ public final class RouteValidator {
     /** Terminal actions a unit may be given: warheads strike, armed planes come home, recon patrols. */
     public static Set<Route.TerminalAction> allowedTerminals(boolean armed, boolean hasWeapon) {
         if (!armed) {
-            return EnumSet.of(Route.TerminalAction.LOOP, Route.TerminalAction.RETURN);
+            return EnumSet.of(Route.TerminalAction.LOITER, Route.TerminalAction.LOOP, Route.TerminalAction.RETURN);
         }
         if (hasWeapon) {
             return EnumSet.of(Route.TerminalAction.LOITER, Route.TerminalAction.RETURN);

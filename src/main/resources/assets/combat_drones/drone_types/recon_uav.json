@@ -1,17 +1,20 @@
 {
-  // Recon UAV: unarmed, long endurance. Can never be hand-flown or crashed on purpose;
-  // the only manual input is the camera gimbal.
+  // Recon UAV: unarmed, long endurance. Can never be hand-flown or steered into anything;
+  // the only manual input is the camera gimbal. A hard crash or being shot down sets off its fuel (blastPower).
+  // A gentle touchdown (Return) lands it intact.
   "category": "RAMP_AUTOPILOT",
   "maxSpeed": 1.0,
   "acceleration": 0.08,
   "batteryOrFuelCapacity": 24000,
   "drainRatePerTick": 1.0,
-  "blastPower": 0,
+  "blastPower": 2.5,
   "payloadCapacity": 0,
   "maxHP": 30,
   "defaultCruiseAltitude": 60,
   "agility": 1.0,
   "controlScheme": "GIMBAL_OBSERVE",
   "armed": false,
+  // Sweeps for enemies in line of sight and marks them on the owner's Mission Planner; its camera can lock targets
+  "sensor": true,
   "motorSoundRange": 48
 }

@@ -2,9 +2,13 @@ package io.github.duckysmacky.combatdrones.entity;
 
 import io.github.duckysmacky.combatdrones.CombatDrones;
 import io.github.duckysmacky.combatdrones.ModContent;
+import io.github.duckysmacky.combatdrones.config.ModConfig;
+import io.github.duckysmacky.combatdrones.network.LockProgressPacket;
 import io.github.duckysmacky.combatdrones.network.ModNetwork;
+import io.github.duckysmacky.combatdrones.physics.LockTracker;
 import io.github.duckysmacky.combatdrones.network.RemoteSessionPacket;
 import io.github.duckysmacky.combatdrones.type.DroneType;
+import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLiving;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.EntityPlayerMP;
@@ -12,6 +16,7 @@ import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.network.play.server.SPacketSetPassengers;
 import net.minecraft.util.DamageSource;
 import net.minecraft.util.EnumHand;
+import net.minecraft.util.math.Vec3d;
 import net.minecraft.util.text.TextComponentTranslation;
 import net.minecraftforge.event.entity.living.LivingAttackEvent;
 import net.minecraftforge.event.entity.living.LivingDamageEvent;
@@ -30,6 +35,7 @@ import net.minecraftforge.fml.common.gameevent.TickEvent;
 import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -52,6 +58,12 @@ public final class RemoteSessions {
         final boolean control;
         final EntityPilotBody body;
         final boolean wasInvisible;
+        // Active lock (sensor units): latest camera direction from the client and the lock in progress
+        final LockTracker lock = new LockTracker(ModConfig.activeLockHoldTicks);
+        @Nullable
+        Vec3d lookDirection;
+        long lookTick;
+        float sentProgress;
 
         Session(EntityPlayerMP player, EntityRampUnit unit, boolean control, EntityPilotBody body, boolean wasInvisible) {
             this.player = player;
@@ -63,6 +75,10 @@ public final class RemoteSessions {
     }
 
     private static final Map<UUID, Session> SESSIONS = new HashMap<>();
+    /** Camera directions older than this (ticks) no longer count toward a lock. */
+    private static final int LOOK_STALE_TICKS = 5;
+    /** Blocks added around a target's hitbox when checking whether the recon camera is on it. */
+    private static final double LOCK_BOX_MARGIN = 1.5;
     /** Set while the body forwards a hit to its player, so the "remote players can't be hurt" rule lets it through. */
     private static boolean forwardingBodyDamage;
 
@@ -246,8 +262,77 @@ public final class RemoteSessions {
             } else {
                 // Potion updates reset the invisible flag whenever any effect changes
                 player.setInvisible(true);
+                updateLock(session);
             }
         }
+    }
+
+    /** Server: a viewer's camera direction (sensor units only; anything else is ignored). */
+    public static void onReconLook(EntityPlayerMP player, int unitId, Vec3d direction) {
+        Session session = SESSIONS.get(player.getUniqueID());
+        DroneType type = session == null ? null : session.unit.getDroneType();
+        if (type == null || !type.isSensor() || session.unit.getEntityId() != unitId
+                || !Double.isFinite(direction.lengthSquared()) || direction.lengthSquared() < 1e-6) {
+            return;
+        }
+        session.lookDirection = direction.normalize();
+        session.lookTick = player.world.getTotalWorldTime();
+    }
+
+    /**
+     * Runs the active lock for a recon viewer: the enemy closest to the camera's line (within lockConeDegrees, in
+     * range and line of sight) is the candidate; holding it for activeLockHoldTicks locks it.
+     */
+    private static void updateLock(Session session) {
+        DroneType type = session.unit.getDroneType();
+        UUID owner = session.unit.getOwner();
+        if (type == null || !type.isSensor() || owner == null) {
+            return;
+        }
+        boolean fresh = session.lookDirection != null && session.player.world.getTotalWorldTime() - session.lookTick <= LOOK_STALE_TICKS;
+        Entity candidate = fresh ? lockCandidate(session, owner) : null;
+        if (session.lock.update(candidate == null ? LockTracker.NONE : candidate.getEntityId())) {
+            ReconIntel.lock(owner, candidate);
+            session.player.sendStatusMessage(new TextComponentTranslation("message.combat_drones.recon.locked", candidate.getName()), true);
+        }
+        float progress = (float) session.lock.getProgress();
+        // Only on change, in 5% steps
+        if (Math.abs(progress - session.sentProgress) >= 0.05F || (progress == 0) != (session.sentProgress == 0) || (progress >= 1) != (session.sentProgress >= 1)) {
+            session.sentProgress = progress;
+            ModNetwork.CHANNEL.sendTo(new LockProgressPacket(progress), session.player);
+        }
+    }
+
+    @Nullable
+    private static Entity lockCandidate(Session session, UUID owner) {
+        EntityRampUnit unit = session.unit;
+        Vec3d eye = ReconIntel.sensorPosition(unit);
+        double range = ModConfig.activeLockRange;
+        List<Entity> targets = new ArrayList<>(unit.world.playerEntities);
+        for (Session other : SESSIONS.values()) {
+            if (other.body.world == unit.world) {
+                targets.add(other.body); // stand-in bodies only exist during sessions
+            }
+        }
+        Entity best = null;
+        double bestAngle = Double.MAX_VALUE;
+        Vec3d rayEnd = eye.add(session.lookDirection.scale(range));
+        for (Entity target : targets) {
+            if (!ReconIntel.isEnemy(owner, target) || target.getDistanceSq(eye.x, eye.y, eye.z) > range * range) {
+                continue;
+            }
+            Vec3d toTarget = new Vec3d(target.posX - eye.x, target.posY + target.height / 2 - eye.y, target.posZ - eye.z);
+            double angle = LockTracker.angleBetween(session.lookDirection.x, session.lookDirection.y, session.lookDirection.z,
+                    toTarget.x, toTarget.y, toTarget.z);
+            // Under the crosshair: within the cone, or the camera line passes through the target's (generously grown) box
+            boolean aimed = angle <= ModConfig.lockConeDegrees
+                    || target.getEntityBoundingBox().grow(LOCK_BOX_MARGIN).calculateIntercept(eye, rayEnd) != null;
+            if (aimed && angle < bestAngle && ReconIntel.hasLineOfSight(unit.world, eye, target)) {
+                best = target;
+                bestAngle = angle;
+            }
+        }
+        return best;
     }
 
     @SubscribeEvent

@@ -46,6 +46,12 @@ public final class ModConfig {
     public static double minLaunchFuel = 0.25;
     public static double lowFuelFraction = 0.15;
     public static double maxMarkDistance = 256.0;
+    public static double detectionSweepRadius = 64.0;
+    public static double detectionDecaySeconds = 15.0;
+    public static double activeLockRange = 192.0;
+    public static double lockConeDegrees = 6.0;
+    public static int activeLockHoldTicks = 30;
+    public static double activeLockDurationSeconds = 60.0;
     public static double boostSpeedMultiplier = 1.5;
     public static double boostFuelMultiplier = 4.0;
 
@@ -99,6 +105,18 @@ public final class ModConfig {
                     "Fuel share at which a loitering unit stops circling: munitions dive on their last waypoint, planes fly home and land.");
             maxMarkDistance = defaults.number("general.maxMarkDistance", maxMarkDistance, 16, 1024,
                     "How far a target can be marked with the Mission Planner, or designated from a munition's camera, in blocks.");
+            detectionSweepRadius = defaults.number("general.detectionSweepRadius", detectionSweepRadius, 8, 256,
+                    "How far a recon UAV spots players in its line of sight, in blocks (half against sneaking players).");
+            detectionDecaySeconds = defaults.number("general.detectionDecaySeconds", detectionDecaySeconds, 1, 600,
+                    "How long a spotted player stays marked at their last seen position, in seconds.");
+            activeLockRange = defaults.number("general.activeLockRange", activeLockRange, 8, 512,
+                    "How far the recon camera can lock a player, in blocks.");
+            lockConeDegrees = defaults.number("general.lockConeDegrees", lockConeDegrees, 0.5, 20,
+                    "How close to the camera crosshair a player must be to start a lock, in degrees.");
+            activeLockHoldTicks = (int) defaults.number("general.activeLockHoldTicks", activeLockHoldTicks, 1, 400,
+                    "Ticks the crosshair must stay on a player to lock them (20 ticks = 1 s).");
+            activeLockDurationSeconds = defaults.number("general.activeLockDurationSeconds", activeLockDurationSeconds, 1, 600,
+                    "How long a locked player is tracked live on the owner's map and cameras, in seconds.");
             boostSpeedMultiplier = defaults.number("general.boostSpeedMultiplier", boostSpeedMultiplier, 1, 4,
                     "Top speed multiplier while a remotely controlled loitering munition boosts (Space).");
             boostFuelMultiplier = defaults.number("general.boostFuelMultiplier", boostFuelMultiplier, 1, 20,

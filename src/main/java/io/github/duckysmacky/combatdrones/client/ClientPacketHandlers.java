@@ -3,6 +3,8 @@ package io.github.duckysmacky.combatdrones.client;
 import io.github.duckysmacky.combatdrones.entity.EntityHandFlownDrone;
 import io.github.duckysmacky.combatdrones.network.DroneStatePacket;
 import io.github.duckysmacky.combatdrones.network.GunFirePacket;
+import io.github.duckysmacky.combatdrones.network.IntelPacket;
+import io.github.duckysmacky.combatdrones.network.LockProgressPacket;
 import io.github.duckysmacky.combatdrones.network.PlannerOpenPacket;
 import io.github.duckysmacky.combatdrones.network.RemoteSessionPacket;
 import io.github.duckysmacky.combatdrones.network.TypeSyncPacket;
@@ -50,6 +52,14 @@ public final class ClientPacketHandlers {
             world.spawnParticle(EnumParticleTypes.FIREWORKS_SPARK, from.x + step.x * index, from.y + step.y * index, from.z + step.z * index, 0, 0, 0);
         }
         world.spawnParticle(EnumParticleTypes.SMOKE_NORMAL, to.x, to.y, to.z, 0, 0.05, 0);
+    }
+
+    public static void onIntel(IntelPacket packet) {
+        ClientIntel.set(packet.getEntries());
+    }
+
+    public static void onLockProgress(LockProgressPacket packet) {
+        ClientIntel.setLockProgress(packet.getProgress());
     }
 
     public static void onDroneState(DroneStatePacket packet) {

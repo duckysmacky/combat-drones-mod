@@ -149,7 +149,7 @@ public class EntityLaunchRamp extends Entity {
         owner = player.getUniqueID();
         setFuel(Math.min(ItemDrone.getFuel(stack), type.getBatteryOrFuelCapacity()));
         ammo = Math.min(ItemDrone.getAmmo(stack), type.getPayloadCapacity());
-        route = Route.empty(type.isArmed() ? Route.TerminalAction.LOITER : Route.TerminalAction.LOOP);
+        route = Route.empty(Route.TerminalAction.LOITER);
         if (!player.capabilities.isCreativeMode) {
             stack.shrink(1);
         }

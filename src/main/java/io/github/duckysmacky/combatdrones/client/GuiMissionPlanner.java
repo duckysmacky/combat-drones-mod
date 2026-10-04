@@ -2,6 +2,7 @@ package io.github.duckysmacky.combatdrones.client;
 
 import io.github.duckysmacky.combatdrones.CombatDrones;
 import io.github.duckysmacky.combatdrones.entity.EntityRampUnit;
+import io.github.duckysmacky.combatdrones.network.IntelPacket;
 import io.github.duckysmacky.combatdrones.network.ModNetwork;
 import io.github.duckysmacky.combatdrones.network.PlannerMarkPacket;
 import io.github.duckysmacky.combatdrones.network.PlannerOpenPacket;
@@ -72,6 +73,7 @@ public class GuiMissionPlanner extends GuiScreen {
     private static final int BUTTON_CONTROL = 11;
     private static final int BUTTON_MARK = 12;
     private static final int TARGET_COLOR = 0xFFFF4040;
+    private static final int LOCKED_COLOR = 0xFFFF2020;
 
     private PlannerOpenPacket view;
     /** Index into view.units of the unit being edited (always 0 in ramp mode). */
@@ -385,10 +387,35 @@ public class GuiMissionPlanner extends GuiScreen {
         if (mc.player != null) {
             drawMarker(mc.player.posX, mc.player.posZ, 0xFFFFFFFF, 2);
         }
+        drawIntel();
         fontRenderer.drawStringWithShadow("N", (mapLeft + mapRight) / 2.0F - 2, mapTop + 3, 0xFFFFFF);
         if (insideMap(mouseX, mouseY)) {
             fontRenderer.drawStringWithShadow(String.format(Locale.ROOT, "X %d  Z %d", Math.round(toWorldX(mouseX)), Math.round(toWorldZ(mouseY))),
                     mapLeft + 4, mapBottom - 11, 0xCCCCCC);
+        }
+    }
+
+    /**
+     * Players the recon has spotted: fading red dots at their last seen spot, or a bright red diamond with a name
+     * for a locked target (which follows them live).
+     */
+    private void drawIntel() {
+        for (IntelPacket.Entry mark : ClientIntel.getMarks()) {
+            int screenX = toScreenX(mark.x);
+            int screenY = toScreenY(mark.z);
+            if (!insideMap(screenX, screenY)) {
+                continue;
+            }
+            if (mark.locked) {
+                for (int row = -4; row <= 4; row++) {
+                    int half = 4 - Math.abs(row);
+                    Gui.drawRect(screenX - half, screenY + row, screenX + half + 1, screenY + row + 1, LOCKED_COLOR);
+                }
+                fontRenderer.drawStringWithShadow(mark.name, screenX + 6, screenY - 4, 0xFF6060);
+            } else {
+                int alpha = 0x40 + (int) (Math.max(0, Math.min(1, mark.freshness)) * 0xBF);
+                Gui.drawRect(screenX - 2, screenY - 2, screenX + 3, screenY + 3, alpha << 24 | 0xE02020);
+            }
         }
     }
 
@@ -427,7 +454,7 @@ public class GuiMissionPlanner extends GuiScreen {
         double fromZ = unit.z;
         // Airborne: the path starts at the waypoint the unit is heading for
         int start = dirty || view.isRampMode() ? 0 : Math.min(unit.waypointIndex, waypoints.size());
-        if (terminal == Route.TerminalAction.LOOP && !waypoints.isEmpty()) {
+        if (terminal == Route.TerminalAction.LOOP && waypoints.size() > 1) {
             // A loop is a closed circuit: the leg to where it's heading, then every leg including last -> first
             Route.Waypoint next = waypoints.get(Math.min(start, waypoints.size() - 1));
             clippedLine(buffer, fromX, fromZ, next.x, next.z, ROUTE_COLOR);
@@ -444,7 +471,9 @@ public class GuiMissionPlanner extends GuiScreen {
             fromX = waypoint.x;
             fromZ = waypoint.z;
         }
-        if (!waypoints.isEmpty() && terminal == Route.TerminalAction.LOITER) {
+        // Loiter circles the last waypoint (so does a one-waypoint loop); shown while setting the radius too
+        boolean circles = terminal == Route.TerminalAction.LOITER || (terminal == Route.TerminalAction.LOOP && waypoints.size() == 1);
+        if (!waypoints.isEmpty() && (circles || editingRadius)) {
             Route.Waypoint last = waypoints.get(waypoints.size() - 1);
             double radius = editingRadius ? previewRadius(cursorX, cursorY) : loiterRadius;
             double previousX = last.x + radius;
@@ -558,6 +587,10 @@ public class GuiMissionPlanner extends GuiScreen {
             text = I18n.format("gui.combat_drones.planner.length", Math.round(length));
         }
         fontRenderer.drawString(text, mapLeft, mapBottom + 4, tooLong || waypoints.size() > view.maxWaypoints ? WARNING : 0xCCCCCC);
+        if (!ClientIntel.getMarks().isEmpty()) {
+            String spotted = I18n.format("gui.combat_drones.planner.spotted", ClientIntel.getMarks().size());
+            fontRenderer.drawString(spotted, mapRight - fontRenderer.getStringWidth(spotted), mapBottom + 4, 0xFF6060);
+        }
     }
 
     private static long percent(double fraction) {
@@ -665,14 +698,24 @@ public class GuiMissionPlanner extends GuiScreen {
         if (waypoints.size() >= view.maxWaypoints) {
             return addMenu.row(PlannerContextMenu.Segment.label(() -> I18n.format("gui.combat_drones.planner.menu.full")));
         }
-        return addMenu.row(PlannerContextMenu.Segment.command(() -> I18n.format("gui.combat_drones.planner.menu.add"), () -> {
-            Route.Waypoint previous = waypoints.isEmpty() ? null : waypoints.get(waypoints.size() - 1);
-            double altitude = previous != null ? previous.altitude : defaultAltitude();
-            Route.Speed speed = previous != null ? previous.speed : Route.Speed.FAST;
-            waypoints.add(new Route.Waypoint(Math.round(worldX), Math.round(worldZ), altitude, speed));
-            selectedWaypoint = waypoints.size() - 1;
-            dirty = true;
-        }));
+        if (unit != null && unit.allowedTerminals.contains(Route.TerminalAction.LOITER)) {
+            // Shortcut: a final waypoint here, circled at the loiter radius
+            addMenu.row(PlannerContextMenu.Segment.command(() -> I18n.format("gui.combat_drones.planner.menu.loiter_here"), () -> {
+                addWaypointAt(worldX, worldZ);
+                terminal = Route.TerminalAction.LOITER;
+            }));
+        }
+        return addMenu.row(PlannerContextMenu.Segment.command(() -> I18n.format("gui.combat_drones.planner.menu.add"), () -> addWaypointAt(worldX, worldZ)));
+    }
+
+    /** Appends a waypoint, copying the previous one's height and speed. */
+    private void addWaypointAt(double worldX, double worldZ) {
+        Route.Waypoint previous = waypoints.isEmpty() ? null : waypoints.get(waypoints.size() - 1);
+        double altitude = previous != null ? previous.altitude : defaultAltitude();
+        Route.Speed speed = previous != null ? previous.speed : Route.Speed.FAST;
+        waypoints.add(new Route.Waypoint(Math.round(worldX), Math.round(worldZ), altitude, speed));
+        selectedWaypoint = waypoints.size() - 1;
+        dirty = true;
     }
 
     /** Options act on {@link #selectedWaypoint}, which is the clicked waypoint for as long as the menu is open. */

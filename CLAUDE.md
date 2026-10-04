@@ -81,9 +81,10 @@ behaviour, not this file.
    not a new Java class per variant. Adding a variant shouldn't require new
    Java.
 6. **No crash-on-purpose for the recon UAV.** Per spec, the recon UAV can
-   never be hand-flown or deliberately destroyed by its own pilot. A
-   collision should redirect or stop it, not trigger a detonation — it
-   carries no warhead.
+   never be hand-flown or steered into anything by its own pilot: it only
+   takes routes and camera input, never a strike command. It carries no
+   warhead, but a hard crash or being shot down sets off its fuel (a small
+   `blastPower`, like a gunship's); a gentle touchdown lands it intact.
 
 ## Working method
 

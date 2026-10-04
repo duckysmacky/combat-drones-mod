@@ -74,8 +74,10 @@ public final class DroneType {
     private WeaponType weaponType = WeaponType.NONE;
     /** Detonates on any collision (racer family). */
     private boolean impactDetonates;
-    /** False for the recon UAV: it never arms, dives or detonates. */
+    /** False for the recon UAV: no warhead or weapon, never dives or strikes (a crash can still set off its fuel). */
     private boolean armed = true;
+    /** Carries a detection sensor (recon): sweeps for enemies and lets its camera lock targets. */
+    private boolean sensor;
 
     /** Parses and validates one type file. Gson's {@code fromJson(Reader)} is lenient, so {@code //} comments are allowed. */
     public static DroneType parse(String id, Reader reader) {
@@ -155,7 +157,8 @@ public final class DroneType {
             require(defaultCruiseAltitude > 0, "ramp-launched types need 'defaultCruiseAltitude' > 0");
         }
         if (!armed) {
-            require(blastPower == 0 && weaponType == WeaponType.NONE && payloadCapacity == 0, "unarmed types can't have a blast, weapon or payload");
+            // blastPower is allowed: it's the fuel going up in a crash, not a warhead
+            require(!impactDetonates && weaponType == WeaponType.NONE && payloadCapacity == 0, "unarmed types can't detonate on impact or carry a weapon or payload");
             require(controlScheme == null || controlScheme == ControlScheme.GIMBAL_OBSERVE, "unarmed types can only use GIMBAL_OBSERVE");
         }
     }
@@ -236,6 +239,10 @@ public final class DroneType {
 
     public boolean isImpactDetonates() {
         return impactDetonates;
+    }
+
+    public boolean isSensor() {
+        return sensor;
     }
 
     public boolean isArmed() {

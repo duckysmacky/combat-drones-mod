@@ -57,21 +57,30 @@ public final class CameraHandler {
         event.setRoll((float) euler[2]);
     }
 
+    /** Zoomed look camera: narrower field of view. */
+    @SubscribeEvent
+    public static void onFov(EntityViewRenderEvent.FOVModifier event) {
+        EntityRampUnit unit = RemoteController.getUnit();
+        if (unit != null && event.getEntity() == unit && RemoteController.getZoom() > 1) {
+            event.setFOV(event.getFOV() / RemoteController.getZoom());
+        }
+    }
+
     /**
      * Ramp unit camera: under stick control it's fixed to the airframe and banks with it; otherwise it's a stabilized
-     * gimbal the mouse turns (relative to the heading, absolute tilt, never rolls).
+     * gimbal pointing where the mouse aimed it in world terms (it holds on to its target, never rolls).
      */
     private static void remoteCamera(EntityViewRenderEvent.CameraSetup event, EntityRampUnit unit) {
-        RemoteController.updateLook();
         float partialTicks = (float) event.getRenderPartialTicks();
+        RemoteController.updateLook(partialTicks);
         float yaw = unit.prevRotationYaw + MathHelper.wrapDegrees(unit.rotationYaw - unit.prevRotationYaw) * partialTicks;
         if (RemoteController.isStickControl()) {
             event.setYaw(yaw + 180.0F); // vanilla's camera yaw convention is offset by 180
             event.setPitch(unit.prevRotationPitch + (unit.rotationPitch - unit.prevRotationPitch) * partialTicks);
             event.setRoll(unit.prevBank + (unit.getBank() - unit.prevBank) * partialTicks);
         } else {
-            event.setYaw(yaw + RemoteController.getLookYaw() + 180.0F);
-            event.setPitch(RemoteController.getLookPitch());
+            event.setYaw(RemoteController.getCameraYaw() + 180.0F);
+            event.setPitch(RemoteController.getCameraPitch());
             event.setRoll(0);
         }
     }

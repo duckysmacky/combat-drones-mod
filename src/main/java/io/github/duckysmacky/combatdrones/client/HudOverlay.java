@@ -183,6 +183,13 @@ public final class HudOverlay {
         if (unit.isBoosting()) {
             drawText(font, I18n.format("hud.combat_drones.boost"), left, top + LINE * 2, 0xFFAA00);
         }
+        if (RemoteController.getZoom() > 1) {
+            drawText(font, I18n.format("hud.combat_drones.zoom", RemoteController.getZoom()), left, top + LINE * 3, TEXT);
+        }
+        if (!ClientIntel.getMarks().isEmpty()) {
+            String targets = I18n.format("hud.combat_drones.targets", ClientIntel.getMarks().size());
+            drawText(font, targets, right - font.getStringWidth(targets), top + LINE * 2, WARNING);
+        }
 
         String fuelText = I18n.format("hud.combat_drones.fuel", percent(fuel));
         drawText(font, fuelText, right - font.getStringWidth(fuelText), top, fuel < LOW_BATTERY ? WARNING : TEXT);
@@ -203,11 +210,32 @@ public final class HudOverlay {
         float health = unit.getHealthFraction();
         drawText(font, I18n.format("hud.combat_drones.health", percent(health)), left, bottom + 16 + LINE, health < 0.5F ? WARNING : TEXT);
         drawCrosshair(centerX, centerY);
+        drawLock(font, centerX, centerY, ClientIntel.getLockProgress());
         if (fuel <= 0) {
             drawCentered(font, I18n.format("hud.combat_drones.warning.fuel_empty"), centerX, centerY + 24, WARNING);
         } else if (fuel < LOW_BATTERY && (minecraft.world.getTotalWorldTime() / 10) % 2 == 0) {
             drawCentered(font, I18n.format("hud.combat_drones.warning.low_fuel"), centerX, centerY + 24, WARNING);
         }
+    }
+
+    /** Recon lock: brackets closing in on the crosshair as the lock builds, then LOCKED. */
+    private static void drawLock(FontRenderer font, int centerX, int centerY, float progress) {
+        if (progress <= 0) {
+            return;
+        }
+        int color = progress >= 1 ? 0xFFFF3030 : 0xFFFFAA00;
+        int gap = 18 - Math.round(10 * Math.min(1, progress));
+        int arm = 5;
+        for (int sideX = -1; sideX <= 1; sideX += 2) {
+            for (int sideY = -1; sideY <= 1; sideY += 2) {
+                int cornerX = centerX + sideX * gap;
+                int cornerY = centerY + sideY * gap;
+                Gui.drawRect(Math.min(cornerX, cornerX - sideX * arm), cornerY, Math.max(cornerX, cornerX - sideX * arm) + 1, cornerY + 1, color);
+                Gui.drawRect(cornerX, Math.min(cornerY, cornerY - sideY * arm), cornerX + 1, Math.max(cornerY, cornerY - sideY * arm) + 1, color);
+            }
+        }
+        String text = progress >= 1 ? I18n.format("hud.combat_drones.locked") : I18n.format("hud.combat_drones.locking", percent(progress));
+        drawCentered(font, text, centerX, centerY + 22, color & 0xFFFFFF);
     }
 
     /** Grenade count, the loaded bomb size and count, or null for drones without payload slots. */
