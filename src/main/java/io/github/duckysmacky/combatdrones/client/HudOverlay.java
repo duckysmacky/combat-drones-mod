@@ -166,7 +166,7 @@ public final class HudOverlay {
         int top = centerY - HALF_HEIGHT;
         int bottom = centerY + HALF_HEIGHT;
 
-        double speedKmh = Math.sqrt(sq(unit.posX - unit.prevPosX) + sq(unit.posY - unit.prevPosY) + sq(unit.posZ - unit.prevPosZ)) * 72;
+        double speedKmh = unit.getSyncedSpeed() * 72;
         double altitude = altitudeAboveGround(minecraft, unit);
         double heading = MathHelper.positiveModulo(unit.rotationYaw + 180, 360);
         double fuel = unit.getFuelFraction();
@@ -174,10 +174,14 @@ public final class HudOverlay {
         drawCentered(font, I18n.format("hud.combat_drones.plane_status", Math.round(heading),
                 altitude < 0 ? "---" : String.valueOf(Math.round(altitude))), centerX, top - LINE - 4, TEXT);
 
-        String mode = !RemoteController.isControl() ? "view" : RemoteController.isStickControl() ? "manual" : "designate";
+        String mode = !RemoteController.isControl() ? "view" : !RemoteController.isStickControl() ? "designate"
+                : RemoteController.isFreeMode() ? "free" : "assisted";
         drawText(font, I18n.format("hud.combat_drones.mode." + mode), left, top, TEXT);
         if (unit.isStrikingDesignated()) {
             drawText(font, I18n.format("hud.combat_drones.striking"), left, top + LINE, WARNING);
+        }
+        if (unit.isBoosting()) {
+            drawText(font, I18n.format("hud.combat_drones.boost"), left, top + LINE * 2, 0xFFAA00);
         }
 
         String fuelText = I18n.format("hud.combat_drones.fuel", percent(fuel));
@@ -204,10 +208,6 @@ public final class HudOverlay {
         } else if (fuel < LOW_BATTERY && (minecraft.world.getTotalWorldTime() / 10) % 2 == 0) {
             drawCentered(font, I18n.format("hud.combat_drones.warning.low_fuel"), centerX, centerY + 24, WARNING);
         }
-    }
-
-    private static double sq(double value) {
-        return value * value;
     }
 
     /** Grenade count, the loaded bomb size and count, or null for drones without payload slots. */

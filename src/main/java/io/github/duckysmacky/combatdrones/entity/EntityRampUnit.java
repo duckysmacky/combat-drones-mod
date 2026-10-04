@@ -1,5 +1,6 @@
 package io.github.duckysmacky.combatdrones.entity;
 
+import com.google.common.base.Optional;
 import io.github.duckysmacky.combatdrones.CombatDrones;
 import io.github.duckysmacky.combatdrones.config.ModConfig;
 import io.github.duckysmacky.combatdrones.item.ItemDrone;
@@ -65,10 +66,22 @@ public class EntityRampUnit extends Entity {
     /** Manual input older than this (ticks) is treated as a centred stick. */
     private static final int STALE_INPUT_TICKS = 10;
     private static final int DESIGNATE_COOLDOWN_TICKS = 10;
+    // Client smoothing: share of the remaining rotation / position error taken out each tick, and the error beyond
+    // which it just jumps (teleport, chunk reload)
+    private static final float ROTATION_SMOOTHING = 0.5F;
+    private static final double POSITION_CORRECTION = 0.3;
+    private static final double SNAP_DISTANCE = 8.0;
 
     private static final DataParameter<String> TYPE_ID = EntityDataManager.createKey(EntityRampUnit.class, DataSerializers.STRING);
     private static final DataParameter<Float> BANK = EntityDataManager.createKey(EntityRampUnit.class, DataSerializers.FLOAT);
     private static final DataParameter<Float> FUEL_FRACTION = EntityDataManager.createKey(EntityRampUnit.class, DataSerializers.FLOAT);
+    // Exact flight state for clients: vanilla sends rotations as bytes (1.4° steps), which made the camera judder
+    private static final DataParameter<Float> HEADING = EntityDataManager.createKey(EntityRampUnit.class, DataSerializers.FLOAT);
+    private static final DataParameter<Float> PITCH = EntityDataManager.createKey(EntityRampUnit.class, DataSerializers.FLOAT);
+    private static final DataParameter<Float> SPEED = EntityDataManager.createKey(EntityRampUnit.class, DataSerializers.FLOAT);
+    /** Where it's diving (designated point or the autopilot's strike point), for the pilot's marker. */
+    private static final DataParameter<Optional<BlockPos>> STRIKE_POINT = EntityDataManager.createKey(EntityRampUnit.class, DataSerializers.OPTIONAL_BLOCK_POS);
+    private static final DataParameter<Boolean> BOOSTING = EntityDataManager.createKey(EntityRampUnit.class, DataSerializers.BOOLEAN);
     private static final DataParameter<Boolean> STRIKING = EntityDataManager.createKey(EntityRampUnit.class, DataSerializers.BOOLEAN);
     private static final DataParameter<Integer> AMMO = EntityDataManager.createKey(EntityRampUnit.class, DataSerializers.VARINT);
     private static final DataParameter<Float> HEALTH_FRACTION = EntityDataManager.createKey(EntityRampUnit.class, DataSerializers.FLOAT);
@@ -89,6 +102,8 @@ public class EntityRampUnit extends Entity {
     private double manualRoll;
     private double manualThrottle;
     private boolean manualTrigger;
+    private boolean manualFree;
+    private boolean manualBoost;
     private long manualInputTick = Long.MIN_VALUE;
     /** A point picked from the camera (click-designate scheme): overrides the route with a strike. */
     @Nullable
@@ -101,6 +116,11 @@ public class EntityRampUnit extends Entity {
 
     // Client-side presentation
     public float prevBank;
+    /** Latest position from the server, dead-reckoned forward between updates; the client eases toward it. */
+    private double serverX;
+    private double serverY;
+    private double serverZ;
+    private boolean hasServerPosition;
     public int hitFlashTicks;
 
     public EntityRampUnit(World world) {
@@ -137,6 +157,11 @@ public class EntityRampUnit extends Entity {
         dataManager.register(HEALTH_FRACTION, 1.0F);
         dataManager.register(AMMO, 0);
         dataManager.register(STRIKING, false);
+        dataManager.register(STRIKE_POINT, Optional.absent());
+        dataManager.register(BOOSTING, false);
+        dataManager.register(HEADING, 0.0F);
+        dataManager.register(PITCH, 0.0F);
+        dataManager.register(SPEED, 0.0F);
     }
 
     @Nullable
@@ -187,6 +212,9 @@ public class EntityRampUnit extends Entity {
     public void setRoute(Route newRoute) {
         route = newRoute;
         waypointIndex = 0;
+        // A new plan (and target) from the planner replaces any point picked from the camera
+        designatedTarget = null;
+        dataManager.set(STRIKING, false);
     }
 
     private void setHealth(float value) {
@@ -196,7 +224,7 @@ public class EntityRampUnit extends Entity {
     }
 
     private static FixedWingFlight.Params paramsOf(DroneType type) {
-        return new FixedWingFlight.Params(type.getMaxSpeed(), type.getAcceleration());
+        return new FixedWingFlight.Params(type.getMaxSpeed(), type.getAcceleration(), type.getAgility());
     }
 
     @Override
@@ -204,6 +232,7 @@ public class EntityRampUnit extends Entity {
         prevBank = getBank();
         super.onUpdate();
         if (world.isRemote) {
+            clientMotion();
             if (hitFlashTicks > 0) {
                 hitFlashTicks--;
             }
@@ -216,7 +245,9 @@ public class EntityRampUnit extends Entity {
             setDead();
             return;
         }
-        FixedWingFlight.Params params = paramsOf(type);
+        boolean boosting = isBoosting(type);
+        dataManager.set(BOOSTING, boosting);
+        FixedWingFlight.Params params = boosting ? paramsOf(type).boosted(ModConfig.boostSpeedMultiplier) : paramsOf(type);
         if (designateCooldown > 0) {
             designateCooldown--;
         }
@@ -225,16 +256,24 @@ public class EntityRampUnit extends Entity {
         }
         // The entity position is the truth (picks up /tp and positions set after NBT load)
         flight.position.set(posX, posY, posZ);
-        FixedWingFlight.Controls controls = manualControls(type);
+        FixedWingFlight.Controls controls = manualControls(type, params, boosting);
+        Vec3d strikePoint = null;
         if (controls == null && designatedTarget != null) {
             controls = RouteAutopilot.strike(flight, designatedTarget.x, designatedTarget.y, designatedTarget.z, terrainFloor(), params, fuel > 0);
+            strikePoint = designatedTarget;
         }
         if (controls == null) {
-            controls = autopilotControls(type, params);
+            RouteAutopilot.Command command = autopilotCommand(type, params);
+            controls = command.controls;
+            if (command.phase == RouteAutopilot.Phase.STRIKE) {
+                strikePoint = routeStrikePoint();
+            }
         }
+        dataManager.set(STRIKE_POINT, strikePoint == null ? Optional.absent() : Optional.of(new BlockPos(strikePoint)));
         double thrust = FixedWingFlight.step(flight, controls, params);
         if (controls.engineOn) {
-            fuel = Math.max(0, fuel - DroneSystems.drainPerTick(type.getDrainRatePerTick(), thrust));
+            double burn = DroneSystems.drainPerTick(type.getDrainRatePerTick(), thrust) * (boosting ? ModConfig.boostFuelMultiplier : 1);
+            fuel = Math.max(0, fuel - burn);
         }
 
         double wantedX = flight.position.x - posX;
@@ -257,18 +296,99 @@ public class EntityRampUnit extends Entity {
     }
 
     /** The route (and its terminal action) on autopilot. */
-    private FixedWingFlight.Controls autopilotControls(DroneType type, FixedWingFlight.Params params) {
+    private RouteAutopilot.Command autopilotCommand(DroneType type, FixedWingFlight.Params params) {
         RouteAutopilot.Situation situation = new RouteAutopilot.Situation(launchY, terrainFloor(), fuel > 0,
                 fuel / type.getBatteryOrFuelCapacity(), ModConfig.lowFuelFraction, type.isArmed() && type.isImpactDetonates(),
                 strikeGroundY(), homeX, launchY - 1, homeZ);
         RouteAutopilot.Command command = RouteAutopilot.guide(flight, route, waypointIndex, situation, params);
         waypointIndex = command.waypointIndex;
-        return command.controls;
+        return command;
+    }
+
+    /** What an autopilot strike is aiming at: the marked target for Destroy, else the ground under the last waypoint. */
+    @Nullable
+    private Vec3d routeStrikePoint() {
+        Route.Target target = route.getTarget();
+        if (route.getTerminal() == Route.TerminalAction.DESTROY && target != null && !Double.isNaN(target.y)) {
+            return new Vec3d(target.x, target.y, target.z);
+        }
+        if (route.size() == 0) {
+            return null;
+        }
+        Route.Waypoint last = route.get(route.size() - 1);
+        double groundY = strikeGroundY();
+        return new Vec3d(last.x, Double.isNaN(groundY) ? launchY : groundY, last.z);
+    }
+
+    /** Boost: a remotely controlled munition with fuel whose pilot holds the boost key (fresh input only). */
+    private boolean isBoosting(DroneType type) {
+        return manualBoost && type.isImpactDetonates() && fuel > 0 && RemoteSessions.controllerOf(this) != null
+                && world.getTotalWorldTime() - manualInputTick <= STALE_INPUT_TICKS;
+    }
+
+    public boolean isBoosting() {
+        return dataManager.get(BOOSTING);
+    }
+
+    /** Client: the point it's diving on, if any. */
+    @Nullable
+    public BlockPos getStrikePoint() {
+        return dataManager.get(STRIKE_POINT).orNull();
+    }
+
+    /** Airspeed in blocks/tick, as the server last reported it (for the HUD). */
+    public float getSyncedSpeed() {
+        return dataManager.get(SPEED);
+    }
+
+    /**
+     * Client: fly on by the synced heading, pitch and speed every tick and ease toward the server's position, instead
+     * of jumping to each position packet. Packets don't arrive exactly once per client tick, so applying them as-is
+     * made the unit (and the camera riding it) stutter.
+     */
+    private void clientMotion() {
+        float heading = dataManager.get(HEADING);
+        float pitch = dataManager.get(PITCH);
+        rotationYaw += MathHelper.wrapDegrees(heading - rotationYaw) * ROTATION_SMOOTHING;
+        rotationPitch += (pitch - rotationPitch) * ROTATION_SMOOTHING;
+        Vec3d velocity = Vec3d.fromPitchYaw(pitch, heading).scale(dataManager.get(SPEED));
+        double x = posX + velocity.x;
+        double y = posY + velocity.y;
+        double z = posZ + velocity.z;
+        if (hasServerPosition) {
+            double errorX = serverX - x;
+            double errorY = serverY - y;
+            double errorZ = serverZ - z;
+            if (errorX * errorX + errorY * errorY + errorZ * errorZ > SNAP_DISTANCE * SNAP_DISTANCE) {
+                x = serverX;
+                y = serverY;
+                z = serverZ;
+            } else {
+                x += errorX * POSITION_CORRECTION;
+                y += errorY * POSITION_CORRECTION;
+                z += errorZ * POSITION_CORRECTION;
+            }
+            // Until the next packet, assume the server moved on the same way
+            serverX += velocity.x;
+            serverY += velocity.y;
+            serverZ += velocity.z;
+        }
+        setPosition(x, y, z);
+    }
+
+    @Override
+    @SideOnly(Side.CLIENT)
+    public void setPositionAndRotationDirect(double x, double y, double z, float yaw, float pitch, int posRotationIncrements, boolean teleport) {
+        // Only remembered: clientMotion() eases toward it. Rotation comes from the exact synced values instead.
+        serverX = x;
+        serverY = y;
+        serverZ = z;
+        hasServerPosition = true;
     }
 
     /** Stick input while a controller flies it by hand (stick scheme), or null when the autopilot should fly. */
     @Nullable
-    private FixedWingFlight.Controls manualControls(DroneType type) {
+    private FixedWingFlight.Controls manualControls(DroneType type, FixedWingFlight.Params params, boolean boosting) {
         if (type.getControlScheme() != DroneType.ControlScheme.STICK || RemoteSessions.controllerOf(this) == null) {
             return null;
         }
@@ -281,7 +401,9 @@ public class EntityRampUnit extends Entity {
         if (manualTrigger) {
             fireWeapon(type);
         }
-        return FixedWingFlight.fromStick(manualPitch, manualRoll, manualThrottle, fuel > 0);
+        double throttle = boosting ? 1 : manualThrottle;
+        return manualFree ? FixedWingFlight.fromRates(flight, params, manualPitch, manualRoll, throttle, fuel > 0)
+                : FixedWingFlight.fromStick(manualPitch, manualRoll, throttle, fuel > 0);
     }
 
     /** Fires one rocket or round along the nose, if the weapon is ready and there's ammo. Manual control only. */
@@ -310,7 +432,7 @@ public class EntityRampUnit extends Entity {
         Vec3d direction = Vec3d.fromPitchYaw(rotationPitch + (float) rand.nextGaussian() * spread / 2,
                 rotationYaw + (float) rand.nextGaussian() * spread / 2);
         Vec3d end = muzzle.add(direction.scale(ModConfig.gunRange));
-        RayTraceResult hit = Raytrace.firstResult(world, muzzle, end, this);
+        RayTraceResult hit = Raytrace.firstResult(world, muzzle, end, this, ModConfig.gunHitMargin);
         if (hit != null && hit.entityHit != null) {
             if (hit.entityHit instanceof EntityLivingBase) {
                 // 10 rounds a second would otherwise mostly land inside vanilla's hurt cooldown and do nothing
@@ -326,7 +448,7 @@ public class EntityRampUnit extends Entity {
     }
 
     /** Server: latest manual input from the network. Only the current controller's input counts; values arrive clamped. */
-    public void acceptManualInput(EntityPlayerMP sender, double pitch, double roll, double throttle, boolean trigger) {
+    public void acceptManualInput(EntityPlayerMP sender, double pitch, double roll, double throttle, boolean trigger, boolean free, boolean boost) {
         if (RemoteSessions.controllerOf(this) != sender) {
             return;
         }
@@ -334,6 +456,8 @@ public class EntityRampUnit extends Entity {
         manualRoll = roll;
         manualThrottle = throttle;
         manualTrigger = trigger;
+        manualFree = free;
+        manualBoost = boost;
         manualInputTick = world.getTotalWorldTime();
     }
 
@@ -448,6 +572,9 @@ public class EntityRampUnit extends Entity {
         rotationYaw = (float) flight.heading;
         rotationPitch = (float) flight.pitch;
         dataManager.set(BANK, (float) flight.bank);
+        dataManager.set(HEADING, (float) flight.heading);
+        dataManager.set(PITCH, (float) flight.pitch);
+        dataManager.set(SPEED, (float) flight.speed);
         DroneType type = getDroneType();
         dataManager.set(FUEL_FRACTION, type == null ? 0 : (float) Math.min(1, fuel / type.getBatteryOrFuelCapacity()));
     }
@@ -455,7 +582,7 @@ public class EntityRampUnit extends Entity {
     /**
      * Ran into terrain or something solid. Warheads go off; an unarmed recon UAV never detonates (architecture
      * rule 6) and lands intact as an item; other units land if they were slow enough (a Return landing, or a belly
-     * landing), and are wrecked otherwise.
+     * landing). A hard crash goes off with the type's blastPower (a gunship's fuel and ammo), or just wrecks it.
      */
     private void onCollision(DroneType type) {
         // Slow contact of any kind counts: a landing roll often ends against a bump or a block edge
@@ -465,8 +592,7 @@ public class EntityRampUnit extends Entity {
         } else if (!type.isArmed() || gentleTouchdown) {
             land(type);
         } else {
-            setDead();
-            DamageEffects.wreck(this);
+            detonate(type);
         }
     }
 

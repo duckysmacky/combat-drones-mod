@@ -14,7 +14,9 @@ import net.minecraft.util.DamageSource;
 import net.minecraft.util.EnumHand;
 import net.minecraft.util.text.TextComponentTranslation;
 import net.minecraftforge.event.entity.living.LivingAttackEvent;
+import net.minecraftforge.event.entity.living.LivingDamageEvent;
 import net.minecraftforge.event.entity.living.LivingDeathEvent;
+import net.minecraftforge.event.entity.living.LivingHurtEvent;
 import net.minecraftforge.event.entity.living.LivingSetAttackTargetEvent;
 import net.minecraftforge.event.entity.player.AttackEntityEvent;
 import net.minecraftforge.event.entity.player.EntityItemPickupEvent;
@@ -142,6 +144,9 @@ public final class RemoteSessions {
         returnHome(player);
         player.setInvisible(session.wasInvisible);
         session.body.setDead();
+        if (player.hasDisconnected()) {
+            return; // logging out: they're saved at home, nobody left to tell
+        }
         ModNetwork.CHANNEL.sendTo(new RemoteSessionPacket(-1, false), player);
         if (message != null) {
             player.sendStatusMessage(new TextComponentTranslation(message), true);
@@ -238,6 +243,9 @@ public final class RemoteSessions {
                 end(player, "message.combat_drones.remote.need_planner");
             } else if (player.getRidingEntity() != session.unit || session.body.isDead) {
                 end(player, "message.combat_drones.remote.link_lost");
+            } else {
+                // Potion updates reset the invisible flag whenever any effect changes
+                player.setInvisible(true);
             }
         }
     }
@@ -286,6 +294,24 @@ public final class RemoteSessions {
         DamageSource source = event.getSource();
         if (source.getTrueSource() != null && source.getTrueSource() != session.player && !source.isExplosion()) {
             session.unit.attackEntityFrom(source, event.getAmount());
+        }
+    }
+
+    /**
+     * Second line of defence: some mods hurt entities without going through the attack event. Whatever reaches the
+     * rider (except hits relayed from their body) is dropped here; hits on the vehicle never hurt its pilot.
+     */
+    @SubscribeEvent
+    public static void onHurt(LivingHurtEvent event) {
+        if (!forwardingBodyDamage && event.getEntityLiving() instanceof EntityPlayer && isRemote((EntityPlayer) event.getEntityLiving())) {
+            event.setCanceled(true);
+        }
+    }
+
+    @SubscribeEvent
+    public static void onDamage(LivingDamageEvent event) {
+        if (!forwardingBodyDamage && event.getEntityLiving() instanceof EntityPlayer && isRemote((EntityPlayer) event.getEntityLiving())) {
+            event.setCanceled(true);
         }
     }
 

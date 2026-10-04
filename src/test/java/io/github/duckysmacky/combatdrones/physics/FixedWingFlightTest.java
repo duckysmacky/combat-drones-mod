@@ -89,4 +89,46 @@ class FixedWingFlightTest {
         assertEquals(0, controls.throttle, 1e-9);
         assertTrue(!controls.engineOn);
     }
+
+    @Test
+    void freeStickHoldsTheAttitudeWhenReleased() {
+        State state = cruising();
+        for (int tick = 0; tick < 5; tick++) {
+            FixedWingFlight.step(state, FixedWingFlight.fromRates(state, PLANE, 0.5, 1, 0.8, true), PLANE);
+        }
+        assertEquals(5 * FixedWingFlight.ROLL_RATE_DEG, state.bank, 1e-6);
+        assertEquals(5 * 0.5 * FixedWingFlight.PITCH_RATE_DEG, state.pitch, 1e-6);
+        double bank = state.bank;
+        double pitch = state.pitch;
+        for (int tick = 0; tick < 20; tick++) {
+            FixedWingFlight.step(state, FixedWingFlight.fromRates(state, PLANE, 0, 0, 0.8, true), PLANE);
+        }
+        assertEquals(bank, state.bank, 1e-6);
+        assertEquals(pitch, state.pitch, 1e-6);
+    }
+
+    @Test
+    void agileAirframeTurnsTighter() {
+        Params agile = new Params(1.0, 0.1, 2.5);
+        State plane = cruising();
+        State rocket = cruising();
+        // Short enough that neither heading wraps past 180
+        for (int tick = 0; tick < 10; tick++) {
+            FixedWingFlight.step(plane, new Controls(45, 0, 0.8, true), PLANE);
+            FixedWingFlight.step(rocket, new Controls(45, 0, 0.8, true), agile);
+        }
+        assertTrue(rocket.heading > plane.heading * 2, "agility 2.5 should turn well over twice as far");
+    }
+
+    @Test
+    void boostRaisesTopSpeed() {
+        State state = cruising();
+        run(state, new Controls(0, 0, 1, true), 300);
+        double normal = state.speed;
+        Params boosted = PLANE.boosted(1.5);
+        for (int tick = 0; tick < 300; tick++) {
+            FixedWingFlight.step(state, new Controls(0, 0, 1, true), boosted);
+        }
+        assertEquals(normal * 1.5, state.speed, 1e-3);
+    }
 }

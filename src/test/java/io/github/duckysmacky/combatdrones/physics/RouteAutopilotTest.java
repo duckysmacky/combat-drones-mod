@@ -4,6 +4,7 @@ import io.github.duckysmacky.combatdrones.physics.Route.TerminalAction;
 import io.github.duckysmacky.combatdrones.physics.Route.Waypoint;
 import org.junit.jupiter.api.Test;
 
+import java.util.Arrays;
 import java.util.Collections;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -177,5 +178,50 @@ class RouteAutopilotTest {
         assertTrue(touchdown != null, "should come down");
         assertTrue(Math.hypot(touchdown.position.x, touchdown.position.z) < 40, "should land near home");
         assertTrue(touchdown.speed < 0.75 * PLANE.maxSpeed, "should touch down slowly, was " + touchdown.speed);
+    }
+
+    @Test
+    void fastMunitionComesRoundWideEnoughToDive() {
+        // Turn circle wider than the dive cone: it has to extend before turning back, or it circles forever
+        FixedWingFlight.Params fast = new FixedWingFlight.Params(1.5, 0.15);
+        FixedWingFlight.State state = launched();
+        state.position.set(80, ORIGIN_Y + 30, 0);
+        state.heading = 90;
+        state.speed = 1.2;
+        Route route = new Route(Collections.singletonList(new Waypoint(0, 0, 30)), TerminalAction.DESTROY)
+                .withTarget(new Route.Target(-20, ORIGIN_Y - 1, -60));
+        int index = 0;
+        for (int tick = 0; tick < 3000 && state.position.y > ORIGIN_Y - 1; tick++) {
+            RouteAutopilot.Command command = RouteAutopilot.guide(state, route, index, situation(1, true), fast);
+            index = command.waypointIndex;
+            FixedWingFlight.step(state, command.controls, fast);
+        }
+        assertTrue(state.position.y <= ORIGIN_Y - 1, "should dive into the target");
+        assertTrue(Math.hypot(state.position.x + 20, state.position.z + 60) < 3, "should hit within 3 blocks, hit " + state.position);
+    }
+
+    @Test
+    void loopFliesTheRouteAgain() {
+        FixedWingFlight.State state = launched();
+        Route route = new Route(Arrays.asList(new Waypoint(0, 150, 30), new Waypoint(150, 150, 30)), TerminalAction.LOOP);
+        int index = 0;
+        boolean wrapped = false;
+        for (int tick = 0; tick < 1500 && !wrapped; tick++) {
+            RouteAutopilot.Command command = RouteAutopilot.guide(state, route, index, situation(1, false), PLANE);
+            wrapped = index == 1 && command.waypointIndex == 0;
+            index = command.waypointIndex;
+            assertEquals(RouteAutopilot.Phase.ROUTE, command.phase);
+            FixedWingFlight.step(state, command.controls, PLANE);
+        }
+        assertTrue(wrapped, "should head back to the first waypoint after the last");
+    }
+
+    @Test
+    void lowFuelLoopHeadsHome() {
+        FixedWingFlight.State state = launched();
+        state.position.set(150, ORIGIN_Y + 30, 150);
+        Route route = new Route(Arrays.asList(new Waypoint(0, 150, 30), new Waypoint(150, 150, 30)), TerminalAction.LOOP);
+        RouteAutopilot.Phase phase = RouteAutopilot.guide(state, route, 1, situation(0.1, false), PLANE).phase;
+        assertEquals(RouteAutopilot.Phase.RETURN, phase);
     }
 }

@@ -10,6 +10,7 @@
   "payloadCapacity": 0,
   "maxHP": 30,
   "defaultCruiseAltitude": 60,
+  "agility": 1.0,
   "controlScheme": "GIMBAL_OBSERVE",
   "armed": false,
   "motorSoundRange": 48

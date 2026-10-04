@@ -26,15 +26,23 @@ public final class Raytrace {
      */
     @Nullable
     public static RayTraceResult firstResult(World world, Vec3d start, Vec3d end, @Nullable Entity ignored) {
+        return firstResult(world, start, end, ignored, 0);
+    }
+
+    /** As {@link #firstResult(World, Vec3d, Vec3d, Entity)}, with entity hitboxes grown by {@code margin} blocks. */
+    @Nullable
+    public static RayTraceResult firstResult(World world, Vec3d start, Vec3d end, @Nullable Entity ignored, double margin) {
         RayTraceResult result = world.rayTraceBlocks(start, end, false, true, false);
         Vec3d limit = result != null ? result.hitVec : end;
         double best = start.squareDistanceTo(limit);
-        AxisAlignedBB area = new AxisAlignedBB(start.x, start.y, start.z, limit.x, limit.y, limit.z).grow(1);
+        AxisAlignedBB area = new AxisAlignedBB(start.x, start.y, start.z, limit.x, limit.y, limit.z).grow(1 + margin);
         for (Entity entity : world.getEntitiesWithinAABBExcludingEntity(ignored, area)) {
-            if (!entity.canBeCollidedWith() || (ignored != null && entity.isRidingOrBeingRiddenBy(ignored))) {
+            // isRidingSameEntity, not isRidingOrBeingRiddenBy: the latter only looks at the entity's own passengers,
+            // so a unit's remote pilot (riding it) would count as a target right on top of it
+            if (!entity.canBeCollidedWith() || (ignored != null && entity.isRidingSameEntity(ignored))) {
                 continue;
             }
-            RayTraceResult intercept = entity.getEntityBoundingBox().grow(entity.getCollisionBorderSize()).calculateIntercept(start, limit);
+            RayTraceResult intercept = entity.getEntityBoundingBox().grow(entity.getCollisionBorderSize() + margin).calculateIntercept(start, limit);
             if (intercept != null && start.squareDistanceTo(intercept.hitVec) < best) {
                 best = start.squareDistanceTo(intercept.hitVec);
                 result = new RayTraceResult(entity, intercept.hitVec);

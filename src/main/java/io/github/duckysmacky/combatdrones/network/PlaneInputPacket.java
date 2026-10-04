@@ -9,23 +9,30 @@ import net.minecraftforge.fml.common.network.simpleimpl.IMessage;
 import net.minecraftforge.fml.common.network.simpleimpl.IMessageHandler;
 import net.minecraftforge.fml.common.network.simpleimpl.MessageContext;
 
-/** Client to server, once per tick under "Take control": stick, throttle and trigger for a ramp unit. Intent only. */
+/**
+ * Client to server, once per tick under "Take control": stick, throttle, trigger, stick mode (assisted: the stick
+ * sets the attitude; free: it sets rotation rates) and boost for a ramp unit. Intent only.
+ */
 public class PlaneInputPacket implements IMessage {
     private int unitId;
     private double pitch;
     private double roll;
     private double throttle;
     private boolean trigger;
+    private boolean free;
+    private boolean boost;
 
     public PlaneInputPacket() {
     }
 
-    public PlaneInputPacket(int unitId, double pitch, double roll, double throttle, boolean trigger) {
+    public PlaneInputPacket(int unitId, double pitch, double roll, double throttle, boolean trigger, boolean free, boolean boost) {
         this.unitId = unitId;
         this.pitch = pitch;
         this.roll = roll;
         this.throttle = throttle;
         this.trigger = trigger;
+        this.free = free;
+        this.boost = boost;
     }
 
     @Override
@@ -36,6 +43,8 @@ public class PlaneInputPacket implements IMessage {
         roll = clamp(buf.readFloat(), -1);
         throttle = clamp(buf.readFloat(), 0);
         trigger = buf.readBoolean();
+        free = buf.readBoolean();
+        boost = buf.readBoolean();
     }
 
     private static double clamp(float value, double min) {
@@ -49,6 +58,8 @@ public class PlaneInputPacket implements IMessage {
         buf.writeFloat((float) roll);
         buf.writeFloat((float) throttle);
         buf.writeBoolean(trigger);
+        buf.writeBoolean(free);
+        buf.writeBoolean(boost);
     }
 
     public static class Handler implements IMessageHandler<PlaneInputPacket, IMessage> {
@@ -59,7 +70,7 @@ public class PlaneInputPacket implements IMessage {
                 Entity entity = player.world.getEntityByID(message.unitId);
                 if (entity instanceof EntityRampUnit) {
                     // The unit itself rejects anyone who isn't its controller
-                    ((EntityRampUnit) entity).acceptManualInput(player, message.pitch, message.roll, message.throttle, message.trigger);
+                    ((EntityRampUnit) entity).acceptManualInput(player, message.pitch, message.roll, message.throttle, message.trigger, message.free, message.boost);
                 }
             });
             return null;

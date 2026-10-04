@@ -1,16 +1,18 @@
 {
-  // Light Loitering Munition: fast, small warhead. "Take control" flies it on sticks.
+  // Light Loitering Munition: fast, small warhead, a guided rocket. "Take control" is point-and-strike: click a spot on the feed and it dives there.
   // Fuel in units; full-throttle endurance = capacity / drain ticks.
   "category": "RAMP_AUTOPILOT",
-  "maxSpeed": 1.5,
-  "acceleration": 0.15,
+  "maxSpeed": 1.8,
+  "acceleration": 0.2,
   "batteryOrFuelCapacity": 3600,
   "drainRatePerTick": 1.0,
-  "blastPower": 4.0,
+  "blastPower": 5.0,
   "payloadCapacity": 0,
   "maxHP": 12,
   "defaultCruiseAltitude": 40,
-  "controlScheme": "STICK",
+  // Rocket-like: rolls, pitches and turns this many times faster than a plane
+  "agility": 2.5,
+  "controlScheme": "CLICK_DESIGNATE",
   "motorSoundRange": 64,
   "impactDetonates": true
 }

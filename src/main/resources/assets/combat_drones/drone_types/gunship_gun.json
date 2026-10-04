@@ -1,15 +1,16 @@
 {
   // Gunship Plane (gun mount): small armed fixed-wing, ramp-launched and routed like a loitering munition,
-  // flown manually via the Mission Planner's "Take control". Never detonates; high rate of fire Rifle Rounds, no splash; payloadCapacity = belt size in rounds.
+  // flown manually via the Mission Planner's "Take control". A hard crash or being shot down sets off its fuel and ammo (blastPower, weaker than a warhead); high rate of fire Rifle Rounds, no splash; payloadCapacity = belt size in rounds.
   "category": "RAMP_AUTOPILOT",
   "maxSpeed": 0.9,
   "acceleration": 0.05,
   "batteryOrFuelCapacity": 6000,
   "drainRatePerTick": 1.0,
-  "blastPower": 0,
+  "blastPower": 3.5,
   "payloadCapacity": 128,
   "maxHP": 40,
   "defaultCruiseAltitude": 40,
+  "agility": 1.0,
   "controlScheme": "STICK",
   "weaponType": "GUN_MOUNT",
   "motorSoundRange": 64

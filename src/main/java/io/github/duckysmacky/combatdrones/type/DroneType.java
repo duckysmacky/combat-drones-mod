@@ -67,6 +67,8 @@ public final class DroneType {
     private double motorSoundRange = 64;
     /** Ramp-launched only: blocks above the launch point. */
     private double defaultCruiseAltitude;
+    /** Ramp-launched only: multiplies roll, pitch and turn rates (1 = plane-like, higher = rocket-like). */
+    private double agility = 1.0;
     /** Input mapping: FPV/DJI for hand-flown types, the Mission Planner takeover scheme for ramp-launched ones. */
     private ControlScheme controlScheme;
     private WeaponType weaponType = WeaponType.NONE;
@@ -104,7 +106,7 @@ public final class DroneType {
             }
             String name = entry.getKey();
             if ((name.equals("signalRange") && category != Category.HAND_FLOWN)
-                    || (name.equals("defaultCruiseAltitude") && category != Category.RAMP_AUTOPILOT)) {
+                    || ((name.equals("defaultCruiseAltitude") || name.equals("agility")) && category != Category.RAMP_AUTOPILOT)) {
                 continue;
             }
             stats.put(name, value.getAsNumber());
@@ -142,6 +144,7 @@ public final class DroneType {
         require(payloadCapacity >= 0, "'payloadCapacity' must be >= 0");
         require(maxHP > 0, "'maxHP' must be > 0");
         require(motorSoundRange >= 0, "'motorSoundRange' must be >= 0");
+        require(agility > 0, "'agility' must be > 0");
         if (category == Category.HAND_FLOWN) {
             require(signalRange > 0, "hand-flown types need 'signalRange' > 0");
             require(defaultBattery != null, "hand-flown types need a valid 'defaultBattery' (LIGHT, STANDARD or HEAVY)");
@@ -217,6 +220,10 @@ public final class DroneType {
 
     public double getDefaultCruiseAltitude() {
         return defaultCruiseAltitude;
+    }
+
+    public double getAgility() {
+        return agility;
     }
 
     public ControlScheme getControlScheme() {

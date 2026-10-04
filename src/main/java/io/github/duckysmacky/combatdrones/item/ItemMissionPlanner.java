@@ -10,8 +10,8 @@ import net.minecraft.util.EnumHand;
 import net.minecraft.world.World;
 
 /**
- * Mission Planner: right-click a loaded Launch Ramp to plan and launch (handled by the ramp block); right-click the
- * air to open the map of your units in flight and re-route them.
+ * Mission Planner: right-click a loaded Launch Ramp to plan and launch (handled by the ramp entity); right-click the
+ * air to open the map of your units in flight and re-route them, or, after "Mark target", to mark a Destroy target.
  */
 public class ItemMissionPlanner extends ItemWithTooltip {
     public ItemMissionPlanner() {
@@ -20,7 +20,7 @@ public class ItemMissionPlanner extends ItemWithTooltip {
 
     @Override
     public ActionResult<ItemStack> onItemRightClick(World world, EntityPlayer player, EnumHand hand) {
-        if (!world.isRemote) {
+        if (!world.isRemote && !PlannerServer.tryMark((EntityPlayerMP) player)) {
             PlannerServer.openAirborne((EntityPlayerMP) player);
         }
         return new ActionResult<>(EnumActionResult.SUCCESS, player.getHeldItem(hand));

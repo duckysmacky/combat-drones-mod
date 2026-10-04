@@ -1,6 +1,7 @@
 package io.github.duckysmacky.combatdrones.client;
 
 import io.github.duckysmacky.combatdrones.CombatDrones;
+import io.github.duckysmacky.combatdrones.ModSounds;
 import io.github.duckysmacky.combatdrones.entity.EntityRampUnit;
 import io.github.duckysmacky.combatdrones.config.ModConfig;
 import io.github.duckysmacky.combatdrones.network.DesignatePacket;
@@ -9,6 +10,7 @@ import io.github.duckysmacky.combatdrones.network.PlaneInputPacket;
 import io.github.duckysmacky.combatdrones.network.TogglePilotPacket;
 import io.github.duckysmacky.combatdrones.type.DroneType;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.audio.PositionedSoundRecord;
 import net.minecraft.client.entity.EntityPlayerSP;
 import net.minecraft.client.gui.GuiIngameMenu;
 import net.minecraft.entity.Entity;
@@ -17,6 +19,7 @@ import net.minecraft.util.math.Vec3d;
 import net.minecraft.util.text.TextComponentTranslation;
 import net.minecraftforge.client.event.InputUpdateEvent;
 import net.minecraftforge.client.event.MouseEvent;
+import net.minecraftforge.client.event.RenderPlayerEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.InputEvent;
@@ -40,8 +43,10 @@ public final class RemoteController {
     private static final float LOOK_UP_LIMIT = -30.0F;
     private static final float LOOK_DOWN_LIMIT = 85.0F;
     /** Mouse pushes a virtual stick (degrees -> stick units) that springs back to centre, like FPV angle mode. */
-    private static final double MOUSE_STICK_GAIN = 1.0 / 30.0;
+    private static final double MOUSE_STICK_GAIN = 1.0 / 15.0;
     private static final double STICK_SPRING = 0.1;
+    /** Free mode: degrees of mouse movement in one tick that equal full stick (full rotation rate), like FPV acro. */
+    private static final double FREE_MOUSE_FULL_STICK = 4.0;
     private static final double THROTTLE_STEP = 0.02;
     /** Throttle a takeover starts at: roughly level cruise. */
     private static final double START_THROTTLE = 0.7;
@@ -60,6 +65,8 @@ public final class RemoteController {
     private static double stickPitch;
     private static double stickRoll;
     private static double throttle;
+    /** Free (rate) stick instead of the self-levelling assisted one; kept between sessions. */
+    private static boolean freeMode;
 
     private RemoteController() {
     }
@@ -81,6 +88,10 @@ public final class RemoteController {
 
     public static boolean isControl() {
         return control;
+    }
+
+    public static boolean isFreeMode() {
+        return freeMode;
     }
 
     public static double getThrottle() {
@@ -153,17 +164,38 @@ public final class RemoteController {
         }
         if (unit != null && isStickControl()) {
             sendStick(minecraft);
+        } else if (unit != null && control) {
+            // Click-designate flies itself; only boost goes up each tick
+            ModNetwork.CHANNEL.sendToServer(new PlaneInputPacket(unitId, 0, 0, 0, false, false, isBoostKeyDown(minecraft)));
         }
     }
 
-    /** Stick flight: mouse (spring-back stick) plus arrow keys for pitch/roll, W/S throttle, LMB held fires. */
+    /**
+     * Stick flight: mouse plus arrow keys for pitch/roll (A/D roll too), W/S throttle, LMB held fires. H switches
+     * between assisted (the mouse pushes a spring-back stick that sets the attitude, which levels out on release)
+     * and free (mouse movement is a rotation rate, the attitude stays where you leave it).
+     */
     private static void sendStick(Minecraft minecraft) {
+        if (DroneKeys.FLIGHT_MODE.isPressed()) {
+            freeMode = !freeMode;
+            minecraft.getSoundHandler().playSound(PositionedSoundRecord.getMasterRecord(ModSounds.DRONE_BEEP, freeMode ? 1.5F : 1.2F));
+            minecraft.player.sendStatusMessage(new TextComponentTranslation(freeMode ? "message.combat_drones.remote.mode_free"
+                    : "message.combat_drones.remote.mode_assisted"), true);
+        }
         double[] mouse = takeMouseMovement();
+        double mouseRight = mouse[0] * ModConfig.planeMouseSensitivity;
         // Mouse forward (view pitch goes down) pushes the nose down, like a flight stick
-        double mouseForward = ModConfig.invertMousePitch ? mouse[1] : -mouse[1];
-        stickRoll = clamp(stickRoll * (1 - STICK_SPRING) + mouse[0] * MOUSE_STICK_GAIN);
-        stickPitch = clamp(stickPitch * (1 - STICK_SPRING) + mouseForward * MOUSE_STICK_GAIN);
-        double roll = clamp(stickRoll + axis(DroneKeys.ROLL_RIGHT.isKeyDown(), DroneKeys.ROLL_LEFT.isKeyDown()));
+        double mouseForward = (ModConfig.invertMousePitch ? mouse[1] : -mouse[1]) * ModConfig.planeMouseSensitivity;
+        if (freeMode) {
+            stickRoll = clamp(mouseRight / FREE_MOUSE_FULL_STICK);
+            stickPitch = clamp(mouseForward / FREE_MOUSE_FULL_STICK);
+        } else {
+            stickRoll = clamp(stickRoll * (1 - STICK_SPRING) + mouseRight * MOUSE_STICK_GAIN);
+            stickPitch = clamp(stickPitch * (1 - STICK_SPRING) + mouseForward * MOUSE_STICK_GAIN);
+        }
+        boolean rollRight = DroneKeys.ROLL_RIGHT.isKeyDown() || minecraft.gameSettings.keyBindRight.isKeyDown();
+        boolean rollLeft = DroneKeys.ROLL_LEFT.isKeyDown() || minecraft.gameSettings.keyBindLeft.isKeyDown();
+        double roll = clamp(stickRoll + axis(rollRight, rollLeft));
         double pitch = clamp(stickPitch + axis(DroneKeys.PITCH_FORWARD.isKeyDown(), DroneKeys.PITCH_BACK.isKeyDown()));
         if (minecraft.gameSettings.keyBindForward.isKeyDown()) {
             throttle = Math.min(1, throttle + THROTTLE_STEP);
@@ -172,7 +204,12 @@ public final class RemoteController {
             throttle = Math.max(0, throttle - THROTTLE_STEP);
         }
         boolean trigger = minecraft.currentScreen == null && Mouse.isButtonDown(0);
-        ModNetwork.CHANNEL.sendToServer(new PlaneInputPacket(unitId, pitch, roll, throttle, trigger));
+        ModNetwork.CHANNEL.sendToServer(new PlaneInputPacket(unitId, pitch, roll, throttle, trigger, freeMode, isBoostKeyDown(minecraft)));
+    }
+
+    /** Space (jump) boosts a munition: faster, at several times the fuel burn. */
+    private static boolean isBoostKeyDown(Minecraft minecraft) {
+        return minecraft.currentScreen == null && minecraft.gameSettings.keyBindJump.isKeyDown();
     }
 
     private static double axis(boolean positive, boolean negative) {
@@ -230,6 +267,17 @@ public final class RemoteController {
         movement.rightKeyDown = false;
         movement.jump = false;
         movement.sneak = false;
+    }
+
+    /**
+     * Anyone riding a ramp unit is a remote pilot: invisible, but vanilla would still draw their armour and held
+     * item floating on the plane, for every viewer.
+     */
+    @SubscribeEvent
+    public static void onRenderPlayer(RenderPlayerEvent.Pre event) {
+        if (event.getEntityPlayer().getRidingEntity() instanceof EntityRampUnit) {
+            event.setCanceled(true);
+        }
     }
 
     /** Clicks would act on whatever the camera looks at; the session uses them itself. */

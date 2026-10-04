@@ -46,6 +46,8 @@ public final class ModConfig {
     public static double minLaunchFuel = 0.25;
     public static double lowFuelFraction = 0.15;
     public static double maxMarkDistance = 256.0;
+    public static double boostSpeedMultiplier = 1.5;
+    public static double boostFuelMultiplier = 4.0;
 
     // [weapons]
     public static int roundsPerRifleItem = 16;
@@ -56,10 +58,12 @@ public final class ModConfig {
     public static int gunCooldownTicks = 2;
     public static double gunSpread = 1.5;
     public static double gunRange = 96.0;
+    public static double gunHitMargin = 0.5;
 
     // [client]
     public static boolean invertMousePitch = false;
     public static double staticIntensity = 1.0;
+    public static double planeMouseSensitivity = 1.0;
 
     private ModConfig() {
     }
@@ -95,6 +99,10 @@ public final class ModConfig {
                     "Fuel share at which a loitering unit stops circling: munitions dive on their last waypoint, planes fly home and land.");
             maxMarkDistance = defaults.number("general.maxMarkDistance", maxMarkDistance, 16, 1024,
                     "How far a target can be marked with the Mission Planner, or designated from a munition's camera, in blocks.");
+            boostSpeedMultiplier = defaults.number("general.boostSpeedMultiplier", boostSpeedMultiplier, 1, 4,
+                    "Top speed multiplier while a remotely controlled loitering munition boosts (Space).");
+            boostFuelMultiplier = defaults.number("general.boostFuelMultiplier", boostFuelMultiplier, 1, 20,
+                    "Fuel burn multiplier while boosting.");
             droneDamageTakenMultiplier = defaults.number("general.droneDamageTakenMultiplier", droneDamageTakenMultiplier, 0, 10,
                     "Multiplies all damage drones take from attacks (weapons, arrows, melee). Lower = harder to shoot down.");
 
@@ -107,8 +115,12 @@ public final class ModConfig {
             gunCooldownTicks = (int) defaults.number("weapons.gunCooldownTicks", gunCooldownTicks, 1, 40, "Ticks between gun rounds while the trigger is held.");
             gunSpread = defaults.number("weapons.gunSpread", gunSpread, 0, 10, "Gun spread: random aim error per round, in degrees.");
             gunRange = defaults.number("weapons.gunRange", gunRange, 8, 256, "Gun range in blocks.");
+            gunHitMargin = defaults.number("weapons.gunHitMargin", gunHitMargin, 0, 2,
+                    "Blocks added around targets' hitboxes for gun rounds, so fast passes still connect.");
 
             invertMousePitch = defaults.get("client.invertMousePitch", invertMousePitch, "Invert vertical mouse movement when flying a drone in FPV.");
+            planeMouseSensitivity = defaults.number("client.planeMouseSensitivity", planeMouseSensitivity, 0.1, 5,
+                    "Mouse sensitivity when flying a ramp unit by hand (1 = default).");
             staticIntensity = defaults.number("client.staticIntensity", staticIntensity, 0, 1,
                     "Strength of the analog-goggle static while flying (0 = off). It grows as the signal weakens.");
 

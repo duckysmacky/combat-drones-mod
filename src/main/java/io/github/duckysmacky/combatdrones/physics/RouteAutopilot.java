@@ -3,8 +3,8 @@ package io.github.duckysmacky.combatdrones.physics;
 /**
  * Flies a {@link Route} by turning flight state into {@link FixedWingFlight.Controls}: banks toward the next waypoint,
  * pitches toward its altitude (never below the terrain floor it's given) and holds the leg's speed. Once the
- * waypoints are done it carries out the route's terminal action: orbit the last waypoint (loiter), dive onto a point
- * (dive / destroy), or fly home and land (return). Pure; the entity supplies terrain, fuel and home in a
+ * waypoints are done it carries out the route's terminal action: orbit the last waypoint (loiter), fly the route
+ * again (loop), dive onto a point (dive / destroy), or fly home and land (return). Pure; the entity supplies terrain, fuel and home in a
  * {@link Situation}.
  */
 public final class RouteAutopilot {
@@ -17,10 +17,14 @@ public final class RouteAutopilot {
     static final double ORBIT_CORRECTION_DEG = 60.0;
     /** A strike pushes over into its dive once the target sits this far below the horizon. */
     static final double DIVE_START_DEG = 25.0;
+    /** A strike only extends (flies straight out to come round again) once the target is this far off the nose. */
+    static final double EXTEND_BEARING_DEG = 90.0;
     /** The dive only starts with the target within this many degrees of the nose. */
     static final double DIVE_ALIGN_DEG = 15.0;
     /** Height above the target a strike climbs to while extending for another pass. */
     static final double REATTACK_HEIGHT = 30.0;
+    /** Speed share flown while lining up a strike: slower turns tighter; the dive itself goes in at full power. */
+    static final double STRIKE_APPROACH_SPEED = Route.Speed.MEDIUM.fraction;
     /** Returning units start their landing approach this close to home. */
     static final double LANDING_RADIUS = 48.0;
     /** Height above home a returning unit cruises at before the approach. */
@@ -108,6 +112,11 @@ public final class RouteAutopilot {
                 index++;
             }
         }
+        boolean lowFuel = situation.fuelFraction < situation.lowFuelFraction;
+        // Loop: start over from the first waypoint, until fuel runs low (then the terminal handling below sends it home)
+        if (index >= route.size() && route.getTerminal() == Route.TerminalAction.LOOP && !lowFuel) {
+            index = 0;
+        }
         if (index < route.size()) {
             Route.Waypoint target = route.get(index);
             double bank = bankToward(state, bearing(state, target.x, target.z));
@@ -117,7 +126,6 @@ public final class RouteAutopilot {
 
         Route.Waypoint last = route.get(route.size() - 1);
         double groundY = Double.isNaN(situation.strikeGroundY) ? situation.originY : situation.strikeGroundY;
-        boolean lowFuel = situation.fuelFraction < situation.lowFuelFraction;
         switch (route.getTerminal()) {
             case DIVE:
                 return new Command(strike(state, last.x, groundY, last.z, situation.minSafeY, params, situation.hasFuel), index, Phase.STRIKE);
@@ -134,7 +142,7 @@ public final class RouteAutopilot {
                 }
                 break;
             default:
-                // LOITER (and LOOP until the recon milestone): circle, until fuel runs low
+                // LOITER, or LOOP once fuel is low: circle, until fuel runs low / without a home to go to
                 if (lowFuel && situation.warhead) {
                     return new Command(strike(state, last.x, groundY, last.z, situation.minSafeY, params, situation.hasFuel), index, Phase.STRIKE);
                 }
@@ -160,7 +168,8 @@ public final class RouteAutopilot {
     /**
      * Fly onto a fixed point and hit it: hold altitude (above the terrain floor) on the approach, push over into a dive
      * once the target is {@link #DIVE_START_DEG} below the horizon and lined up on the nose, and follow the line of
-     * sight down at full power. If it isn't lined up by then it extends out and comes round for another pass. Also used for a manually designated point.
+     * sight down at full power. If it isn't lined up, it first extends out (far enough to turn back in a straight line)
+     * and comes round for another pass. Also used for a manually designated point.
      */
     public static FixedWingFlight.Controls strike(FixedWingFlight.State state, double targetX, double targetY, double targetZ, double minSafeY,
                                                   FixedWingFlight.Params params, boolean hasFuel) {
@@ -168,15 +177,22 @@ public final class RouteAutopilot {
         double bank = bankToward(state, bearing);
         double horizontal = Math.hypot(targetX - state.position.x, targetZ - state.position.z);
         double lineOfSight = Math.toDegrees(Math.atan2(state.position.y - targetY, horizontal)); // positive = below the horizon
-        boolean linedUp = Math.abs(FixedWingFlight.wrap(bearing - state.heading)) <= DIVE_ALIGN_DEG || horizontal <= 3;
-        if (lineOfSight < DIVE_START_DEG) {
-            // Approach: turn toward the target at height until it slides into the dive cone
-            return controls(state, bank, Math.max(state.position.y, minSafeY), 1, params, hasFuel);
+        double headingError = Math.abs(FixedWingFlight.wrap(bearing - state.heading));
+        boolean linedUp = headingError <= DIVE_ALIGN_DEG || horizontal <= 3;
+        // Target behind it and too close to come round in time (inside the dive cone plus a turn's width): fly straight
+        // out first, climbing. Turning now would just circle it. Anything less far off the nose: keep turning in.
+        double coneDistance = Math.max(0, state.position.y - targetY) / Math.tan(Math.toRadians(DIVE_START_DEG));
+        double turnDiameter = 2 * state.speed * state.speed
+                / (FixedWingFlight.TURN_GRAVITY * params.agility * Math.tan(Math.toRadians(FixedWingFlight.MAX_BANK_DEG)));
+        // The nose can't come down to the line of sight before it's over the target (lined up too late, too close)
+        double catchUpTicks = Math.max(0, lineOfSight - state.pitch) / (FixedWingFlight.PITCH_RATE_DEG * params.agility);
+        boolean tooSteep = lineOfSight >= DIVE_START_DEG && horizontal > 3 && state.speed * catchUpTicks > horizontal;
+        if ((headingError > EXTEND_BEARING_DEG || tooSteep) && horizontal < coneDistance + turnDiameter) {
+            return controls(state, 0, Math.max(targetY + REATTACK_HEIGHT, minSafeY), STRIKE_APPROACH_SPEED, params, hasFuel);
         }
-        if (!linedUp) {
-            // Inside the cone but not pointing at it (overshot, or arrived from the side): diving now would spiral in,
-            // and turning tightly just circles it. Fly straight out of the cone, climbing, then come back round.
-            return controls(state, 0, Math.max(targetY + REATTACK_HEIGHT, minSafeY), 1, params, hasFuel);
+        if (lineOfSight < DIVE_START_DEG || !linedUp) {
+            // Approach: turn toward the target at height until it's on the nose and inside the dive cone
+            return controls(state, bank, Math.max(state.position.y, minSafeY), STRIKE_APPROACH_SPEED, params, hasFuel);
         }
         // In the dive, steer harder: small heading errors become misses once the point is close
         bank = FixedWingFlight.clamp(FixedWingFlight.wrap(bearing - state.heading) * DIVE_BANK_GAIN, FixedWingFlight.MAX_BANK_DEG);
