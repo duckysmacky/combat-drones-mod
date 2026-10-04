@@ -1,5 +1,6 @@
 package io.github.duckysmacky.combatdrones;
 
+import io.github.duckysmacky.combatdrones.command.CommandCombatDrones;
 import io.github.duckysmacky.combatdrones.config.ModConfig;
 import io.github.duckysmacky.combatdrones.entity.EntityRampUnit;
 import io.github.duckysmacky.combatdrones.network.ModNetwork;
@@ -10,6 +11,7 @@ import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.SidedProxy;
 import net.minecraftforge.fml.common.event.FMLInitializationEvent;
 import net.minecraftforge.fml.common.event.FMLPreInitializationEvent;
+import net.minecraftforge.fml.common.event.FMLServerStartingEvent;
 import org.apache.logging.log4j.Logger;
 
 @Mod(modid = CombatDrones.MOD_ID, name = CombatDrones.NAME, useMetadata = true, acceptedMinecraftVersions = "[1.12.2]")
@@ -32,6 +34,11 @@ public class CombatDrones {
         ModConfig.load(event.getModConfigurationDirectory());
         ModNetwork.register();
         proxy.preInit();
+    }
+
+    @Mod.EventHandler
+    public void serverStarting(FMLServerStartingEvent event) {
+        event.registerServerCommand(new CommandCombatDrones());
     }
 
     @Mod.EventHandler

@@ -8,7 +8,7 @@
   "drainRatePerTick": 1.0,
   "blastPower": 7.5,
   "payloadCapacity": 0,
-  "maxHP": 30,
+  "maxHP": 75,
   "defaultCruiseAltitude": 50,
   "agility": 1.0,
   "controlScheme": "STICK",

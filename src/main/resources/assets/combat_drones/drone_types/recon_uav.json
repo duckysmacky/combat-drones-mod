@@ -9,7 +9,7 @@
   "drainRatePerTick": 1.0,
   "blastPower": 2.5,
   "payloadCapacity": 0,
-  "maxHP": 30,
+  "maxHP": 75,
   "defaultCruiseAltitude": 60,
   "agility": 1.0,
   "controlScheme": "GIMBAL_OBSERVE",

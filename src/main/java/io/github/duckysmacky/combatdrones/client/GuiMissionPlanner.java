@@ -708,11 +708,11 @@ public class GuiMissionPlanner extends GuiScreen {
         return addMenu.row(PlannerContextMenu.Segment.command(() -> I18n.format("gui.combat_drones.planner.menu.add"), () -> addWaypointAt(worldX, worldZ)));
     }
 
-    /** Appends a waypoint, copying the previous one's height and speed. */
+    /** Appends a waypoint, copying the previous one's height and speed (the first one flies at Medium). */
     private void addWaypointAt(double worldX, double worldZ) {
         Route.Waypoint previous = waypoints.isEmpty() ? null : waypoints.get(waypoints.size() - 1);
         double altitude = previous != null ? previous.altitude : defaultAltitude();
-        Route.Speed speed = previous != null ? previous.speed : Route.Speed.FAST;
+        Route.Speed speed = previous != null ? previous.speed : Route.Speed.MEDIUM;
         waypoints.add(new Route.Waypoint(Math.round(worldX), Math.round(worldZ), altitude, speed));
         selectedWaypoint = waypoints.size() - 1;
         dirty = true;

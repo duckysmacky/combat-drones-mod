@@ -12,12 +12,15 @@ import io.github.duckysmacky.combatdrones.type.DroneTypes;
 
 import javax.annotation.Nullable;
 import java.io.File;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
  * The single mod config, {@code config/combat_drones.toml}. Missing entries are written back with their defaults,
- * so the file always lists every knob; values the admin changed are kept. Read once at startup.
+ * so the file always lists every knob; values the admin changed are kept. Read at startup and again on
+ * {@code /combat_drones config_reload}.
  *
  * <ul>
  *   <li>{@code [general]}: global server balance knobs.</li>
@@ -52,6 +55,7 @@ public final class ModConfig {
     public static double lockConeDegrees = 6.0;
     public static int activeLockHoldTicks = 30;
     public static double activeLockDurationSeconds = 60.0;
+    public static boolean reconIntelForAllies = false;
     public static double boostSpeedMultiplier = 1.5;
     public static double boostFuelMultiplier = 4.0;
 
@@ -71,7 +75,62 @@ public final class ModConfig {
     public static double staticIntensity = 1.0;
     public static double planeMouseSensitivity = 1.0;
 
+    /**
+     * Every knob's compiled default, captured before the first load (static initializers run in source order, so
+     * this must stay below the fields). "Default: X" comments must record these, not whatever was loaded last.
+     */
+    private static final Map<Field, Object> COMPILED_DEFAULTS = currentValues();
+    @Nullable
+    private static File configDirectory;
+
     private ModConfig() {
+    }
+
+    private static Map<Field, Object> currentValues() {
+        Map<Field, Object> values = new LinkedHashMap<>();
+        for (Field field : ModConfig.class.getDeclaredFields()) {
+            int modifiers = field.getModifiers();
+            if (Modifier.isStatic(modifiers) && !Modifier.isFinal(modifiers) && field.getType().isPrimitive()) {
+                try {
+                    values.put(field, field.get(null));
+                } catch (IllegalAccessException e) {
+                    throw new IllegalStateException(e);
+                }
+            }
+        }
+        return values;
+    }
+
+    private static void restore(Map<Field, Object> values) {
+        for (Map.Entry<Field, Object> entry : values.entrySet()) {
+            try {
+                entry.getKey().set(null, entry.getValue());
+            } catch (IllegalAccessException e) {
+                throw new IllegalStateException(e);
+            }
+        }
+    }
+
+    /**
+     * Re-reads the file in game: back to compiled defaults and bundled drone stats, then load as at startup. If the
+     * file can't be read (a TOML syntax error, say), everything goes back to the values in use before and the error
+     * is rethrown for the caller to report.
+     */
+    public static void reload() {
+        if (configDirectory == null) {
+            throw new IllegalStateException("Config was never loaded");
+        }
+        Map<Field, Object> previous = currentValues();
+        Map<String, DroneType> previousTypes = DroneTypes.snapshot();
+        try {
+            restore(COMPILED_DEFAULTS);
+            DroneTypes.resetToBundled();
+            load(configDirectory);
+        } catch (RuntimeException e) {
+            restore(previous);
+            DroneTypes.restore(previousTypes);
+            throw e;
+        }
     }
 
     public static RouteValidator.Limits routeLimits() {
@@ -80,6 +139,7 @@ public final class ModConfig {
 
     /** Must run after {@link DroneTypes#load}, since the drone tables default to the bundled types. */
     public static void load(File configDir) {
+        configDirectory = configDir;
         File file = new File(configDir, FILE_NAME);
         try (CommentedFileConfig config = CommentedFileConfig.builder(file, TomlFormat.instance()).preserveInsertionOrder().sync().build()) {
             config.load();
@@ -117,6 +177,9 @@ public final class ModConfig {
                     "Ticks the crosshair must stay on a player to lock them (20 ticks = 1 s).");
             activeLockDurationSeconds = defaults.number("general.activeLockDurationSeconds", activeLockDurationSeconds, 1, 600,
                     "How long a locked player is tracked live on the owner's map and cameras, in seconds.");
+            reconIntelForAllies = defaults.get("general.reconIntelForAllies", reconIntelForAllies,
+                    "Share recon UAV intel (spotted players) with the owner's vanilla scoreboard teammates, who are then never "
+                            + "spotted themselves. Off: only the owner sees it (use this for free-for-all games that put everyone on one team).");
             boostSpeedMultiplier = defaults.number("general.boostSpeedMultiplier", boostSpeedMultiplier, 1, 4,
                     "Top speed multiplier while a remotely controlled loitering munition boosts (Space).");
             boostFuelMultiplier = defaults.number("general.boostFuelMultiplier", boostFuelMultiplier, 1, 20,

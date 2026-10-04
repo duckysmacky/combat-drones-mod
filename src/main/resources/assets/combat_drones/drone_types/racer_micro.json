@@ -9,7 +9,7 @@
   "drainRatePerTick": 1.0,
   "blastPower": 4.0,
   "payloadCapacity": 0,
-  "maxHP": 8,
+  "maxHP": 20,
   "signalRange": 112,
   "impactDetonates": true,
   "motorSoundRange": 40,

@@ -26,6 +26,8 @@ public final class DroneTypes {
 
     // Sorted so item registration and creative-tab order don't depend on filesystem iteration order
     private static final Map<String, DroneType> TYPES = new TreeMap<>();
+    /** The types exactly as bundled, before any config overrides (config reloads start from these). */
+    private static final Map<String, DroneType> BUNDLED = new TreeMap<>();
 
     private DroneTypes() {
     }
@@ -53,7 +55,23 @@ public final class DroneTypes {
             throw new IllegalStateException("No drone types found under " + BUNDLED_DIR);
         }
 
+        BUNDLED.clear();
+        BUNDLED.putAll(TYPES);
         CombatDrones.logger.info("Loaded {} drone types: {}", TYPES.size(), TYPES.keySet());
+    }
+
+    /** Drops config overrides: every type back to its bundled stats. */
+    public static void resetToBundled() {
+        restore(BUNDLED);
+    }
+
+    public static Map<String, DroneType> snapshot() {
+        return new TreeMap<>(TYPES);
+    }
+
+    public static void restore(Map<String, DroneType> types) {
+        TYPES.clear();
+        TYPES.putAll(types);
     }
 
     /**

@@ -8,7 +8,7 @@
   "drainRatePerTick": 1.0,
   "blastPower": 5.0,
   "payloadCapacity": 0,
-  "maxHP": 12,
+  "maxHP": 30,
   "defaultCruiseAltitude": 40,
   // Rocket-like: rolls, pitches and turns this many times faster than a plane
   "agility": 2.5,

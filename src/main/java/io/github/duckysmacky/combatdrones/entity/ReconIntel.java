@@ -1,5 +1,6 @@
 package io.github.duckysmacky.combatdrones.entity;
 
+import com.mojang.authlib.GameProfile;
 import io.github.duckysmacky.combatdrones.CombatDrones;
 import io.github.duckysmacky.combatdrones.config.ModConfig;
 import io.github.duckysmacky.combatdrones.network.IntelPacket;
@@ -84,8 +85,8 @@ public final class ReconIntel {
     }
 
     /**
-     * Whether {@code entity} is someone a recon owned by {@code owner} reports: any other visible player (not
-     * spectating), or another player's stand-in body. Invisible players, remote pilots riding their units included,
+     * Whether {@code entity} is someone a recon owned by {@code owner} reports: any visible player (not spectating)
+     * who isn't an ally, or a non-ally's stand-in body. Invisible players, remote pilots riding their units included,
      * stay hidden.
      */
     static boolean isEnemy(UUID owner, @Nullable Entity entity) {
@@ -94,9 +95,50 @@ public final class ReconIntel {
         }
         if (entity instanceof EntityPlayer) {
             EntityPlayer player = (EntityPlayer) entity;
-            return !owner.equals(player.getUniqueID()) && !player.isSpectator() && !player.isInvisible();
+            return !isAlly(owner, player) && !player.isSpectator() && !player.isInvisible();
         }
-        return entity instanceof EntityPilotBody && !owner.equals(((EntityPilotBody) entity).getOwner());
+        if (!(entity instanceof EntityPilotBody)) {
+            return false;
+        }
+        UUID bodyOwner = ((EntityPilotBody) entity).getOwner();
+        if (bodyOwner == null || owner.equals(bodyOwner)) {
+            return bodyOwner == null;
+        }
+        // Bodies only exist while their player is online and remote, so the player can be looked up
+        MinecraftServer server = FMLCommonHandler.instance().getMinecraftServerInstance();
+        EntityPlayer bodyPlayer = server == null ? null : server.getPlayerList().getPlayerByUUID(bodyOwner);
+        return bodyPlayer == null || !isAlly(owner, bodyPlayer);
+    }
+
+    /**
+     * Whether {@code player} is on {@code owner}'s side for recon intel: the owner, and, with reconIntelForAllies on,
+     * players on the owner's vanilla scoreboard team (off by default: a free-for-all game typically puts everyone on
+     * one team).
+     */
+    static boolean isAlly(UUID owner, EntityPlayer player) {
+        if (owner.equals(player.getUniqueID())) {
+            return true;
+        }
+        if (!ModConfig.reconIntelForAllies || player.getTeam() == null) {
+            return false;
+        }
+        String ownerName = nameOf(owner);
+        return ownerName != null && player.getTeam().getMembershipCollection().contains(ownerName);
+    }
+
+    /** The owner's name, even while they're offline (scoreboard teams are kept by name). */
+    @Nullable
+    private static String nameOf(UUID playerId) {
+        MinecraftServer server = FMLCommonHandler.instance().getMinecraftServerInstance();
+        if (server == null) {
+            return null;
+        }
+        EntityPlayerMP online = server.getPlayerList().getPlayerByUUID(playerId);
+        if (online != null) {
+            return online.getName();
+        }
+        GameProfile profile = server.getPlayerProfileCache().getProfileByUUID(playerId);
+        return profile == null ? null : profile.getName();
     }
 
     /** Seen if either the head or the middle of the body is in view (a fence or half-wall doesn't hide them). */
@@ -171,18 +213,29 @@ public final class ReconIntel {
         }
     }
 
+    /** Sends a player the marks of every recon owner they're allied with (just their own, by default). */
     private static void sync(EntityPlayerMP player, long now) {
-        Map<UUID, Mark> marks = MARKS.get(player.getUniqueID());
-        List<IntelPacket.Entry> entries = new ArrayList<>();
-        if (marks != null) {
-            for (Mark mark : marks.values()) {
-                if (mark.dimension != player.dimension || entries.size() >= MAX_SENT_MARKS) {
+        // The same target spotted by several allied recons shows once: the freshest (a lock beats any sighting)
+        Map<UUID, IntelPacket.Entry> merged = new HashMap<>();
+        for (Map.Entry<UUID, Map<UUID, Mark>> owner : MARKS.entrySet()) {
+            if (!isAlly(owner.getKey(), player)) {
+                continue;
+            }
+            for (Mark mark : owner.getValue().values()) {
+                if (mark.dimension != player.dimension) {
                     continue;
                 }
                 boolean locked = now <= mark.lockedUntil;
                 float remaining = locked ? 1 : (float) Math.max(0, (mark.expiresAt - now) / (ModConfig.detectionDecaySeconds * 20));
-                entries.add(new IntelPacket.Entry(mark.x, mark.y, mark.z, mark.name, locked, remaining));
+                IntelPacket.Entry known = merged.get(mark.targetId);
+                if (known == null || (locked && !known.locked) || (locked == known.locked && remaining > known.freshness)) {
+                    merged.put(mark.targetId, new IntelPacket.Entry(mark.x, mark.y, mark.z, mark.name, locked, remaining));
+                }
             }
+        }
+        List<IntelPacket.Entry> entries = new ArrayList<>(merged.values());
+        if (entries.size() > MAX_SENT_MARKS) {
+            entries = entries.subList(0, MAX_SENT_MARKS);
         }
         if (entries.isEmpty() && !SHOWING.remove(player.getUniqueID())) {
             return;

@@ -42,6 +42,11 @@ public final class ModNetwork {
         CHANNEL.registerMessage(LockProgressPacket.Handler.class, LockProgressPacket.class, id++, Side.CLIENT);
     }
 
+    /** After a config reload: everyone gets the new stats right away. */
+    public static void syncTypesToAll() {
+        CHANNEL.sendToAll(new TypeSyncPacket(DroneTypes.all()));
+    }
+
     /** Clients predict flight locally, so they need the server's (possibly overridden) stats, not their own files. */
     @SubscribeEvent
     public static void onPlayerLogin(PlayerEvent.PlayerLoggedInEvent event) {
