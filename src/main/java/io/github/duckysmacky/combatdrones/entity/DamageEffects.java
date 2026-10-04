@@ -18,6 +18,8 @@ final class DamageEffects {
     /** Server: a hit that didn't destroy the drone. */
     static void hit(Entity drone) {
         drone.world.setEntityState(drone, HIT_STATUS);
+        ((WorldServer) drone.world).spawnParticle(EnumParticleTypes.CRIT, drone.posX, drone.posY + drone.height / 2, drone.posZ,
+                8, drone.width / 3, drone.height / 3, drone.width / 3, 0.3);
         drone.world.playSound(null, drone.posX, drone.posY, drone.posZ, ModSounds.DRONE_HIT, SoundCategory.NEUTRAL,
                 1.0F, 0.9F + drone.world.rand.nextFloat() * 0.2F);
     }
@@ -35,7 +37,11 @@ final class DamageEffects {
             return;
         }
         EnumParticleTypes smoke = healthFraction < 0.25F ? EnumParticleTypes.SMOKE_LARGE : EnumParticleTypes.SMOKE_NORMAL;
-        drone.world.spawnParticle(smoke, drone.posX + (drone.world.rand.nextDouble() - 0.5) * drone.width, drone.posY + drone.height / 2,
-                drone.posZ + (drone.world.rand.nextDouble() - 0.5) * drone.width, 0, 0.02, 0);
+        double x = drone.posX + (drone.world.rand.nextDouble() - 0.5) * drone.width;
+        double z = drone.posZ + (drone.world.rand.nextDouble() - 0.5) * drone.width;
+        drone.world.spawnParticle(smoke, x, drone.posY + drone.height / 2, z, 0, 0.02, 0);
+        if (healthFraction < 0.25F) {
+            drone.world.spawnParticle(EnumParticleTypes.FLAME, x, drone.posY + drone.height / 2, z, 0, 0.01, 0); // on fire
+        }
     }
 }

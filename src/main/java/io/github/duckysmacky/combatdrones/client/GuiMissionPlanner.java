@@ -1,6 +1,5 @@
 package io.github.duckysmacky.combatdrones.client;
 
-import io.github.duckysmacky.combatdrones.CombatDrones;
 import io.github.duckysmacky.combatdrones.entity.EntityRampUnit;
 import io.github.duckysmacky.combatdrones.network.IntelPacket;
 import io.github.duckysmacky.combatdrones.network.ModNetwork;
@@ -18,15 +17,10 @@ import net.minecraft.client.gui.GuiButton;
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.renderer.BufferBuilder;
 import net.minecraft.client.renderer.GlStateManager;
-import net.minecraft.client.renderer.RenderHelper;
 import net.minecraft.client.renderer.Tessellator;
 import net.minecraft.client.renderer.vertex.DefaultVertexFormats;
 import net.minecraft.client.resources.I18n;
 import net.minecraft.entity.Entity;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
-import net.minecraft.util.ResourceLocation;
-import net.minecraftforge.fml.common.registry.ForgeRegistries;
 import org.lwjgl.input.Keyboard;
 import org.lwjgl.input.Mouse;
 import org.lwjgl.opengl.GL11;
@@ -52,6 +46,8 @@ public class GuiMissionPlanner extends GuiScreen {
     private static final int GRID_COLOR = 0x30FFFFFF;
     private static final int ROUTE_COLOR = 0xFFFFCC33;
     private static final int UNIT_COLOR = 0xFF55FF55;
+    /** Map icon size of an airborne unit, GUI pixels along its longest side. */
+    private static final float UNIT_ICON_SIZE = 18;
     private static final int WARNING = 0xFF5555;
     private static final double MIN_SCALE = 0.1;
     private static final double MAX_SCALE = 8;
@@ -501,18 +497,16 @@ public class GuiMissionPlanner extends GuiScreen {
         }
     }
 
-    /** Each airborne unit's item icon, so different unit types can be told apart. */
+    /** Each airborne unit seen from above, turned to its heading, so different unit types can be told apart. */
     private void drawUnitIcons() {
-        RenderHelper.enableGUIStandardItemLighting();
         for (PlannerOpenPacket.UnitView unit : view.units) {
-            Item item = unit.entityId < 0 ? null : ForgeRegistries.ITEMS.getValue(new ResourceLocation(CombatDrones.MOD_ID, unit.typeId));
+            DroneType type = unit.entityId < 0 ? null : DroneTypes.get(unit.typeId);
             int screenX = toScreenX(unit.x);
             int screenY = toScreenY(unit.z);
-            if (item != null && insideMap(screenX, screenY)) {
-                itemRender.renderItemAndEffectIntoGUI(new ItemStack(item), screenX - 8, screenY - 8);
+            if (type != null && insideMap(screenX, screenY)) {
+                GeoModels.renderTopDown(GeoModels.nameFor(type), screenX, screenY, unit.heading, UNIT_ICON_SIZE);
             }
         }
-        RenderHelper.disableStandardItemLighting();
     }
 
     /** An arrowhead around an airborne unit's icon, pointing the way it's heading. */

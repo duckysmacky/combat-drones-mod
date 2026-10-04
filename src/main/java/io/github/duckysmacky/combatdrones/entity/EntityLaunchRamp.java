@@ -5,6 +5,7 @@ import io.github.duckysmacky.combatdrones.ModContent;
 import io.github.duckysmacky.combatdrones.ModSounds;
 import io.github.duckysmacky.combatdrones.config.ModConfig;
 import io.github.duckysmacky.combatdrones.item.ItemDrone;
+import io.github.duckysmacky.combatdrones.network.EffectPacket;
 import io.github.duckysmacky.combatdrones.network.PlannerServer;
 import io.github.duckysmacky.combatdrones.network.RouteCodec;
 import io.github.duckysmacky.combatdrones.physics.Route;
@@ -22,6 +23,7 @@ import net.minecraft.util.DamageSource;
 import net.minecraft.util.EnumHand;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.SoundCategory;
+import net.minecraft.util.math.Vec3d;
 import net.minecraft.util.text.TextComponentTranslation;
 import net.minecraft.world.World;
 import net.minecraftforge.fml.common.registry.ForgeRegistries;
@@ -234,7 +236,8 @@ public class EntityLaunchRamp extends Entity {
         double x = posX - Math.sin(radians) * RAIL_END;
         double z = posZ + Math.cos(radians) * RAIL_END;
         world.spawnEntity(new EntityRampUnit(world, type, owner, route, fuel, ammo, x, posY + 1.3, z, rotationYaw));
-        world.playSound(null, posX, posY, posZ, ModSounds.UNIT_LAUNCH, SoundCategory.NEUTRAL, 2.0F, 1.0F);
+        world.playSound(null, posX, posY, posZ, ModSounds.UNIT_LAUNCH, SoundCategory.NEUTRAL, 3.0F, 1.0F);
+        EffectPacket.launch(world, new Vec3d(posX, posY, posZ), Vec3d.fromPitchYaw(0, rotationYaw));
         clearUnit();
     }
 

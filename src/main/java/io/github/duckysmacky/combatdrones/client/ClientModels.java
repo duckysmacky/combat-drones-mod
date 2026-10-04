@@ -2,6 +2,7 @@ package io.github.duckysmacky.combatdrones.client;
 
 import io.github.duckysmacky.combatdrones.CombatDrones;
 import io.github.duckysmacky.combatdrones.ModContent;
+import io.github.duckysmacky.combatdrones.item.ItemDrone;
 import net.minecraft.client.renderer.block.model.ModelResourceLocation;
 import net.minecraft.item.Item;
 import net.minecraftforge.client.event.ModelRegistryEvent;
@@ -19,6 +20,9 @@ public final class ClientModels {
     @SubscribeEvent
     public static void registerModels(ModelRegistryEvent event) {
         for (Item item : ModContent.ITEMS) {
+            if (item instanceof ItemDrone || item == ModContent.launchRamp) {
+                item.setTileEntityItemStackRenderer(GeoModels.ItemRenderer.INSTANCE);
+            }
             ModelLoader.setCustomModelResourceLocation(item, 0, new ModelResourceLocation(item.getRegistryName(), "inventory"));
         }
     }

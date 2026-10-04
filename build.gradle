@@ -36,10 +36,17 @@ repositories {
         name 'CleanroomMC Maven'
         url 'https://maven.cleanroommc.com'
     }
+    maven {
+        name 'GeckoLib'
+        url 'https://dl.cloudsmith.io/public/geckolib3/geckolib/maven/'
+    }
 }
 
 dependencies {
     shade 'com.electronwill.night-config:toml:3.6.7'
+
+    // Entity/item model rendering (client side only, see client/GeoModels)
+    implementation rfg.deobf('software.bernie.geckolib:geckolib-forge-1.12.2:3.0.31')
 
     // Dev-env only: stops Forge 2860 refusing to load next to newer-Forge-only checks
     runtimeOnly 'com.cleanroommc:strip-latest-forge-requirements:1.0'

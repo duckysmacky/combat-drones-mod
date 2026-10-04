@@ -15,11 +15,12 @@ public class ClientProxy extends CommonProxy {
     @Override
     public void preInit() {
         RenderingRegistry.registerEntityRenderingHandler(EntityHandFlownDrone.class, RenderHandFlownDrone::new);
-        RenderingRegistry.registerEntityRenderingHandler(EntityBomb.class, RenderBomb::new);
+        RenderingRegistry.registerEntityRenderingHandler(EntityBomb.class, RenderProjectile::bomb);
         RenderingRegistry.registerEntityRenderingHandler(EntityRampUnit.class, RenderRampUnit::new);
         RenderingRegistry.registerEntityRenderingHandler(EntityLaunchRamp.class, RenderLaunchRamp::new);
         RenderingRegistry.registerEntityRenderingHandler(EntityPilotBody.class, RenderPilotBody::new);
-        RenderingRegistry.registerEntityRenderingHandler(EntityRocket.class, RenderRocket::new);
+        RenderingRegistry.registerEntityRenderingHandler(EntityRocket.class, RenderProjectile::rocket);
+        GeoModels.init();
     }
 
     @Override

@@ -2,59 +2,166 @@
   "drone.motor": {
     "category": "neutral",
     "subtitle": "subtitles.combat_drones.drone.motor",
-    "sounds": ["combat_drones:drone/motor"]
+    "sounds": [
+      "combat_drones:drone/motor"
+    ]
   },
   "drone.motor_far": {
     "category": "neutral",
     "subtitle": "subtitles.combat_drones.drone.motor",
-    "sounds": ["combat_drones:drone/motor_far"]
+    "sounds": [
+      "combat_drones:drone/motor_far"
+    ]
+  },
+  "drone.motor_dji": {
+    "category": "neutral",
+    "subtitle": "subtitles.combat_drones.drone.motor",
+    "sounds": [
+      "combat_drones:drone/motor_dji"
+    ]
   },
   "drone.link": {
     "category": "player",
     "subtitle": "subtitles.combat_drones.drone.link",
-    "sounds": ["combat_drones:drone/link"]
+    "sounds": [
+      "combat_drones:drone/link"
+    ]
   },
   "drone.beep": {
     "category": "player",
-    "sounds": ["combat_drones:drone/beep"]
+    "sounds": [
+      "combat_drones:drone/beep"
+    ]
   },
   "drone.battery": {
     "category": "player",
     "subtitle": "subtitles.combat_drones.drone.battery",
-    "sounds": ["combat_drones:drone/click"]
+    "sounds": [
+      "combat_drones:drone/battery"
+    ]
   },
   "drone.attach": {
     "category": "player",
     "subtitle": "subtitles.combat_drones.drone.attach",
-    "sounds": ["combat_drones:drone/clink"]
+    "sounds": [
+      "combat_drones:drone/attach0",
+      "combat_drones:drone/attach1",
+      "combat_drones:drone/attach2"
+    ]
   },
   "drone.connect": {
     "category": "player",
-    "sounds": ["combat_drones:drone/connect"]
+    "sounds": [
+      "combat_drones:drone/connect"
+    ]
   },
   "drone.hit": {
     "category": "neutral",
     "subtitle": "subtitles.combat_drones.drone.hit",
-    "sounds": ["combat_drones:drone/hit"]
+    "sounds": [
+      "combat_drones:drone/hit"
+    ]
   },
   "unit.engine": {
     "category": "neutral",
     "subtitle": "subtitles.combat_drones.unit.engine",
-    "sounds": ["combat_drones:drone/engine"]
+    "sounds": [
+      "combat_drones:unit/engine"
+    ]
+  },
+  "unit.engine_electric": {
+    "category": "neutral",
+    "subtitle": "subtitles.combat_drones.unit.engine_electric",
+    "sounds": [
+      "combat_drones:unit/engine_electric"
+    ]
+  },
+  "unit.engine_twostroke": {
+    "category": "neutral",
+    "subtitle": "subtitles.combat_drones.unit.engine",
+    "sounds": [
+      "combat_drones:unit/engine_twostroke"
+    ]
+  },
+  "unit.engine_piston": {
+    "category": "neutral",
+    "subtitle": "subtitles.combat_drones.unit.engine",
+    "sounds": [
+      "combat_drones:unit/engine_piston"
+    ]
   },
   "unit.launch": {
     "category": "neutral",
     "subtitle": "subtitles.combat_drones.unit.launch",
-    "sounds": ["combat_drones:drone/launch"]
+    "sounds": [
+      "combat_drones:unit/launch"
+    ]
+  },
+  "unit.boost": {
+    "category": "neutral",
+    "subtitle": "subtitles.combat_drones.unit.boost",
+    "sounds": [
+      "combat_drones:unit/boost"
+    ]
   },
   "gunship.rocket": {
     "category": "neutral",
     "subtitle": "subtitles.combat_drones.gunship.rocket",
-    "sounds": ["combat_drones:drone/rocket"]
+    "sounds": [
+      "combat_drones:gunship/rocket"
+    ]
   },
   "gunship.gun": {
     "category": "neutral",
     "subtitle": "subtitles.combat_drones.gunship.gun",
-    "sounds": ["combat_drones:drone/gun"]
+    "sounds": [
+      "combat_drones:gunship/gun0",
+      "combat_drones:gunship/gun1"
+    ]
+  },
+  "bullet.impact": {
+    "category": "neutral",
+    "subtitle": "subtitles.combat_drones.bullet.impact",
+    "sounds": [
+      "combat_drones:bullet/impact0",
+      "combat_drones:bullet/impact1",
+      "combat_drones:bullet/impact2"
+    ]
+  },
+  "bullet.flyby": {
+    "category": "neutral",
+    "subtitle": "subtitles.combat_drones.bullet.flyby",
+    "sounds": [
+      "combat_drones:bullet/flyby0",
+      "combat_drones:bullet/flyby1"
+    ]
+  },
+  "bomb.release": {
+    "category": "neutral",
+    "subtitle": "subtitles.combat_drones.bomb.release",
+    "sounds": [
+      "combat_drones:bomb/release"
+    ]
+  },
+  "explosion.near": {
+    "category": "blocks",
+    "subtitle": "subtitles.combat_drones.explosion.near",
+    "sounds": [
+      "combat_drones:explosion/near0",
+      "combat_drones:explosion/near1",
+      "combat_drones:explosion/near2",
+      "combat_drones:explosion/near3"
+    ]
+  },
+  "explosion.far": {
+    "category": "blocks",
+    "subtitle": "subtitles.combat_drones.explosion.far",
+    "sounds": [
+      "combat_drones:explosion/far0",
+      "combat_drones:explosion/far1",
+      "combat_drones:explosion/far2",
+      "combat_drones:explosion/far3",
+      "combat_drones:explosion/far4"
+    ]
   }
 }

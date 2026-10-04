@@ -26,6 +26,7 @@ import net.minecraft.network.datasync.DataSerializers;
 import net.minecraft.network.datasync.EntityDataManager;
 import net.minecraft.util.DamageSource;
 import net.minecraft.util.EntityDamageSourceIndirect;
+import net.minecraft.util.EnumParticleTypes;
 import net.minecraft.util.SoundCategory;
 import net.minecraft.util.math.RayTraceResult;
 import net.minecraft.util.ResourceLocation;
@@ -122,6 +123,7 @@ public class EntityRampUnit extends Entity {
     private double serverZ;
     private boolean hasServerPosition;
     public int hitFlashTicks;
+    private boolean wasBoosting;
 
     public EntityRampUnit(World world) {
         super(world);
@@ -246,6 +248,15 @@ public class EntityRampUnit extends Entity {
                 hitFlashTicks--;
             }
             DamageEffects.damageSmoke(this, getHealthFraction());
+            DroneType clientType = getDroneType();
+            boolean boostingNow = isBoosting();
+            if (clientType != null && getFuelFraction() > 0) {
+                if (boostingNow && !wasBoosting) {
+                    Exhaust.boostStart(this);
+                }
+                Exhaust.unitTrail(this, clientType, boostingNow);
+            }
+            wasBoosting = boostingNow;
             return;
         }
         DroneType type = getDroneType();
@@ -429,7 +440,7 @@ public class EntityRampUnit extends Entity {
             weaponCooldown = ModConfig.rocketCooldownTicks;
             Vec3d velocity = nose.scale(ModConfig.rocketSpeed).add(flight.velocity.x, flight.velocity.y, flight.velocity.z);
             world.spawnEntity(new EntityRocket(world, this, owner, muzzle, velocity));
-            world.playSound(null, posX, posY, posZ, ModSounds.GUNSHIP_ROCKET, SoundCategory.NEUTRAL, 3.0F, 1.0F);
+            world.playSound(null, posX, posY, posZ, ModSounds.GUNSHIP_ROCKET, SoundCategory.NEUTRAL, 4.5F, 1.0F);
         } else {
             weaponCooldown = ModConfig.gunCooldownTicks;
             fireRound(muzzle);
@@ -452,9 +463,9 @@ public class EntityRampUnit extends Entity {
                     (float) ModConfig.gunDamagePerRound);
         }
         Vec3d impact = hit != null ? hit.hitVec : end;
-        ModNetwork.CHANNEL.sendToAllAround(new GunFirePacket(muzzle, impact),
-                new NetworkRegistry.TargetPoint(world.provider.getDimension(), posX, posY, posZ, 128));
-        world.playSound(null, posX, posY, posZ, ModSounds.GUNSHIP_GUN, SoundCategory.NEUTRAL, 3.0F, 0.9F + rand.nextFloat() * 0.2F);
+        ModNetwork.CHANNEL.sendToAllAround(new GunFirePacket(muzzle, impact, hit != null, getEntityId()),
+                new NetworkRegistry.TargetPoint(world.provider.getDimension(), posX, posY, posZ, 160));
+        world.playSound(null, posX, posY, posZ, ModSounds.GUNSHIP_GUN, SoundCategory.NEUTRAL, 4.5F, 0.9F + rand.nextFloat() * 0.2F);
     }
 
     /** Server: latest manual input from the network. Only the current controller's input counts; values arrive clamped. */
@@ -618,6 +629,8 @@ public class EntityRampUnit extends Entity {
     /** Comes down intact: drops back as its item, remaining fuel and ammo and all. */
     private void land(DroneType type) {
         setDead();
+        ((WorldServer) world).spawnParticle(EnumParticleTypes.CLOUD, posX, posY + 0.1, posZ, 16, width / 2, 0.05, width / 2, 0.02);
+        world.playSound(null, posX, posY, posZ, ModSounds.DRONE_HIT, SoundCategory.NEUTRAL, 1.0F, 0.5F);
         Item item = ForgeRegistries.ITEMS.getValue(new ResourceLocation(CombatDrones.MOD_ID, type.getId()));
         if (item != null) {
             entityDropItem(ItemDrone.withAmmo(ItemDrone.withFuel(new ItemStack(item), fuel), getAmmo()), 0.2F);

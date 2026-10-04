@@ -15,7 +15,9 @@
   "hitboxWidth": 0.7,
   "hitboxHeight": 0.3,
   "signalRange": 144,
-  "motorSoundRange": 32,
+  "motorSoundRange": 48,
+  // Engine loop sound event (combat_drones:<name>); unset = the family default
+  "engineSound": "drone.motor_dji",
   "defaultBattery": "STANDARD",
   "controlScheme": "DJI",
   "payload": "BOMB"

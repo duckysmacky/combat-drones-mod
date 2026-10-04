@@ -5,6 +5,7 @@ import io.github.duckysmacky.combatdrones.entity.EntityHandFlownDrone;
 import io.github.duckysmacky.combatdrones.type.DroneType;
 import net.minecraft.client.audio.MovingSound;
 import net.minecraft.util.SoundCategory;
+import net.minecraft.util.SoundEvent;
 
 /**
  * Looping motor noise that follows one drone. Vanilla hears a sound out to 16 × volume blocks (playback loudness is
@@ -19,7 +20,7 @@ public class DroneMotorSound extends MovingSound {
     private final boolean forPilot;
 
     public DroneMotorSound(EntityHandFlownDrone drone) {
-        super(drone.isLocallyPiloted() ? ModSounds.DRONE_MOTOR : ModSounds.DRONE_MOTOR_FAR, SoundCategory.NEUTRAL);
+        super(drone.isLocallyPiloted() ? ModSounds.DRONE_MOTOR : farSoundOf(drone), SoundCategory.NEUTRAL);
         this.drone = drone;
         repeat = true;
         repeatDelay = 0;
@@ -27,6 +28,12 @@ public class DroneMotorSound extends MovingSound {
         DroneType type = drone.getDroneType();
         volume = forPilot ? PILOT_VOLUME : (float) Math.max(1.0, (type == null ? 32 : type.getMotorSoundRange()) / 16.0);
         update();
+    }
+
+    /** What others hear: the type's own motor sound (e.g. the DJI's softer hum), or the FPV buzz. */
+    private static SoundEvent farSoundOf(EntityHandFlownDrone drone) {
+        DroneType type = drone.getDroneType();
+        return ModSounds.engine(type == null ? null : type.getEngineSound(), ModSounds.DRONE_MOTOR_FAR);
     }
 
     @Override

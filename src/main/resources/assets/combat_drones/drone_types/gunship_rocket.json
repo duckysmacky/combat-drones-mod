@@ -10,11 +10,13 @@
   "payloadCapacity": 8,
   "maxHP": 100,
   // Collision box in blocks: the fuselage core, not the wingtips or props
-  "hitboxWidth": 1.4,
-  "hitboxHeight": 0.6,
+  "hitboxWidth": 1.6,
+  "hitboxHeight": 0.7,
   "defaultCruiseAltitude": 40,
   "agility": 1.0,
   "controlScheme": "STICK",
   "weaponType": "ROCKET_POD",
-  "motorSoundRange": 64
+  "motorSoundRange": 96,
+  // Engine loop sound event (combat_drones:<name>); unset = the family default
+  "engineSound": "unit.engine_piston"
 }

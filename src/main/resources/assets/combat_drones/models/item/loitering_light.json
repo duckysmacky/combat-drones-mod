@@ -1,6 +1,3 @@
 {
-  "parent": "combat_drones:item/drone_base",
-  "textures": {
-    "layer0": "combat_drones:items/loitering_light"
-  }
+  "parent": "combat_drones:item/vehicle_base"
 }

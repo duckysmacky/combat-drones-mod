@@ -4,7 +4,6 @@ import io.github.duckysmacky.combatdrones.config.ModConfig;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.nbt.NBTTagCompound;
-import net.minecraft.util.EnumParticleTypes;
 import net.minecraft.util.math.RayTraceResult;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
@@ -56,7 +55,7 @@ public class EntityRocket extends Entity {
         Vec3d from = new Vec3d(posX, posY, posZ);
         Vec3d to = from.add(motionX, motionY, motionZ);
         if (world.isRemote) {
-            world.spawnParticle(EnumParticleTypes.SMOKE_NORMAL, posX, posY, posZ, 0, 0, 0);
+            Exhaust.rocketTrail(this);
             setPosition(to.x, to.y, to.z);
             return;
         }

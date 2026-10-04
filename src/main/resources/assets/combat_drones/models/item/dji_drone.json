@@ -1,6 +1,3 @@
 {
-  "parent": "combat_drones:item/drone_base",
-  "textures": {
-    "layer0": "combat_drones:items/dji_drone"
-  }
+  "parent": "combat_drones:item/vehicle_base"
 }

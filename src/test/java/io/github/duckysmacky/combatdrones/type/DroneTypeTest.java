@@ -2,9 +2,17 @@ package io.github.duckysmacky.combatdrones.type;
 
 import org.junit.jupiter.api.Test;
 
+import java.io.IOException;
+import java.io.Reader;
 import java.io.StringReader;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -23,6 +31,26 @@ class DroneTypeTest {
 
     private static DroneType parse(String json) {
         return DroneType.parse("test", new StringReader(json));
+    }
+
+    /** Every bundled type parses, and has its art: a geo model and a texture named after it (rule 5, no Java). */
+    @Test
+    void bundledTypesParseAndHaveModels() throws IOException {
+        Path assets = Paths.get("src/main/resources/assets/combat_drones");
+        List<Path> files;
+        try (Stream<Path> listing = Files.list(assets.resolve("drone_types"))) {
+            files = listing.filter(path -> path.toString().endsWith(".json")).collect(Collectors.toList());
+        }
+        assertFalse(files.isEmpty());
+        for (Path file : files) {
+            String id = file.getFileName().toString().replace(".json", "");
+            try (Reader reader = Files.newBufferedReader(file)) {
+                DroneType type = DroneType.parse(id, reader);
+                assertTrue(type.getHitboxWidth() > 0, id);
+            }
+            assertTrue(Files.exists(assets.resolve("geo/" + id + ".geo.json")), id + " has no geo model");
+            assertTrue(Files.exists(assets.resolve("textures/entity/" + id + ".png")), id + " has no texture");
+        }
     }
 
     @Test

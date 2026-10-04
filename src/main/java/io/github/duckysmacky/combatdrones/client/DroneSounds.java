@@ -28,6 +28,7 @@ public final class DroneSounds {
         if (event.phase != TickEvent.Phase.END) {
             return;
         }
+        Effects.tick(minecraft.world != null);
         if (minecraft.world == null) {
             MOTOR_SOUNDS.clear();
             return;

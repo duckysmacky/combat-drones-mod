@@ -15,7 +15,7 @@
   "hitboxHeight": 0.2,
   "signalRange": 112,
   "impactDetonates": true,
-  "motorSoundRange": 40,
+  "motorSoundRange": 60,
   "defaultBattery": "LIGHT",
   "controlScheme": "FPV"
 }

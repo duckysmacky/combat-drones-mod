@@ -1,6 +1,3 @@
 {
-  "parent": "combat_drones:item/drone_base",
-  "textures": {
-    "layer0": "combat_drones:items/racer_micro"
-  }
+  "parent": "combat_drones:item/vehicle_base"
 }

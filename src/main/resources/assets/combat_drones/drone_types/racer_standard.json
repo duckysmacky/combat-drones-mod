@@ -13,7 +13,7 @@
   "hitboxHeight": 0.25,
   "signalRange": 128,
   "impactDetonates": true,
-  "motorSoundRange": 40,
+  "motorSoundRange": 60,
   "defaultBattery": "LIGHT",
   "controlScheme": "FPV",
   "payload": "GRENADE"

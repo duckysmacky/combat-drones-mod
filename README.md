@@ -52,6 +52,22 @@ tools/server_smoke_test.sh      # scripted server run: dive, destroy, low-fuel d
 `runObfServer` needs `run/obfuscated/eula.txt` (`eula=true`). The smoke test expects the flat dev world in
 `run/world` and prints where each test unit ended up; its full log is `build/smoke/server.log`.
 
+## Art and sound
+
+Models are Bedrock `geo.json` files rendered with [GeckoLib](https://www.curseforge.com/minecraft/mc-mods/geckolib)
+1.12.2 (3.0.31). GeckoLib is needed on clients only; the dedicated server runs without it.
+
+```
+python3 tools/art/gen_models.py [name ...] [--preview DIR]  # geo models + textures (DIR gets 4-view PNG sheets)
+python3 tools/art/gen_items.py [--preview FILE]             # 16x16 item sprites, goggles armour layer, rearm station
+python3 tools/art/build_sounds.py                           # engine, weapon and explosion sounds from reference_mods/
+python3 tools/gen_sounds.py                                 # synthesized UI sounds (link, beeps, clicks, chime, hit)
+```
+
+The generated files are committed, so none of these are needed to build. Models open in Blockbench (Bedrock
+format); once one is edited there, remove it from `MODELS` in `gen_models.py` so a rerun doesn't overwrite it.
+`build_sounds.py` reads the reference mod jars, which stay local (`reference_mods/` is gitignored).
+
 ## Server admin
 
 - All balance knobs live in `config/combat_drones.toml`. `/combat_drones config_reload` (op) re-reads it in game

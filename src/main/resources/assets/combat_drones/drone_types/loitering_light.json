@@ -16,6 +16,8 @@
   // Rocket-like: rolls, pitches and turns this many times faster than a plane
   "agility": 2.5,
   "controlScheme": "CLICK_DESIGNATE",
-  "motorSoundRange": 64,
+  "motorSoundRange": 96,
+  // Engine loop sound event (combat_drones:<name>); unset = the family default
+  "engineSound": "unit.engine_electric",
   "impactDetonates": true
 }

@@ -372,6 +372,7 @@ public class EntityHandFlownDrone extends Entity {
         setPayload(count - 1, bomb);
         HandFlownFlight.State state = flightState;
         world.spawnEntity(new EntityBomb(world, bomb, posX, posY - 0.35, posZ, state.velocity.x, state.velocity.y, state.velocity.z, owner));
+        world.playSound(null, posX, posY, posZ, ModSounds.BOMB_RELEASE, SoundCategory.NEUTRAL, 1.0F, 1.0F);
         world.playSound(null, posX, posY, posZ, ModSounds.DRONE_BATTERY, SoundCategory.NEUTRAL, 1.0F, 0.6F);
     }
 

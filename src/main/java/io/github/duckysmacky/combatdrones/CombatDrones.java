@@ -14,7 +14,8 @@ import net.minecraftforge.fml.common.event.FMLPreInitializationEvent;
 import net.minecraftforge.fml.common.event.FMLServerStartingEvent;
 import org.apache.logging.log4j.Logger;
 
-@Mod(modid = CombatDrones.MOD_ID, name = CombatDrones.NAME, useMetadata = true, acceptedMinecraftVersions = "[1.12.2]")
+@Mod(modid = CombatDrones.MOD_ID, name = CombatDrones.NAME, useMetadata = true, acceptedMinecraftVersions = "[1.12.2]",
+        dependencies = "required-client:geckolib3;before:geckolib3")
 public class CombatDrones {
     public static final String MOD_ID = "combat_drones";
     public static final String NAME = "Combat Drones";
@@ -26,6 +27,23 @@ public class CombatDrones {
 
     @SidedProxy(clientSide = "io.github.duckysmacky.combatdrones.client.ClientProxy", serverSide = "io.github.duckysmacky.combatdrones.CommonProxy")
     public static CommonProxy proxy;
+
+    public CombatDrones() {
+        disableGeckoLibExamples();
+    }
+
+    /**
+     * In a dev (deobfuscated) environment GeckoLib registers its example blocks, items, creative tab and a creeper
+     * renderer unless {@code GeckoLibMod.DISABLE_IN_DEV} is set before its constructor runs; "before:geckolib3" makes
+     * ours run first. Reflection, so a server without GeckoLib never links the class. Production never has them.
+     */
+    private static void disableGeckoLibExamples() {
+        try {
+            Class.forName("software.bernie.example.GeckoLibMod").getField("DISABLE_IN_DEV").setBoolean(null, true);
+        } catch (ReflectiveOperationException | LinkageError ignored) {
+            // GeckoLib absent (dedicated server) or reorganised: nothing to switch off
+        }
+    }
 
     @Mod.EventHandler
     public void preInit(FMLPreInitializationEvent event) {

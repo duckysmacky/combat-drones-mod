@@ -1,6 +1,7 @@
 package io.github.duckysmacky.combatdrones.entity;
 
 import io.github.duckysmacky.combatdrones.config.ModConfig;
+import io.github.duckysmacky.combatdrones.network.EffectPacket;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.player.EntityPlayer;
@@ -57,6 +58,7 @@ public class DroneExplosion extends Explosion {
             explosion.clearAffectedBlockPositions();
         }
         sendToNearbyPlayers(world, explosion, x, y, z, power);
+        EffectPacket.explosion(world, x, y, z, power);
         if (shrapnelDamage > 0 && shrapnelRadius > 0) {
             throwShrapnel(world, source, placedBy, new Vec3d(x, y, z), shrapnelDamage, shrapnelRadius);
         }

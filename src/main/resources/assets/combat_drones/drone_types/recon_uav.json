@@ -19,5 +19,5 @@
   "armed": false,
   // Sweeps for enemies in line of sight and marks them on the owner's Mission Planner; its camera can lock targets
   "sensor": true,
-  "motorSoundRange": 48
+  "motorSoundRange": 72
 }
