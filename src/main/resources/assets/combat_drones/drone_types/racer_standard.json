@@ -8,6 +8,9 @@
   "blastPower": 4.5,
   "payloadCapacity": 1,
   "maxHP": 25,
+  // Collision box in blocks: the fuselage core, not the wingtips or props
+  "hitboxWidth": 0.5,
+  "hitboxHeight": 0.25,
   "signalRange": 128,
   "impactDetonates": true,
   "motorSoundRange": 40,

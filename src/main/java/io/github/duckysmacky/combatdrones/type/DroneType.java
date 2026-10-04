@@ -5,6 +5,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParseException;
 
+import javax.annotation.Nullable;
 import java.io.Reader;
 import java.io.StringReader;
 import java.util.LinkedHashMap;
@@ -65,6 +66,14 @@ public final class DroneType {
     private BatteryPack defaultBattery;
     /** Blocks from which the motor can be heard. Drones are meant to be loud: hearing one is the counterplay. */
     private double motorSoundRange = 64;
+    /** Collision box (blocks): the fuselage core, not the wingtips. What gets hit, so it's a balance stat too. */
+    private double hitboxWidth = 0.6;
+    private double hitboxHeight = 0.3;
+    /**
+     * Engine loop sound event under {@code combat_drones:} (e.g. "unit.engine_shahed"): heard by others for hand-flown
+     * drones, by everyone for ramp units. Null = the family default.
+     */
+    private String engineSound;
     /** Ramp-launched only: blocks above the launch point. */
     private double defaultCruiseAltitude;
     /** Ramp-launched only: multiplies roll, pitch and turn rates (1 = plane-like, higher = rocket-like). */
@@ -147,6 +156,8 @@ public final class DroneType {
         require(maxHP > 0, "'maxHP' must be > 0");
         require(motorSoundRange >= 0, "'motorSoundRange' must be >= 0");
         require(agility > 0, "'agility' must be > 0");
+        require(hitboxWidth >= 0.1 && hitboxWidth <= 4, "'hitboxWidth' must be in 0.1..4");
+        require(hitboxHeight >= 0.1 && hitboxHeight <= 4, "'hitboxHeight' must be in 0.1..4");
         if (category == Category.HAND_FLOWN) {
             require(signalRange > 0, "hand-flown types need 'signalRange' > 0");
             require(defaultBattery != null, "hand-flown types need a valid 'defaultBattery' (LIGHT, STANDARD or HEAVY)");
@@ -223,6 +234,19 @@ public final class DroneType {
 
     public double getDefaultCruiseAltitude() {
         return defaultCruiseAltitude;
+    }
+
+    public float getHitboxWidth() {
+        return (float) hitboxWidth;
+    }
+
+    public float getHitboxHeight() {
+        return (float) hitboxHeight;
+    }
+
+    @Nullable
+    public String getEngineSound() {
+        return engineSound;
     }
 
     public double getAgility() {

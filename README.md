@@ -40,3 +40,23 @@ sudo apt install openjdk-21-jdk openjdk-8-jdk
 ```
 
 Before the first `runServer`, accept the EULA: `echo eula=true > run/eula.txt`.
+
+## Testing
+
+```
+./gradlew build                 # compiles and runs the JUnit tests (pure flight/route/lock math)
+./gradlew runObfServer          # dedicated server on the reobfuscated jar: catches client-class leaks
+tools/server_smoke_test.sh      # scripted server run: dive, destroy, low-fuel dive, gunship return, recon loop
+```
+
+`runObfServer` needs `run/obfuscated/eula.txt` (`eula=true`). The smoke test expects the flat dev world in
+`run/world` and prints where each test unit ended up; its full log is `build/smoke/server.log`.
+
+## Server admin
+
+- All balance knobs live in `config/combat_drones.toml`. `/combat_drones config_reload` (op) re-reads it in game
+  and pushes the new drone stats to every player; a file that doesn't parse is rejected and the old values stay.
+- Friendly fire follows vanilla teams: drone blasts, shrapnel, gunfire and rockets are credited to the pilot, so
+  `/scoreboard teams option <team> friendlyfire false` protects teammates.
+- Recon intel is owner-only by default; `reconIntelForAllies = true` shares it with the owner's scoreboard team
+  (leave it off for free-for-all games that put everyone on one team).

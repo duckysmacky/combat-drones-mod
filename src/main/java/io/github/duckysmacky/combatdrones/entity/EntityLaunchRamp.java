@@ -33,13 +33,13 @@ import javax.annotation.Nullable;
 import java.util.UUID;
 
 /**
- * Launch Ramp: a 3-block rail placed facing exactly where its placer looks, so units can be aimed at any heading.
+ * Launch Ramp: a 4-block rail placed facing exactly where its placer looks, so units can be aimed at any heading.
  * Holds at most one ramp-launched unit (type, owner, fuel) plus the route planned for it; the unit only becomes an
  * {@link EntityRampUnit} when it launches. Left-click (attack) knocks the ramp down, dropping it and its unit.
  */
 public class EntityLaunchRamp extends Entity {
     /** How far along the rail (blocks, from the ramp's centre) a launching unit appears. */
-    private static final double RAIL_END = 1.5;
+    private static final double RAIL_END = 2.0;
 
     private static final DataParameter<String> UNIT_TYPE = EntityDataManager.createKey(EntityLaunchRamp.class, DataSerializers.STRING);
     private static final DataParameter<Float> FUEL_FRACTION = EntityDataManager.createKey(EntityLaunchRamp.class, DataSerializers.FLOAT);
@@ -52,7 +52,7 @@ public class EntityLaunchRamp extends Entity {
 
     public EntityLaunchRamp(World world) {
         super(world);
-        setSize(1.4F, 0.6F);
+        setSize(1.6F, 0.8F);
     }
 
     public EntityLaunchRamp(World world, double x, double y, double z, float yaw) {
@@ -233,7 +233,7 @@ public class EntityLaunchRamp extends Entity {
         double radians = Math.toRadians(rotationYaw);
         double x = posX - Math.sin(radians) * RAIL_END;
         double z = posZ + Math.cos(radians) * RAIL_END;
-        world.spawnEntity(new EntityRampUnit(world, type, owner, route, fuel, ammo, x, posY + 1.0, z, rotationYaw));
+        world.spawnEntity(new EntityRampUnit(world, type, owner, route, fuel, ammo, x, posY + 1.3, z, rotationYaw));
         world.playSound(null, posX, posY, posZ, ModSounds.UNIT_LAUNCH, SoundCategory.NEUTRAL, 2.0F, 1.0F);
         clearUnit();
     }

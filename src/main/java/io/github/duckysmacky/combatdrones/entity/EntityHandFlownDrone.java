@@ -243,10 +243,19 @@ public class EntityHandFlownDrone extends Entity {
         return type.getPayload() == DroneType.PayloadKind.GRENADE ? ModContent.fragGrenade : null;
     }
 
+    /** Takes the type's hitbox size, also after a config reload; setSize keeps the min corner, so re-centre. */
+    private void fitHitbox(@Nullable DroneType type) {
+        if (type != null && (width != type.getHitboxWidth() || height != type.getHitboxHeight())) {
+            setSize(type.getHitboxWidth(), type.getHitboxHeight());
+            setPosition(posX, posY, posZ);
+        }
+    }
+
     @Override
     public void onUpdate() {
         prevRoll = getRoll();
         super.onUpdate();
+        fitHitbox(getDroneType());
         if (world.isRemote) {
             if (locallyPiloted) {
                 predictStep();

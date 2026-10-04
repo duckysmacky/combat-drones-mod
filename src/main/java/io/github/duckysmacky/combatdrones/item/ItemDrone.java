@@ -97,6 +97,9 @@ public class ItemDrone extends Item {
             tooltip.add(TextFormatting.YELLOW + I18n.format("tooltip.combat_drones.drone.default_battery",
                     I18n.format("item.combat_drones." + type.getDefaultBattery().itemName() + ".name")));
         }
+        if (!type.isImpactDetonates() && type.getBlastPower() > 0) {
+            tooltip.add(TextFormatting.GRAY + I18n.format("tooltip.combat_drones.drone.crash_blast"));
+        }
         if (type.isImpactDetonates()) {
             tooltip.add(TextFormatting.GRAY + I18n.format("tooltip.combat_drones.drone.kamikaze"));
             if (type.getPayload() == DroneType.PayloadKind.GRENADE && type.getPayloadCapacity() > 0) {
@@ -128,6 +131,14 @@ public class ItemDrone extends Item {
                         getAmmo(stack), type.getPayloadCapacity()));
             }
             Tooltips.addDetails("tooltip.combat_drones.drone.setup_ramp", tooltip);
+            // How "Take control" / View works for this unit
+            String control = type.isSensor() ? "sensor"
+                    : type.getWeaponType() != DroneType.WeaponType.NONE ? "gunship"
+                    : type.getControlScheme() == null ? null : type.getControlScheme().name().toLowerCase(Locale.ROOT);
+            if (control != null) {
+                Tooltips.addDetails("tooltip.combat_drones.drone.control." + control, tooltip,
+                        Tooltips.keyName(DroneKeys.FLIGHT_MODE), Tooltips.keyName(DroneKeys.TOGGLE_FPV));
+            }
         }
     }
 

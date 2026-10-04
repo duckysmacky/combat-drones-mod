@@ -10,6 +10,9 @@
   "blastPower": 2.5,
   "payloadCapacity": 0,
   "maxHP": 75,
+  // Collision box in blocks: the fuselage core, not the wingtips or props
+  "hitboxWidth": 1.4,
+  "hitboxHeight": 0.6,
   "defaultCruiseAltitude": 60,
   "agility": 1.0,
   "controlScheme": "GIMBAL_OBSERVE",

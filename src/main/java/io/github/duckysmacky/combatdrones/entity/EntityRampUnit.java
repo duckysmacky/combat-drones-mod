@@ -227,10 +227,19 @@ public class EntityRampUnit extends Entity {
         return new FixedWingFlight.Params(type.getMaxSpeed(), type.getAcceleration(), type.getAgility());
     }
 
+    /** Takes the type's hitbox size, also after a config reload; setSize keeps the min corner, so re-centre. */
+    private void fitHitbox(@Nullable DroneType type) {
+        if (type != null && (width != type.getHitboxWidth() || height != type.getHitboxHeight())) {
+            setSize(type.getHitboxWidth(), type.getHitboxHeight());
+            setPosition(posX, posY, posZ);
+        }
+    }
+
     @Override
     public void onUpdate() {
         prevBank = getBank();
         super.onUpdate();
+        fitHitbox(getDroneType());
         if (world.isRemote) {
             clientMotion();
             if (hitFlashTicks > 0) {
