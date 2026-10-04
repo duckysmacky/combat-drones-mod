@@ -1,8 +1,7 @@
 .context/
 docs/
 
-# Reference jar and build outputs; keep the wrapper
-*.jar
+reference_mods/
 !gradle/wrapper/gradle-wrapper.jar
 
 # Gradle
