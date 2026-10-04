@@ -14,7 +14,7 @@
   "hitboxWidth": 1.4,
   "hitboxHeight": 0.6,
   "defaultCruiseAltitude": 60,
-  "agility": 1.0,
+  "agility": 1.4,
   "controlScheme": "GIMBAL_OBSERVE",
   "armed": false,
   // Sweeps for enemies in line of sight and marks them on the owner's Mission Planner; its camera can lock targets

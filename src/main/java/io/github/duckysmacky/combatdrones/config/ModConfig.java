@@ -61,11 +61,11 @@ public final class ModConfig {
 
     // [weapons]
     public static int roundsPerRifleItem = 16;
-    public static double rocketBlastPower = 2.5;
+    public static double rocketBlastPower = 3.0;
     public static double rocketSpeed = 3.0;
-    public static int rocketCooldownTicks = 20;
-    public static double gunDamagePerRound = 3.0;
-    public static int gunCooldownTicks = 2;
+    public static int rocketCooldownTicks = 15;
+    public static double gunDamagePerRound = 4.5;
+    public static double gunCooldownTicks = 1.25;
     public static double gunSpread = 1.5;
     public static double gunRange = 96.0;
     public static double gunHitMargin = 0.5;
@@ -193,7 +193,8 @@ public final class ModConfig {
             rocketSpeed = defaults.number("weapons.rocketSpeed", rocketSpeed, 0.5, 10, "Rocket speed on top of the plane's own, in blocks/tick.");
             rocketCooldownTicks = (int) defaults.number("weapons.rocketCooldownTicks", rocketCooldownTicks, 1, 200, "Ticks between rockets while the trigger is held.");
             gunDamagePerRound = defaults.number("weapons.gunDamagePerRound", gunDamagePerRound, 0, 40, "Damage per gun round (half-hearts).");
-            gunCooldownTicks = (int) defaults.number("weapons.gunCooldownTicks", gunCooldownTicks, 1, 40, "Ticks between gun rounds while the trigger is held.");
+            gunCooldownTicks = defaults.number("weapons.gunCooldownTicks", gunCooldownTicks, 1, 40,
+                    "Ticks between gun rounds while the trigger is held; fractions work (1.25 = 16 rounds/s).");
             gunSpread = defaults.number("weapons.gunSpread", gunSpread, 0, 10, "Gun spread: random aim error per round, in degrees.");
             gunRange = defaults.number("weapons.gunRange", gunRange, 8, 256, "Gun range in blocks.");
             gunHitMargin = defaults.number("weapons.gunHitMargin", gunHitMargin, 0, 2,

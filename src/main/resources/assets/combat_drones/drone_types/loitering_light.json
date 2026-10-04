@@ -14,7 +14,7 @@
   "hitboxHeight": 0.5,
   "defaultCruiseAltitude": 40,
   // Rocket-like: rolls, pitches and turns this many times faster than a plane
-  "agility": 2.5,
+  "agility": 3.0,
   "controlScheme": "CLICK_DESIGNATE",
   "motorSoundRange": 96,
   // Engine loop sound event (combat_drones:<name>); unset = the family default

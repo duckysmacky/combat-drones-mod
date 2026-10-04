@@ -26,6 +26,7 @@ import net.minecraft.init.SoundEvents;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemArmor;
 import net.minecraft.item.ItemStack;
+import net.minecraft.util.NonNullList;
 import net.minecraft.util.ResourceLocation;
 import net.minecraftforge.common.util.EnumHelper;
 import net.minecraftforge.event.RegistryEvent;
@@ -33,8 +34,12 @@ import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.registry.EntityEntry;
 import net.minecraftforge.fml.common.registry.EntityEntryBuilder;
+import net.minecraftforge.fml.relauncher.Side;
+import net.minecraftforge.fml.relauncher.SideOnly;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
 
 /** Registers every item and block. Placeholder plain items until each one gets behaviour. */
@@ -45,7 +50,46 @@ public final class ModContent {
         public ItemStack createIcon() {
             return new ItemStack(fpvRemote);
         }
+
+        /** Grouped by role (see {@link #tabRank}) instead of registry ID order, which existing worlds would keep. */
+        @Override
+        @SideOnly(Side.CLIENT)
+        public void displayAllRelevantItems(NonNullList<ItemStack> items) {
+            super.displayAllRelevantItems(items);
+            items.sort(Comparator.comparingInt(ModContent::tabRank));
+        }
     };
+
+    /** Hand-flown, then ramp-launched drones in this order; types not listed go last in their group. */
+    private static final List<String> DRONE_TAB_ORDER = Arrays.asList("racer_micro", "racer_standard", "racer_longrange", "dji_drone",
+            "loitering_light", "loitering_heavy", "gunship_rocket", "gunship_gun", "recon_uav");
+
+    /**
+     * Creative tab position: FPV gear (0+), hand-flown drones (100+), batteries and payloads (200+), ramp gear (400+),
+     * ramp units (500+), their ammo (600+), anything else (800), the not yet functional Rearm Station last.
+     */
+    private static int tabRank(ItemStack stack) {
+        Item item = stack.getItem();
+        if (item instanceof ItemDrone) {
+            DroneType type = ((ItemDrone) item).getDroneType();
+            int index = type == null ? -1 : DRONE_TAB_ORDER.indexOf(type.getId());
+            boolean handFlown = type != null && type.getCategory() == DroneType.Category.HAND_FLOWN;
+            return (handFlown ? 100 : 500) + (index < 0 ? 99 : index);
+        }
+        int[] bases = {0, 200, 400, 600};
+        List<List<Item>> groups = Arrays.asList(
+                Arrays.asList(fpvRemote, fpvGoggles),
+                Arrays.asList(lightBattery, standardBattery, heavyBattery, fragGrenade, bombLight, bomb, bombHeavy),
+                Arrays.asList(launchRamp, missionPlanner, fuelCan),
+                Arrays.asList(rocket, rifleRounds));
+        for (int group = 0; group < groups.size(); group++) {
+            int index = groups.get(group).indexOf(item);
+            if (index >= 0) {
+                return bases[group] + index;
+            }
+        }
+        return item == Item.getItemFromBlock(rearmStation) ? 900 : 800;
+    }
 
     /** Cosmetic helmet: no protection, never wears out. Wearing it is what lets a player enter FPV. */
     private static final ItemArmor.ArmorMaterial GOGGLES_MATERIAL = EnumHelper.addArmorMaterial(
@@ -96,7 +140,7 @@ public final class ModContent {
         bombLight = register(event, named(new ItemBomb(BombType.LIGHT, 64), BombType.LIGHT.itemName()));
         bomb = register(event, named(new ItemBomb(BombType.MEDIUM, 32), BombType.MEDIUM.itemName()));
         bombHeavy = register(event, named(new ItemBomb(BombType.HEAVY, 16), BombType.HEAVY.itemName()));
-        rocket = register(event, simpleItem("rocket").setMaxStackSize(16));
+        rocket = register(event, simpleItem("rocket"));
         rifleRounds = register(event, simpleItem("rifle_rounds"));
         // One placeable item per data-defined type; the registry name is the type ID
         for (DroneType type : DroneTypes.all()) {

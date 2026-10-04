@@ -9,16 +9,16 @@ import javax.vecmath.Vector3d;
  * yaw (0 = +Z, grows clockwise), pitch is positive nose-down, bank is positive right-wing-down.
  */
 public final class FixedWingFlight {
-    static final double MAX_BANK_DEG = 45.0;
+    static final double MAX_BANK_DEG = 55.0;
     static final double ROLL_RATE_DEG = 4.0;
     /** Nose-up limit. */
     static final double MAX_PITCH_DEG = 30.0;
     /** Nose-down limit: steeper than the climb, so strikes can dive onto a point. */
     static final double MAX_DIVE_PITCH_DEG = 60.0;
     static final double PITCH_RATE_DEG = 2.0;
-    static final double MAX_TURN_RATE_DEG = 4.0;
+    static final double MAX_TURN_RATE_DEG = 5.0;
     /** Coordinated-turn "gravity" (blocks/tick²): turn rate = TURN_GRAVITY · tan(bank) / speed. */
-    static final double TURN_GRAVITY = 0.04;
+    static final double TURN_GRAVITY = 0.05;
     /** Gravity along the flight path (vanilla gravity): diving speeds the plane up, climbing slows it down. */
     static final double PATH_GRAVITY = 0.08;
     /** Below this share of top speed the wing stalls: the nose drops and the plane sinks. */

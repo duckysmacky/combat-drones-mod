@@ -16,7 +16,7 @@ import java.util.List;
  * with the server tick it was last brought up to date (-1 for never). Answered with {@link MapTilePacket}s.
  */
 public class MapTileRequestPacket implements IMessage {
-    public static final int MAX_REGIONS = 256;
+    public static final int MAX_REGIONS = 1024;
 
     public static final class Region {
         public final int x;

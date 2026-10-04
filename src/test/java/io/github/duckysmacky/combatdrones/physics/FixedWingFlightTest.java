@@ -131,4 +131,20 @@ class FixedWingFlightTest {
         }
         assertEquals(normal * 1.5, state.speed, 1e-3);
     }
+
+    @Test
+    void turnRateFollowsAgilityOrder() {
+        // Same speed, full bank, half a second: more agile airframes come round further
+        double[] agilities = {3.0, 2.0, 1.4, 1.1};
+        double previous = Double.MAX_VALUE;
+        for (double agility : agilities) {
+            Params params = new Params(1.0, 0.1, agility);
+            State state = cruising();
+            for (int tick = 0; tick < 10; tick++) {
+                FixedWingFlight.step(state, new Controls(FixedWingFlight.MAX_BANK_DEG, 0, 0.8, true), params);
+            }
+            assertTrue(state.heading < previous, "agility " + agility + " should turn less than the one before");
+            previous = state.heading;
+        }
+    }
 }

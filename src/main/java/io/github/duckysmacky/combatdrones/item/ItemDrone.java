@@ -80,8 +80,18 @@ public class ItemDrone extends Item {
         if (type == null) {
             return;
         }
+        // Order for every item: what it is, its current state, then stats, behaviour and how-to behind Shift
         boolean handFlown = type.getCategory() == DroneType.Category.HAND_FLOWN;
         tooltip.add(TextFormatting.GRAY + I18n.format(handFlown ? "tooltip.combat_drones.drone.hand_flown" : "tooltip.combat_drones.drone.ramp_launched"));
+        if (!handFlown) {
+            double fuel = getFuel(stack);
+            tooltip.add(TextFormatting.YELLOW + I18n.format("tooltip.combat_drones.drone.fuel",
+                    Math.round(Math.min(1, fuel / type.getBatteryOrFuelCapacity()) * 100)));
+            if (type.getWeaponType() != DroneType.WeaponType.NONE) {
+                tooltip.add(TextFormatting.YELLOW + I18n.format("tooltip.combat_drones.drone.ammo." + type.getWeaponType().name().toLowerCase(Locale.ROOT),
+                        getAmmo(stack), type.getPayloadCapacity()));
+            }
+        }
         if (!GuiScreen.isShiftKeyDown()) {
             tooltip.add(TextFormatting.DARK_GRAY + I18n.format("tooltip.combat_drones.hold_shift"));
             return;
@@ -123,13 +133,6 @@ public class ItemDrone extends Item {
             Tooltips.addDetails("tooltip.combat_drones.drone.setup", tooltip,
                     Tooltips.keyName(DroneKeys.TOGGLE_FPV), Tooltips.keyName(DroneKeys.FLIGHT_MODE), Tooltips.keyName(DroneKeys.MOTORS));
         } else {
-            double fuel = getFuel(stack);
-            tooltip.add(TextFormatting.YELLOW + I18n.format("tooltip.combat_drones.drone.fuel",
-                    Math.round(Math.min(1, fuel / type.getBatteryOrFuelCapacity()) * 100)));
-            if (type.getWeaponType() != DroneType.WeaponType.NONE) {
-                tooltip.add(TextFormatting.YELLOW + I18n.format("tooltip.combat_drones.drone.ammo." + type.getWeaponType().name().toLowerCase(Locale.ROOT),
-                        getAmmo(stack), type.getPayloadCapacity()));
-            }
             Tooltips.addDetails("tooltip.combat_drones.drone.setup_ramp", tooltip);
             // How "Take control" / View works for this unit
             String control = type.isSensor() ? "sensor"

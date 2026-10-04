@@ -15,7 +15,7 @@ import net.minecraftforge.fml.common.event.FMLServerStartingEvent;
 import org.apache.logging.log4j.Logger;
 
 @Mod(modid = CombatDrones.MOD_ID, name = CombatDrones.NAME, useMetadata = true, acceptedMinecraftVersions = "[1.12.2]",
-        dependencies = "required-client:geckolib3;before:geckolib3")
+        dependencies = "required-client:geckolib3;after:geckolib3")
 public class CombatDrones {
     public static final String MOD_ID = "combat_drones";
     public static final String NAME = "Combat Drones";

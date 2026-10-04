@@ -41,6 +41,7 @@ public class ItemRemote extends Item {
     @Override
     @SideOnly(Side.CLIENT)
     public void addInformation(ItemStack stack, @Nullable World world, List<String> tooltip, ITooltipFlag flag) {
+        Tooltips.addSummary(getTranslationKey(), tooltip);
         NBTTagCompound tag = stack.getTagCompound();
         if (getLinkedDrone(stack) != null && tag != null) {
             tooltip.add(TextFormatting.GREEN + I18n.format("item.combat_drones.fpv_remote.linked", I18n.format(tag.getString(TAG_DRONE_NAME))));

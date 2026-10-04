@@ -62,8 +62,11 @@ public class EntityRampUnit extends Entity {
     /** Movement lost to a collision beyond this (blocks/tick) counts as a crash. */
     private static final double CRASH_THRESHOLD = 0.1;
     private static final double RENDER_DISTANCE = 160.0;
-    /** Non-explosive units touching down slower than this share of top speed land instead of crashing. */
+    /** On its Return landing approach, a unit touching down slower than this share of top speed lands intact. */
     private static final double LANDING_SPEED_FRACTION = 0.75;
+    /** Anywhere else only a belly landing does: flat onto the ground, slower than this share, barely sinking. */
+    private static final double BELLY_LANDING_SPEED_FRACTION = 0.5;
+    private static final double BELLY_LANDING_SINK_RATE = 0.2;
     /** Manual input older than this (ticks) is treated as a centred stick. */
     private static final int STALE_INPUT_TICKS = 10;
     private static final int DESIGNATE_COOLDOWN_TICKS = 10;
@@ -110,7 +113,10 @@ public class EntityRampUnit extends Entity {
     @Nullable
     private Vec3d designatedTarget;
     private int designateCooldown;
-    private int weaponCooldown;
+    /** Ticks until the weapon can fire again; fractional so fire rates aren't limited to 20 / whole ticks. */
+    private double weaponCooldown;
+    /** This tick the autopilot was flying Return's final landing approach. */
+    private boolean landingApproach;
     /** Keeps the unit's chunk (and the next one ahead) loaded, so it keeps flying far from any player. */
     @Nullable
     private ForgeChunkManager.Ticket chunkTicket;
@@ -272,11 +278,12 @@ public class EntityRampUnit extends Entity {
             designateCooldown--;
         }
         if (weaponCooldown > 0) {
-            weaponCooldown--;
+            weaponCooldown -= 1; // may dip just below 0; the next shot keeps that remainder
         }
         // The entity position is the truth (picks up /tp and positions set after NBT load)
         flight.position.set(posX, posY, posZ);
         FixedWingFlight.Controls controls = manualControls(type, params, boosting);
+        landingApproach = false;
         Vec3d strikePoint = null;
         if (controls == null && designatedTarget != null) {
             controls = RouteAutopilot.strike(flight, designatedTarget.x, designatedTarget.y, designatedTarget.z, terrainFloor(), params, fuel > 0);
@@ -285,6 +292,7 @@ public class EntityRampUnit extends Entity {
         if (controls == null) {
             RouteAutopilot.Command command = autopilotCommand(type, params);
             controls = command.controls;
+            landingApproach = command.phase == RouteAutopilot.Phase.LAND;
             if (command.phase == RouteAutopilot.Phase.STRIKE) {
                 strikePoint = routeStrikePoint();
             }
@@ -308,8 +316,9 @@ public class EntityRampUnit extends Entity {
         flight.position.set(posX, posY, posZ);
         syncPresentation();
         // onGround catches shallow touchdowns, which lose too little movement to count as a crash
-        if (blocked > CRASH_THRESHOLD || onGround || hitsEntity(swept)) {
-            onCollision(type);
+        boolean hitEntity = hitsEntity(swept);
+        if (blocked > CRASH_THRESHOLD || onGround || hitEntity) {
+            onCollision(type, hitEntity);
             return;
         }
         ReconIntel.sweep(this, type);
@@ -437,12 +446,12 @@ public class EntityRampUnit extends Entity {
         Vec3d nose = Vec3d.fromPitchYaw(rotationPitch, rotationYaw);
         Vec3d muzzle = new Vec3d(posX, posY + height / 2, posZ).add(nose.scale(1.2));
         if (type.getWeaponType() == DroneType.WeaponType.ROCKET_POD) {
-            weaponCooldown = ModConfig.rocketCooldownTicks;
+            weaponCooldown += ModConfig.rocketCooldownTicks;
             Vec3d velocity = nose.scale(ModConfig.rocketSpeed).add(flight.velocity.x, flight.velocity.y, flight.velocity.z);
             world.spawnEntity(new EntityRocket(world, this, owner, muzzle, velocity));
             world.playSound(null, posX, posY, posZ, ModSounds.GUNSHIP_ROCKET, SoundCategory.NEUTRAL, 4.5F, 1.0F);
         } else {
-            weaponCooldown = ModConfig.gunCooldownTicks;
+            weaponCooldown += ModConfig.gunCooldownTicks;
             fireRound(muzzle);
         }
     }
@@ -601,16 +610,22 @@ public class EntityRampUnit extends Entity {
     }
 
     /**
-     * Ran into terrain or something solid. Warheads go off; every other unit lands intact as an item if it was slow
-     * enough (a Return landing, or a belly landing). A hard crash goes off with the type's blastPower (a gunship's
-     * fuel and ammo, the recon UAV's fuel), or just wrecks it.
+     * Ran into terrain or something solid. Warheads go off. Every other unit lands intact as an item only when it
+     * was actually landing (Return's approach, or a flat, slow belly landing); anything else (a wall, a hillside, an
+     * entity, a steep or fast touchdown) goes off with the type's blastPower (a gunship's fuel and ammo, the recon
+     * UAV's fuel), or just wrecks it.
      */
-    private void onCollision(DroneType type) {
-        // Slow contact of any kind counts: a landing roll often ends against a bump or a block edge
-        boolean gentleTouchdown = flight.speed < LANDING_SPEED_FRACTION * type.getMaxSpeed();
+    private void onCollision(DroneType type, boolean hitEntity) {
         if (type.isArmed() && type.isImpactDetonates()) {
             detonate(type);
-        } else if (gentleTouchdown) {
+            return;
+        }
+        // Slow speed alone isn't a landing: a plane cruising at Medium into a hillside must still go up. Only Return's
+        // approach (where the roll-out may clip a bump or block edge) or a flat, slow belly touchdown counts.
+        boolean returnLanding = landingApproach && flight.speed < LANDING_SPEED_FRACTION * type.getMaxSpeed();
+        boolean bellyLanding = onGround && !collidedHorizontally && flight.speed < BELLY_LANDING_SPEED_FRACTION * type.getMaxSpeed()
+                && Math.abs(flight.velocity.y) < BELLY_LANDING_SINK_RATE;
+        if (!hitEntity && (returnLanding || bellyLanding)) {
             land(type);
         } else {
             detonate(type);

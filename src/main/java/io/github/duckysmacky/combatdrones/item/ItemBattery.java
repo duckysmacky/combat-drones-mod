@@ -2,6 +2,7 @@ package io.github.duckysmacky.combatdrones.item;
 
 import io.github.duckysmacky.combatdrones.client.Tooltips;
 import io.github.duckysmacky.combatdrones.type.BatteryPack;
+import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.resources.I18n;
 import net.minecraft.client.util.ITooltipFlag;
 import net.minecraft.item.Item;
@@ -57,11 +58,13 @@ public class ItemBattery extends Item {
     @Override
     @SideOnly(Side.CLIENT)
     public void addInformation(ItemStack stack, @Nullable World world, List<String> tooltip, ITooltipFlag flag) {
-        tooltip.add(TextFormatting.YELLOW + I18n.format("tooltip.combat_drones.battery.charge", Math.round(getCharge(stack) * 100)));
+        // What it is, its charge, then (with Shift) its stats before the how-to lines
         Tooltips.addSummary(getTranslationKey(), tooltip);
-        if (Tooltips.addDetails(getTranslationKey(), tooltip)) {
-            tooltip.add(TextFormatting.GRAY + I18n.format("tooltip.combat_drones.battery.multipliers",
+        tooltip.add(TextFormatting.YELLOW + I18n.format("tooltip.combat_drones.battery.charge", Math.round(getCharge(stack) * 100)));
+        if (GuiScreen.isShiftKeyDown()) {
+            tooltip.add(TextFormatting.YELLOW + I18n.format("tooltip.combat_drones.battery.multipliers",
                     pack.getCapacityMultiplier(), Math.round(pack.getPerformanceMultiplier() * 100)));
         }
+        Tooltips.addDetails(getTranslationKey(), tooltip);
     }
 }

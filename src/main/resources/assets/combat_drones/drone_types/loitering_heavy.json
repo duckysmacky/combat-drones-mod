@@ -13,7 +13,7 @@
   "hitboxWidth": 1.2,
   "hitboxHeight": 0.5,
   "defaultCruiseAltitude": 50,
-  "agility": 1.0,
+  "agility": 2.0,
   "controlScheme": "STICK",
   "motorSoundRange": 96,
   // Engine loop sound event (combat_drones:<name>); unset = the family default

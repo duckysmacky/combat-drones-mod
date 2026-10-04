@@ -20,7 +20,7 @@ import java.util.Arrays;
  * coarser when zoomed out, and is rescanned a few rows per frame so arriving tiles fill in while the planner is open.
  */
 final class PlannerTerrainMap {
-    private static final int SIZE = 512;
+    private static final int SIZE = 1024;
     private static final int ROWS_PER_FRAME = 16;
 
     private final DynamicTexture texture = new DynamicTexture(SIZE, SIZE);
@@ -39,7 +39,8 @@ final class PlannerTerrainMap {
      */
     void update(WorldClient world, double centerX, double centerZ, double visibleBlocks) {
         int wantedResolution = 1;
-        while (SIZE * wantedResolution < visibleBlocks * 1.5 && wantedResolution < 16) {
+        // Full detail until the view is nearly as wide as the window; coarser only far zoomed out
+        while (SIZE * wantedResolution < visibleBlocks * 1.1 && wantedResolution < 16) {
             wantedResolution *= 2;
         }
         int extent = SIZE * blocksPerTexel;
