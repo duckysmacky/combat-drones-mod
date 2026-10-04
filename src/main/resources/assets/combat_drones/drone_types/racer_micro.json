@@ -3,8 +3,8 @@
   // Units: speed in blocks/tick (1 = 72 km/h), battery in charge units, HP like mobs.
   // Full-throttle flight time = batteryOrFuelCapacity / drainRatePerTick ticks.
   "category": "HAND_FLOWN",
-  "maxSpeed": 1.6,
-  "acceleration": 0.16,
+  "maxSpeed": 2.35,
+  "acceleration": 0.235,
   "batteryOrFuelCapacity": 1800,
   "drainRatePerTick": 1.0,
   "blastPower": 4.0,
@@ -13,7 +13,7 @@
   // Collision box in blocks: the fuselage core, not the wingtips or props
   "hitboxWidth": 0.4,
   "hitboxHeight": 0.2,
-  "signalRange": 112,
+  "signalRange": 150,
   "impactDetonates": true,
   "motorSoundRange": 60,
   "defaultBattery": "LIGHT",

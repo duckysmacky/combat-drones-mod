@@ -42,6 +42,7 @@ public final class ModNetwork {
         CHANNEL.registerMessage(LockProgressPacket.Handler.class, LockProgressPacket.class, id++, Side.CLIENT);
         CHANNEL.registerMessage(MapTileRequestPacket.Handler.class, MapTileRequestPacket.class, id++, Side.SERVER);
         CHANNEL.registerMessage(MapTilePacket.Handler.class, MapTilePacket.class, id++, Side.CLIENT);
+        CHANNEL.registerMessage(EngineSoundPacket.Handler.class, EngineSoundPacket.class, id++, Side.CLIENT);
         CHANNEL.registerMessage(EffectPacket.Handler.class, EffectPacket.class, id++, Side.CLIENT);
     }
 

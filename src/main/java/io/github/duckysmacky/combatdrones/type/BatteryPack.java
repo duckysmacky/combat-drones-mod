@@ -3,14 +3,17 @@ package io.github.duckysmacky.combatdrones.type;
 import java.util.Locale;
 
 /**
- * Battery sizes for hand-flown drones. Any drone takes any size: bigger packs hold more charge but weigh more,
- * cutting top speed and acceleration. Multipliers come from the config ({@code [batteries.<name>]}) and are synced
+ * Battery sizes for hand-flown drones. Any drone takes any size, and each is a real trade-off: Light is fast but
+ * short-lived, Standard is the reference, Heavy lasts long but slows the drone. Multipliers come from the config ({@code [batteries.<name>]}) and are synced
  * to clients, since flight prediction depends on them.
  */
 public enum BatteryPack {
-    LIGHT(1.0, 1.0),
-    STANDARD(1.6, 0.9),
-    HEAVY(2.4, 0.8);
+    /** A risky pick: about a minute of racing, but light enough to make the drone 20 % faster. */
+    LIGHT(0.5, 1.2),
+    /** The reference: normal speed, an average flight. */
+    STANDARD(1.0, 1.0),
+    /** Long flights, but the weight costs a quarter of top speed and acceleration. */
+    HEAVY(2.0, 0.75);
 
     private final double defaultCapacityMultiplier;
     private final double defaultPerformanceMultiplier;
@@ -33,7 +36,7 @@ public enum BatteryPack {
         return key() + "_battery";
     }
 
-    /** Multiplies a drone type's base (Light-pack) capacity. */
+    /** Multiplies a drone type's base (Standard-pack) capacity. */
     public double getCapacityMultiplier() {
         return capacityMultiplier;
     }

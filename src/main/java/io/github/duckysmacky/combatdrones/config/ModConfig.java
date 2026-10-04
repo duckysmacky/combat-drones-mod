@@ -230,11 +230,11 @@ public final class ModConfig {
             defaults.comment("weapons", "Gunship Plane weapons, fired only under manual control.");
             defaults.comment("client", "Options for your own client only.");
             defaults.comment("batteries", "Battery pack sizes for hand-flown drones. capacityMultiplier scales a drone's base capacity "
-                    + "(defined for a Light pack); performanceMultiplier scales its top speed and acceleration (pack weight).");
+                    + "(defined for a Standard pack); performanceMultiplier scales its top speed and acceleration (pack weight).");
             defaults.comment("bombs", "Bombs for DJI-style drones. bayUnits: space taken in a drone's bomb bay (its payloadCapacity); "
                     + "blastPower: vanilla scale (TNT = 4); weightPerBomb: share of top speed and acceleration lost per bomb carried.");
             defaults.comment("drones", "Per-drone-type stats. Units: speed in blocks/tick (1 = 72 km/h), acceleration in blocks/tick², "
-                    + "capacity (with a Light pack) and drain in charge units (full-throttle flight time = capacity / drain ticks), blastPower on the vanilla "
+                    + "capacity (with a Standard pack) and drain in charge units (full-throttle flight time = capacity / drain ticks), blastPower on the vanilla "
                     + "scale (TNT = 4), maxHP like mob health, signalRange and motorSoundRange in blocks.");
 
             for (String retired : RETIRED_KEYS) {

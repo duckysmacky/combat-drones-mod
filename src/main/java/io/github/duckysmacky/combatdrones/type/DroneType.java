@@ -49,7 +49,7 @@ public final class DroneType {
     private double maxSpeed;
     /** Blocks per tick², at full throttle. */
     private double acceleration;
-    /** Battery (hand-flown, with a Light pack) or fuel (ramp-launched) units. */
+    /** Battery (hand-flown, with a Standard pack) or fuel (ramp-launched) units. */
     private double batteryOrFuelCapacity;
     /** Units drained per tick at full throttle. */
     private double drainRatePerTick;

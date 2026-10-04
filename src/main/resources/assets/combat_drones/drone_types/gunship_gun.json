@@ -13,10 +13,10 @@
   "hitboxWidth": 1.6,
   "hitboxHeight": 0.7,
   "defaultCruiseAltitude": 40,
-  "agility": 1.1,
+  "agility": 1.05,
   "controlScheme": "STICK",
   "weaponType": "GUN_MOUNT",
-  "motorSoundRange": 96,
+  "motorSoundRange": 160,
   // Engine loop sound event (combat_drones:<name>); unset = the family default
   "engineSound": "unit.engine_piston"
 }

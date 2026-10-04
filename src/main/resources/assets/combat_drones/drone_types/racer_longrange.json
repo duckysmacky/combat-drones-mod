@@ -1,9 +1,9 @@
 {
-  // Long-Range Racer: slower, bigger battery and signal range. One grenade slot.
-  // signalRange must stay <= 160 (entity tracking range) until remote view lands in M6.
+  // Long-Range Racer: slowest racer, biggest battery and signal range. One grenade slot.
+  // The pilot rides along from a stand-in body, so signalRange is not limited by entity tracking.
   "category": "HAND_FLOWN",
-  "maxSpeed": 1.1,
-  "acceleration": 0.10,
+  "maxSpeed": 1.45,
+  "acceleration": 0.125,
   "batteryOrFuelCapacity": 3600,
   "drainRatePerTick": 1.0,
   "blastPower": 4.5,
@@ -12,10 +12,10 @@
   // Collision box in blocks: the fuselage core, not the wingtips or props
   "hitboxWidth": 0.65,
   "hitboxHeight": 0.3,
-  "signalRange": 160,
+  "signalRange": 400,
   "impactDetonates": true,
   "motorSoundRange": 60,
-  "defaultBattery": "LIGHT",
+  "defaultBattery": "HEAVY",
   "controlScheme": "FPV",
   "payload": "GRENADE"
 }

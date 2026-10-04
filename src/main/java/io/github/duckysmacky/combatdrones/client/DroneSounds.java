@@ -3,6 +3,7 @@ package io.github.duckysmacky.combatdrones.client;
 import io.github.duckysmacky.combatdrones.CombatDrones;
 import io.github.duckysmacky.combatdrones.entity.EntityHandFlownDrone;
 import io.github.duckysmacky.combatdrones.entity.EntityRampUnit;
+import io.github.duckysmacky.combatdrones.network.EngineSoundPacket;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.audio.ITickableSound;
 import net.minecraft.entity.Entity;
@@ -22,6 +23,26 @@ public final class DroneSounds {
     private DroneSounds() {
     }
 
+    /** Engines of planes too far away to be tracked, by entity ID (see {@link FarEngineSound}). */
+    private static final Map<Integer, FarEngineSound> FAR_ENGINES = new HashMap<>();
+
+    /** From the server: running planes within earshot that this client doesn't track. */
+    static void onFarEngines(EngineSoundPacket packet) {
+        Minecraft minecraft = Minecraft.getMinecraft();
+        for (EngineSoundPacket.Entry entry : packet.getEntries()) {
+            FarEngineSound known = FAR_ENGINES.get(entry.entityId);
+            if (known != null && !known.isDonePlaying()) {
+                known.refresh(entry);
+                continue;
+            }
+            FarEngineSound sound = FarEngineSound.of(entry);
+            if (sound != null) {
+                FAR_ENGINES.put(entry.entityId, sound);
+                minecraft.getSoundHandler().playSound(sound);
+            }
+        }
+    }
+
     @SubscribeEvent
     public static void onClientTick(TickEvent.ClientTickEvent event) {
         Minecraft minecraft = Minecraft.getMinecraft();
@@ -31,9 +52,11 @@ public final class DroneSounds {
         Effects.tick(minecraft.world != null);
         if (minecraft.world == null) {
             MOTOR_SOUNDS.clear();
+            FAR_ENGINES.clear();
             return;
         }
         MOTOR_SOUNDS.values().removeIf(ITickableSound::isDonePlaying);
+        FAR_ENGINES.values().removeIf(ITickableSound::isDonePlaying);
         for (Entity entity : minecraft.world.loadedEntityList) {
             if (entity instanceof EntityHandFlownDrone && ((EntityHandFlownDrone) entity).areMotorsOn()
                     && !MOTOR_SOUNDS.containsKey(entity.getEntityId())) {

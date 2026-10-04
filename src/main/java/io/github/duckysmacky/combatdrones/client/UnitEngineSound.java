@@ -41,7 +41,7 @@ public class UnitEngineSound extends MovingSound {
         yPosF = (float) unit.posY;
         zPosF = (float) unit.posZ;
         DroneType type = unit.getDroneType();
-        double speed = Math.sqrt(Math.pow(unit.posX - unit.prevPosX, 2) + Math.pow(unit.posY - unit.prevPosY, 2) + Math.pow(unit.posZ - unit.prevPosZ, 2));
+        double speed = unit.getSyncedSpeed();
         double speedFraction = type == null || type.getMaxSpeed() <= 0 ? 0.8 : speed / type.getMaxSpeed();
         pitch = 0.8F + 0.4F * (float) Math.max(0, Math.min(1, speedFraction)) + (unit.isBoosting() ? 0.25F : 0);
     }
