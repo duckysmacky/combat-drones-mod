@@ -346,7 +346,7 @@ public class GuiMissionPlanner extends GuiScreen {
         if (terrain == null) {
             terrain = new PlannerTerrainMap();
         }
-        terrain.update(mc.world, centerX, centerZ);
+        terrain.update(mc.world, centerX, centerZ, (mapRight - mapLeft) / scale);
         terrain.draw(mapLeft, mapTop, mapRight, mapBottom, centerX, centerZ, scale);
         PlannerOpenPacket.UnitView unit = currentUnit();
 
@@ -539,13 +539,9 @@ public class GuiMissionPlanner extends GuiScreen {
     }
 
     private void clippedLine(BufferBuilder buffer, double fromX, double fromZ, double toX, double toZ, int color) {
-        int x1 = toScreenX(fromX);
-        int y1 = toScreenY(fromZ);
-        int x2 = toScreenX(toX);
-        int y2 = toScreenY(toZ);
-        // ponytail: lines with an end off the map are skipped rather than clipped; fine for a route editor
-        if (insideMap(x1, y1) && insideMap(x2, y2)) {
-            line(buffer, x1, y1, x2, y2, color);
+        double[] clipped = LineClip.clip(toScreenX(fromX), toScreenY(fromZ), toScreenX(toX), toScreenY(toZ), mapLeft, mapTop, mapRight, mapBottom);
+        if (clipped != null) {
+            line(buffer, clipped[0], clipped[1], clipped[2], clipped[3], color);
         }
     }
 

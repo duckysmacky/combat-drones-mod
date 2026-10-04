@@ -40,6 +40,8 @@ public final class ModNetwork {
         CHANNEL.registerMessage(IntelPacket.Handler.class, IntelPacket.class, id++, Side.CLIENT);
         CHANNEL.registerMessage(ReconLookPacket.Handler.class, ReconLookPacket.class, id++, Side.SERVER);
         CHANNEL.registerMessage(LockProgressPacket.Handler.class, LockProgressPacket.class, id++, Side.CLIENT);
+        CHANNEL.registerMessage(MapTileRequestPacket.Handler.class, MapTileRequestPacket.class, id++, Side.SERVER);
+        CHANNEL.registerMessage(MapTilePacket.Handler.class, MapTilePacket.class, id++, Side.CLIENT);
     }
 
     /** After a config reload: everyone gets the new stats right away. */

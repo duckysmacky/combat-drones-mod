@@ -5,6 +5,7 @@ import io.github.duckysmacky.combatdrones.network.DroneStatePacket;
 import io.github.duckysmacky.combatdrones.network.GunFirePacket;
 import io.github.duckysmacky.combatdrones.network.IntelPacket;
 import io.github.duckysmacky.combatdrones.network.LockProgressPacket;
+import io.github.duckysmacky.combatdrones.network.MapTilePacket;
 import io.github.duckysmacky.combatdrones.network.PlannerOpenPacket;
 import io.github.duckysmacky.combatdrones.network.RemoteSessionPacket;
 import io.github.duckysmacky.combatdrones.network.TypeSyncPacket;
@@ -56,6 +57,10 @@ public final class ClientPacketHandlers {
 
     public static void onIntel(IntelPacket packet) {
         ClientIntel.set(packet.getEntries());
+    }
+
+    public static void onMapTiles(MapTilePacket packet) {
+        ClientMapTiles.accept(packet);
     }
 
     public static void onLockProgress(LockProgressPacket packet) {

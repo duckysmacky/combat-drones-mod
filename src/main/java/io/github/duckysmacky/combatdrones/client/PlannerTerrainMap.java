@@ -1,7 +1,6 @@
 package io.github.duckysmacky.combatdrones.client;
 
-import net.minecraft.block.material.MapColor;
-import net.minecraft.block.state.IBlockState;
+import io.github.duckysmacky.combatdrones.world.MapColors;
 import net.minecraft.client.multiplayer.WorldClient;
 import net.minecraft.client.renderer.BufferBuilder;
 import net.minecraft.client.renderer.GlStateManager;
@@ -15,9 +14,10 @@ import org.lwjgl.opengl.GL11;
 import java.util.Arrays;
 
 /**
- * Top-down terrain under the Mission Planner map, shaded like a vanilla map, at one block per texel. Built from the
- * chunks the client has loaded, so anything past render distance stays blank. A window of {@link #SIZE} blocks follows
- * the map centre and is rescanned a few rows per frame, so newly loaded chunks fill in while the planner is open.
+ * Top-down terrain under the Mission Planner map, shaded like a vanilla map. Chunks this client has loaded are drawn
+ * live; everything else comes from the server's map snapshot ({@link ClientMapTiles}), so places seen before (by any
+ * player or unit) stay on the map. A window of {@link #SIZE} texels follows the map centre, at one block per texel or
+ * coarser when zoomed out, and is rescanned a few rows per frame so arriving tiles fill in while the planner is open.
  */
 final class PlannerTerrainMap {
     private static final int SIZE = 512;
@@ -28,74 +28,68 @@ final class PlannerTerrainMap {
     private final BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
     private int originX = Integer.MIN_VALUE;
     private int originZ;
+    private int blocksPerTexel = 1;
     private int nextRow;
 
-    /** Moves the window when the view centre strays from it, then scans the next few rows. */
-    void update(WorldClient world, double centerX, double centerZ) {
-        if (originX == Integer.MIN_VALUE || Math.abs(centerX - (originX + SIZE / 2)) > SIZE / 4
-                || Math.abs(centerZ - (originZ + SIZE / 2)) > SIZE / 4) {
-            originX = (int) Math.floor(centerX) - SIZE / 2;
-            originZ = (int) Math.floor(centerZ) - SIZE / 2;
+    /**
+     * Moves the window when the view centre strays from it (or the zoom needs a different resolution), asks the
+     * server for the map around it, then scans the next few rows.
+     *
+     * @param visibleBlocks width of the area the map currently shows, in blocks
+     */
+    void update(WorldClient world, double centerX, double centerZ, double visibleBlocks) {
+        int wantedResolution = 1;
+        while (SIZE * wantedResolution < visibleBlocks * 1.5 && wantedResolution < 16) {
+            wantedResolution *= 2;
+        }
+        int extent = SIZE * blocksPerTexel;
+        if (originX == Integer.MIN_VALUE || wantedResolution != blocksPerTexel || Math.abs(centerX - (originX + extent / 2)) > extent / 4
+                || Math.abs(centerZ - (originZ + extent / 2)) > extent / 4) {
+            blocksPerTexel = wantedResolution;
+            extent = SIZE * blocksPerTexel;
+            originX = (int) Math.floor(centerX) - extent / 2;
+            originZ = (int) Math.floor(centerZ) - extent / 2;
             Arrays.fill(pixels, 0);
             nextRow = 0;
         }
+        ClientMapTiles.request(originX, originZ, originX + extent, originZ + extent);
         for (int row = 0; row < ROWS_PER_FRAME; row++) {
-            int worldZ = originZ + nextRow;
+            int worldZ = originZ + nextRow * blocksPerTexel;
             for (int column = 0; column < SIZE; column++) {
-                pixels[nextRow * SIZE + column] = colorAt(world, originX + column, worldZ);
+                pixels[nextRow * SIZE + column] = colorAt(world, originX + column * blocksPerTexel, worldZ);
             }
             nextRow = (nextRow + 1) % SIZE;
         }
         texture.updateDynamicTexture();
     }
 
-    /** Vanilla map shading: brighter where the ground rises toward the south, darker where it falls. */
+    /** Live from a loaded chunk, else the server's snapshot, else blank. */
     private int colorAt(WorldClient world, int x, int z) {
         Chunk chunk = world.getChunkProvider().getLoadedChunk(x >> 4, z >> 4);
-        if (chunk == null || chunk.isEmpty()) {
-            return 0;
+        if (chunk != null && !chunk.isEmpty()) {
+            Chunk north = (z & 15) == 0 ? world.getChunkProvider().getLoadedChunk(x >> 4, (z - 1) >> 4) : chunk;
+            return MapColors.toArgb(MapColors.encode(world, chunk, north, x, z, cursor));
         }
-        int height = surfaceHeight(chunk, x, z);
-        if (height <= 0) {
-            return 0;
-        }
-        cursor.setPos(x, height - 1, z);
-        IBlockState state = chunk.getBlockState(cursor);
-        MapColor color = state.getMapColor(world, cursor);
-        Chunk northChunk = world.getChunkProvider().getLoadedChunk(x >> 4, (z - 1) >> 4);
-        int northHeight = northChunk == null || northChunk.isEmpty() ? height : surfaceHeight(northChunk, x, z - 1);
-        int shade = height > northHeight ? 2 : height < northHeight ? 0 : 1;
-        return color.getMapColor(shade);
-    }
-
-    /** One above the topmost block that shows on a map (skips air and other colourless blocks under the heightmap). */
-    private int surfaceHeight(Chunk chunk, int x, int z) {
-        int height = chunk.getHeightValue(x & 15, z & 15);
-        while (height > 0) {
-            cursor.setPos(x, height - 1, z);
-            if (chunk.getBlockState(cursor).getMaterial().getMaterialMapColor() != MapColor.AIR) {
-                break;
-            }
-            height--;
-        }
-        return height;
+        byte[] tile = ClientMapTiles.get(x >> 4, z >> 4);
+        return tile == null ? 0 : MapColors.toArgb(tile[(z & 15) * 16 + (x & 15)]);
     }
 
     /** Draws the scanned window into the given screen rectangle, with the same world-to-screen mapping as the map. */
     void draw(int left, int top, int right, int bottom, double centerX, double centerZ, double scale) {
+        int extent = SIZE * blocksPerTexel;
         double midX = (left + right) / 2.0;
         double midY = (top + bottom) / 2.0;
         double screenLeft = Math.max(left, midX + (originX - centerX) * scale);
         double screenTop = Math.max(top, midY + (originZ - centerZ) * scale);
-        double screenRight = Math.min(right, midX + (originX + SIZE - centerX) * scale);
-        double screenBottom = Math.min(bottom, midY + (originZ + SIZE - centerZ) * scale);
+        double screenRight = Math.min(right, midX + (originX + extent - centerX) * scale);
+        double screenBottom = Math.min(bottom, midY + (originZ + extent - centerZ) * scale);
         if (screenLeft >= screenRight || screenTop >= screenBottom) {
             return;
         }
-        double u0 = (centerX + (screenLeft - midX) / scale - originX) / SIZE;
-        double v0 = (centerZ + (screenTop - midY) / scale - originZ) / SIZE;
-        double u1 = (centerX + (screenRight - midX) / scale - originX) / SIZE;
-        double v1 = (centerZ + (screenBottom - midY) / scale - originZ) / SIZE;
+        double u0 = (centerX + (screenLeft - midX) / scale - originX) / extent;
+        double v0 = (centerZ + (screenTop - midY) / scale - originZ) / extent;
+        double u1 = (centerX + (screenRight - midX) / scale - originX) / extent;
+        double v1 = (centerZ + (screenBottom - midY) / scale - originZ) / extent;
 
         GlStateManager.enableBlend();
         GlStateManager.color(0.8F, 0.8F, 0.8F, 1.0F);
