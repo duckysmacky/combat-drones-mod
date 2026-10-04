@@ -33,7 +33,6 @@ import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
-import net.minecraft.util.math.ChunkPos;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.util.text.TextComponentTranslation;
@@ -45,8 +44,6 @@ import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.fml.relauncher.SideOnly;
 
 import javax.annotation.Nullable;
-import java.util.HashSet;
-import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -54,7 +51,7 @@ import java.util.UUID;
  * {@link DroneType}. Flies its {@link Route} on autopilot until fuel runs out; before launch the unit lives inside
  * the Launch Ramp's tile entity instead.
  */
-public class EntityRampUnit extends Entity {
+public class EntityRampUnit extends Entity implements ChunkAnchor.Holder {
     /** Blocks the autopilot keeps above the terrain it's about to fly over. */
     private static final double TERRAIN_CLEARANCE = 6;
     /** How far ahead (in ticks of flight) the terrain floor looks. */
@@ -118,8 +115,7 @@ public class EntityRampUnit extends Entity {
     /** This tick the autopilot was flying Return's final landing approach. */
     private boolean landingApproach;
     /** Keeps the unit's chunk (and the next one ahead) loaded, so it keeps flying far from any player. */
-    @Nullable
-    private ForgeChunkManager.Ticket chunkTicket;
+    private final ChunkAnchor anchor = new ChunkAnchor(this);
 
     // Client-side presentation
     public float prevBank;
@@ -322,7 +318,7 @@ public class EntityRampUnit extends Entity {
             return;
         }
         ReconIntel.sweep(this, type);
-        updateChunkLoading();
+        anchor.hold(posX + flight.velocity.x * 20, posZ + flight.velocity.z * 20);
     }
 
     /** The route (and its terminal action) on autopilot. */
@@ -514,35 +510,10 @@ public class EntityRampUnit extends Entity {
         sender.sendStatusMessage(new TextComponentTranslation("message.combat_drones.remote.designated", Math.round(hit.distanceTo(start))), true);
     }
 
-    /** Server: forces the current chunk and the one a second ahead; releases chunks it has left behind. */
-    private void updateChunkLoading() {
-        if (chunkTicket == null) {
-            chunkTicket = ForgeChunkManager.requestTicket(CombatDrones.instance, world, ForgeChunkManager.Type.ENTITY);
-            if (chunkTicket == null) {
-                return; // out of tickets (forgeChunkLoading.cfg): fly on, but only while players keep the area loaded
-            }
-            chunkTicket.bindEntity(this);
-        }
-        Set<ChunkPos> wanted = new HashSet<>();
-        wanted.add(new ChunkPos(MathHelper.floor(posX) >> 4, MathHelper.floor(posZ) >> 4));
-        wanted.add(new ChunkPos(MathHelper.floor(posX + flight.velocity.x * 20) >> 4, MathHelper.floor(posZ + flight.velocity.z * 20) >> 4));
-        for (ChunkPos forced : chunkTicket.getChunkList()) {
-            if (!wanted.contains(forced)) {
-                ForgeChunkManager.unforceChunk(chunkTicket, forced);
-            }
-        }
-        for (ChunkPos chunk : wanted) {
-            if (!chunkTicket.getChunkList().contains(chunk)) {
-                ForgeChunkManager.forceChunk(chunkTicket, chunk);
-            }
-        }
-    }
-
     /** Server: after a restart Forge hands back the ticket this unit held (see CombatDrones' loading callback). */
+    @Override
     public void adoptChunkTicket(ForgeChunkManager.Ticket ticket) {
-        chunkTicket = ticket;
-        // Forge restores the ticket but not its chunks; without forcing one now the unit would never tick to do it
-        ForgeChunkManager.forceChunk(ticket, new ChunkPos(MathHelper.floor(posX) >> 4, MathHelper.floor(posZ) >> 4));
+        anchor.adopt(ticket);
     }
 
     @Override
@@ -551,9 +522,8 @@ public class EntityRampUnit extends Entity {
             RemoteSessions.onUnitRemoved(this); // rider home before any explosion
         }
         super.setDead();
-        if (!world.isRemote && chunkTicket != null) {
-            ForgeChunkManager.releaseTicket(chunkTicket);
-            chunkTicket = null;
+        if (!world.isRemote) {
+            anchor.release();
         }
     }
 

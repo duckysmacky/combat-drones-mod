@@ -54,7 +54,10 @@ public final class RemoteSessions {
 
     private static final class Session {
         final EntityPlayerMP player;
-        final EntityRampUnit unit;
+        /** The ramp unit or hand-flown drone the player rides. */
+        final Entity vehicle;
+        /** A hand-flown drone flown in FPV (its own checks decide the link), not a ramp unit session. */
+        final boolean drone;
         final boolean control;
         final EntityPilotBody body;
         final boolean wasInvisible;
@@ -65,9 +68,10 @@ public final class RemoteSessions {
         long lookTick;
         float sentProgress;
 
-        Session(EntityPlayerMP player, EntityRampUnit unit, boolean control, EntityPilotBody body, boolean wasInvisible) {
+        Session(EntityPlayerMP player, Entity vehicle, boolean drone, boolean control, EntityPilotBody body, boolean wasInvisible) {
             this.player = player;
-            this.unit = unit;
+            this.vehicle = vehicle;
+            this.drone = drone;
             this.control = control;
             this.body = body;
             this.wasInvisible = wasInvisible;
@@ -107,16 +111,34 @@ public final class RemoteSessions {
         }
         Session current = SESSIONS.get(player.getUniqueID());
         if (current != null) {
-            if (current.unit == unit) {
+            if (current.vehicle == unit || current.drone) {
                 end(player, null);
             } else {
                 // Switching units: hop straight across, keeping the body and the saved home
                 current.player.dismountRidingEntity();
                 SESSIONS.remove(player.getUniqueID());
-                mount(new Session(player, unit, control, current.body, current.wasInvisible));
+                mount(new Session(player, unit, false, control, current.body, current.wasInvisible));
                 return null;
             }
         }
+        begin(player, unit, false, control);
+        return null;
+    }
+
+    /**
+     * Server: a pilot takes off with a hand-flown drone (FPV). Same stand-in body as for ramp units, so the drone can
+     * fly as far as its signal reaches: vanilla only streams the world and entities around the player's own entity.
+     * The drone's own pilot checks (goggles, remote, signal from home) keep deciding when the link ends.
+     */
+    public static void startDrone(EntityPlayerMP player, EntityHandFlownDrone drone) {
+        if (SESSIONS.containsKey(player.getUniqueID())) {
+            end(player, null);
+        }
+        begin(player, drone, true, true);
+    }
+
+    /** Saves home, leaves a body there, hides the player and puts them on the vehicle. */
+    private static void begin(EntityPlayerMP player, Entity vehicle, boolean drone, boolean control) {
         if (player.isRiding()) {
             player.dismountRidingEntity();
         }
@@ -129,20 +151,38 @@ public final class RemoteSessions {
         player.getEntityData().setTag(HOME_TAG, home);
 
         EntityPilotBody body = new EntityPilotBody(player.world, player);
-        Session session = new Session(player, unit, control, body, player.isInvisible());
+        Session session = new Session(player, vehicle, drone, control, body, player.isInvisible());
         SESSIONS.put(player.getUniqueID(), session);
         player.world.spawnEntity(body);
         player.setInvisible(true);
         mount(session);
-        return null;
+    }
+
+    /** Where the player left their body (server), or null when they aren't in a session. */
+    @Nullable
+    public static Vec3d homeOf(EntityPlayer player) {
+        NBTTagCompound data = player.getEntityData();
+        if (!SESSIONS.containsKey(player.getUniqueID()) || !data.hasKey(HOME_TAG)) {
+            return null;
+        }
+        NBTTagCompound home = data.getCompoundTag(HOME_TAG);
+        return new Vec3d(home.getDouble("X"), home.getDouble("Y"), home.getDouble("Z"));
+    }
+
+    /** True while the player flies a hand-flown drone from a body (as opposed to a ramp unit session). */
+    public static boolean isDroneSession(EntityPlayer player) {
+        Session session = SESSIONS.get(player.getUniqueID());
+        return session != null && session.drone;
     }
 
     private static void mount(Session session) {
         SESSIONS.put(session.player.getUniqueID(), session);
         EntityPlayerMP player = session.player;
-        player.connection.setPlayerLocation(session.unit.posX, session.unit.posY, session.unit.posZ, player.rotationYaw, player.rotationPitch);
-        player.startRiding(session.unit, true);
-        ModNetwork.CHANNEL.sendTo(new RemoteSessionPacket(session.unit.getEntityId(), session.control), player);
+        player.connection.setPlayerLocation(session.vehicle.posX, session.vehicle.posY, session.vehicle.posZ, player.rotationYaw, player.rotationPitch);
+        player.startRiding(session.vehicle, true);
+        NBTTagCompound home = player.getEntityData().getCompoundTag(HOME_TAG);
+        ModNetwork.CHANNEL.sendTo(new RemoteSessionPacket(session.vehicle.getEntityId(), session.control, session.drone,
+                home.getDouble("X"), home.getDouble("Y"), home.getDouble("Z")), player);
     }
 
     /** Ends the player's session, if any, and puts them back where they left their body. */
@@ -151,19 +191,24 @@ public final class RemoteSessions {
         if (session == null) {
             return;
         }
-        if (player.getRidingEntity() == session.unit) {
+        if (player.getRidingEntity() == session.vehicle) {
             player.dismountRidingEntity();
             // Tell the client about the dismount before the teleport, or it would apply the teleport while still
             // riding and snap back onto the unit
-            player.connection.sendPacket(new SPacketSetPassengers(session.unit));
+            player.connection.sendPacket(new SPacketSetPassengers(session.vehicle));
         }
         returnHome(player);
         player.setInvisible(session.wasInvisible);
         session.body.setDead();
+        if (session.drone && session.vehicle instanceof EntityHandFlownDrone) {
+            // Ended from here (death, logout, drone gone): the drone lets go of its pilot too. Ending from the drone's
+            // side has already cleared its pilot, so this does nothing then.
+            ((EntityHandFlownDrone) session.vehicle).releasePilot(player);
+        }
         if (player.hasDisconnected()) {
             return; // logging out: they're saved at home, nobody left to tell
         }
-        ModNetwork.CHANNEL.sendTo(new RemoteSessionPacket(-1, false), player);
+        ModNetwork.CHANNEL.sendTo(new RemoteSessionPacket(-1, false, false, 0, 0, 0), player);
         if (message != null) {
             player.sendStatusMessage(new TextComponentTranslation(message), true);
         }
@@ -189,13 +234,13 @@ public final class RemoteSessions {
     @Nullable
     public static EntityPlayerMP controllerOf(EntityRampUnit unit) {
         Session session = sessionOf(unit);
-        return session != null && session.control ? session.player : null;
+        return session != null && session.control && !session.drone ? session.player : null;
     }
 
     @Nullable
-    private static Session sessionOf(EntityRampUnit unit) {
+    private static Session sessionOf(Entity unit) {
         for (Session session : SESSIONS.values()) {
-            if (session.unit == unit) {
+            if (session.vehicle == unit) {
                 return session;
             }
         }
@@ -212,7 +257,7 @@ public final class RemoteSessions {
     }
 
     /** A unit is about to leave the world (destroyed, detonating): get its rider home before anything goes off. */
-    static void onUnitRemoved(EntityRampUnit unit) {
+    static void onUnitRemoved(Entity unit) {
         Session session = sessionOf(unit);
         if (session != null) {
             end(session.player, "message.combat_drones.remote.unit_lost");
@@ -253,11 +298,12 @@ public final class RemoteSessions {
             EntityPlayerMP player = session.player;
             if (!player.isEntityAlive() || player.hasDisconnected()) {
                 end(player, null);
-            } else if (session.unit.isDead || session.unit.world != player.world) {
+            } else if (session.vehicle.isDead || session.vehicle.world != player.world) {
                 end(player, "message.combat_drones.remote.unit_lost");
-            } else if (!isHoldingPlanner(player)) {
+            } else if (!session.drone && !isHoldingPlanner(player)) {
+                // (A drone's own pilot checks run in its tick: goggles, remote, signal from home)
                 end(player, "message.combat_drones.remote.need_planner");
-            } else if (player.getRidingEntity() != session.unit || session.body.isDead) {
+            } else if (player.getRidingEntity() != session.vehicle || session.body.isDead) {
                 end(player, "message.combat_drones.remote.link_lost");
             } else {
                 // Potion updates reset the invisible flag whenever any effect changes
@@ -270,8 +316,8 @@ public final class RemoteSessions {
     /** Server: a viewer's camera direction (sensor units only; anything else is ignored). */
     public static void onReconLook(EntityPlayerMP player, int unitId, Vec3d direction) {
         Session session = SESSIONS.get(player.getUniqueID());
-        DroneType type = session == null ? null : session.unit.getDroneType();
-        if (type == null || !type.isSensor() || session.unit.getEntityId() != unitId
+        DroneType type = session == null || !(session.vehicle instanceof EntityRampUnit) ? null : ((EntityRampUnit) session.vehicle).getDroneType();
+        if (type == null || !type.isSensor() || session.vehicle.getEntityId() != unitId
                 || !Double.isFinite(direction.lengthSquared()) || direction.lengthSquared() < 1e-6) {
             return;
         }
@@ -284,8 +330,11 @@ public final class RemoteSessions {
      * range and line of sight) is the candidate; holding it for activeLockHoldTicks locks it.
      */
     private static void updateLock(Session session) {
-        DroneType type = session.unit.getDroneType();
-        UUID owner = session.unit.getOwner();
+        if (!(session.vehicle instanceof EntityRampUnit)) {
+            return;
+        }
+        DroneType type = ((EntityRampUnit) session.vehicle).getDroneType();
+        UUID owner = ((EntityRampUnit) session.vehicle).getOwner();
         if (type == null || !type.isSensor() || owner == null) {
             return;
         }
@@ -305,7 +354,7 @@ public final class RemoteSessions {
 
     @Nullable
     private static Entity lockCandidate(Session session, UUID owner) {
-        EntityRampUnit unit = session.unit;
+        EntityRampUnit unit = (EntityRampUnit) session.vehicle;
         Vec3d eye = ReconIntel.sensorPosition(unit);
         double range = ModConfig.activeLockRange;
         List<Entity> targets = new ArrayList<>(unit.world.playerEntities);
@@ -378,7 +427,7 @@ public final class RemoteSessions {
         event.setCanceled(true);
         DamageSource source = event.getSource();
         if (source.getTrueSource() != null && source.getTrueSource() != session.player && !source.isExplosion()) {
-            session.unit.attackEntityFrom(source, event.getAmount());
+            session.vehicle.attackEntityFrom(source, event.getAmount());
         }
     }
 

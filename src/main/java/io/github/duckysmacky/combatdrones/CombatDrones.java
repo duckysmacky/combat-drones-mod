@@ -2,7 +2,7 @@ package io.github.duckysmacky.combatdrones;
 
 import io.github.duckysmacky.combatdrones.command.CommandCombatDrones;
 import io.github.duckysmacky.combatdrones.config.ModConfig;
-import io.github.duckysmacky.combatdrones.entity.EntityRampUnit;
+import io.github.duckysmacky.combatdrones.entity.ChunkAnchor;
 import io.github.duckysmacky.combatdrones.network.ModNetwork;
 import io.github.duckysmacky.combatdrones.type.DroneTypes;
 import net.minecraftforge.common.ForgeChunkManager;
@@ -62,11 +62,11 @@ public class CombatDrones {
     @Mod.EventHandler
     public void init(FMLInitializationEvent event) {
         proxy.init();
-        // Flying ramp units keep their own chunks loaded; after a restart Forge returns their tickets here
+        // Flying ramp units and running drones keep their own chunks loaded; after a restart Forge returns their tickets here
         ForgeChunkManager.setForcedChunkLoadingCallback(this, (tickets, world) -> {
             for (ForgeChunkManager.Ticket ticket : tickets) {
-                if (ticket.getEntity() instanceof EntityRampUnit) {
-                    ((EntityRampUnit) ticket.getEntity()).adoptChunkTicket(ticket);
+                if (ticket.getEntity() instanceof ChunkAnchor.Holder) {
+                    ((ChunkAnchor.Holder) ticket.getEntity()).adoptChunkTicket(ticket);
                 } else {
                     ForgeChunkManager.releaseTicket(ticket);
                 }

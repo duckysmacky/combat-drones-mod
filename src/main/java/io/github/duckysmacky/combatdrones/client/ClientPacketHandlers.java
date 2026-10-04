@@ -13,6 +13,7 @@ import io.github.duckysmacky.combatdrones.network.TypeSyncPacket;
 import io.github.duckysmacky.combatdrones.type.DroneTypes;
 import net.minecraft.client.Minecraft;
 import net.minecraft.entity.Entity;
+import net.minecraft.util.math.Vec3d;
 
 /** Client-side bodies of client-bound packet handlers; only ever invoked on the client thread. */
 public final class ClientPacketHandlers {
@@ -34,7 +35,8 @@ public final class ClientPacketHandlers {
     }
 
     public static void onRemoteSession(RemoteSessionPacket packet) {
-        RemoteController.onSession(packet.getUnitId(), packet.isControl());
+        RemoteController.onSession(packet.getUnitId(), packet.isControl(), packet.isDrone(),
+                new Vec3d(packet.getHomeX(), packet.getHomeY(), packet.getHomeZ()));
     }
 
     public static void onGunFire(GunFirePacket packet) {

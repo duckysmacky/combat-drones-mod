@@ -29,6 +29,9 @@ public class EntityBomb extends Entity {
 
     @Nullable
     private UUID owner;
+    /** The drone that released it (only known until a reload). */
+    @Nullable
+    private Entity dropper;
     private int age;
 
     public EntityBomb(World world) {
@@ -36,8 +39,10 @@ public class EntityBomb extends Entity {
         setSize(0.3F, 0.3F);
     }
 
-    public EntityBomb(World world, BombType type, double x, double y, double z, double motionX, double motionY, double motionZ, @Nullable UUID owner) {
+    public EntityBomb(World world, BombType type, double x, double y, double z, double motionX, double motionY, double motionZ, @Nullable UUID owner,
+                      @Nullable Entity dropper) {
         this(world);
+        this.dropper = dropper;
         dataManager.set(BOMB_TYPE, type.ordinal());
         setPosition(x, y, z);
         this.motionX = motionX;
@@ -76,7 +81,8 @@ public class EntityBomb extends Entity {
 
     private boolean hitsEntity() {
         for (Entity entity : world.getEntitiesWithinAABBExcludingEntity(this, getEntityBoundingBox())) {
-            if (entity.canBeCollidedWith() && entity.isEntityAlive()) {
+            // Never the drone that dropped it, nor its pilot riding along under it
+            if (entity.canBeCollidedWith() && entity.isEntityAlive() && (dropper == null || !entity.isRidingSameEntity(dropper))) {
                 return true;
             }
         }

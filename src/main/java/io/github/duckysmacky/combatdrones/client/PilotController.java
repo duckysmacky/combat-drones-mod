@@ -17,6 +17,7 @@ import net.minecraft.client.entity.EntityPlayerSP;
 import net.minecraft.client.settings.GameSettings;
 import net.minecraft.entity.Entity;
 import net.minecraft.util.MovementInput;
+import net.minecraft.util.math.Vec3d;
 import net.minecraft.util.text.TextComponentTranslation;
 import net.minecraftforge.client.event.InputUpdateEvent;
 import net.minecraftforge.client.event.MouseEvent;
@@ -149,7 +150,9 @@ public final class PilotController {
         }
         HandFlownFlight.Input input = readInput(minecraft, player);
         DroneType type = drone.getDroneType();
-        signalDistance = player.getDistance(drone);
+        // The pilot rides the drone; signal runs from their body
+        Vec3d home = RemoteController.getDroneHome();
+        signalDistance = home != null ? drone.getDistance(home.x, home.y, home.z) : player.getDistance(drone);
         signalQuality = type == null ? 0 : DroneSystems.signalQuality(signalDistance, type.getSignalRange());
         warningBeeps();
         sequence++;

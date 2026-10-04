@@ -2,6 +2,7 @@ package io.github.duckysmacky.combatdrones.client;
 
 import io.github.duckysmacky.combatdrones.CombatDrones;
 import io.github.duckysmacky.combatdrones.ModSounds;
+import io.github.duckysmacky.combatdrones.entity.EntityHandFlownDrone;
 import io.github.duckysmacky.combatdrones.entity.EntityRampUnit;
 import io.github.duckysmacky.combatdrones.entity.Raytrace;
 import io.github.duckysmacky.combatdrones.config.ModConfig;
@@ -58,6 +59,9 @@ public final class RemoteController {
     private static final double START_THROTTLE = 0.7;
 
     private static int unitId = -1;
+    /** Where the body stands while flying a hand-flown drone (signal is measured from here), or null. */
+    @Nullable
+    private static Vec3d droneHome;
     private static boolean control;
     @Nullable
     private static EntityRampUnit unit;
@@ -83,6 +87,11 @@ public final class RemoteController {
     private static boolean freeMode;
 
     private RemoteController() {
+    }
+
+    @Nullable
+    public static Vec3d getDroneHome() {
+        return droneHome;
     }
 
     /** The unit whose camera we're looking through, once the client tracks it. */
@@ -130,11 +139,19 @@ public final class RemoteController {
         return type == null ? null : type.getControlScheme();
     }
 
-    /** From the server: a session started ({@code id} >= 0) or ended. */
-    public static void onSession(int id, boolean underControl) {
+    /**
+     * From the server: a session started ({@code id} >= 0) or ended. Hand-flown drone sessions are driven by
+     * {@link PilotController}; here we only keep where the body stands, for the signal readout.
+     */
+    public static void onSession(int id, boolean underControl, boolean drone, Vec3d home) {
         Minecraft minecraft = Minecraft.getMinecraft();
         if (id < 0) {
+            droneHome = null;
             stop(minecraft);
+            return;
+        }
+        if (drone) {
+            droneHome = home;
             return;
         }
         unitId = id;
@@ -343,7 +360,8 @@ public final class RemoteController {
      */
     @SubscribeEvent
     public static void onRenderPlayer(RenderPlayerEvent.Pre event) {
-        if (event.getEntityPlayer().getRidingEntity() instanceof EntityRampUnit) {
+        Entity vehicle = event.getEntityPlayer().getRidingEntity();
+        if (vehicle instanceof EntityRampUnit || vehicle instanceof EntityHandFlownDrone) {
             event.setCanceled(true);
         }
     }

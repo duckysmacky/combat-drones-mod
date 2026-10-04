@@ -32,9 +32,11 @@ import net.minecraft.util.EnumHand;
 import net.minecraft.util.SoundCategory;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.math.AxisAlignedBB;
+import net.minecraft.util.math.Vec3d;
 import net.minecraft.util.text.TextComponentTranslation;
 import net.minecraft.world.World;
 import net.minecraft.world.WorldServer;
+import net.minecraftforge.common.ForgeChunkManager;
 import net.minecraftforge.fml.common.registry.ForgeRegistries;
 import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.fml.relauncher.SideOnly;
@@ -50,7 +52,7 @@ import java.util.UUID;
  * Shared entity for every HAND_FLOWN drone type (FPV racers, DJI drone); behaviour differences come from
  * its {@link DroneType}. The server owns the flight state; the pilot's client predicts it (see client code).
  */
-public class EntityHandFlownDrone extends Entity {
+public class EntityHandFlownDrone extends Entity implements ChunkAnchor.Holder {
     /** Impact speed (blocks/tick) below which a collision is a landing, not a crash. */
     static final double ARM_SPEED = 0.25;
     /** Crash damage per block/tick of impact speed for drones that don't detonate. */
@@ -77,6 +79,7 @@ public class EntityHandFlownDrone extends Entity {
     private static final String OUT_OF_RANGE = "message.combat_drones.out_of_range";
     /** Inputs the server holds ahead of simulation; anything beyond this is dropped (per-drone rate limit). */
     private static final int MAX_QUEUED_INPUTS = 3;
+    private final ChunkAnchor anchor = new ChunkAnchor(this);
 
     protected final HandFlownFlight.State flightState = new HandFlownFlight.State();
     @Nullable
@@ -297,6 +300,13 @@ public class EntityHandFlownDrone extends Entity {
             charge = Math.max(0, charge - DroneSystems.drainPerTick(type.getDrainRatePerTick(), thrust));
         }
         applyStepToEntity(type);
+        // While its motors run it stays loaded, so a drone left hovering far away (pilot gone, signal lost) keeps
+        // flying, draining its battery, and stays reachable; once they stop, its chunk can unload normally
+        if (input.motorsOn && !isDead) {
+            anchor.hold(posX + flightState.velocity.x * 20, posZ + flightState.velocity.z * 20);
+        } else {
+            anchor.release();
+        }
         if (pilot != null && !isDead) {
             ModNetwork.CHANNEL.sendTo(new DroneStatePacket(this, lastProcessedSequence), pilot);
         }
@@ -371,7 +381,7 @@ public class EntityHandFlownDrone extends Entity {
         }
         setPayload(count - 1, bomb);
         HandFlownFlight.State state = flightState;
-        world.spawnEntity(new EntityBomb(world, bomb, posX, posY - 0.35, posZ, state.velocity.x, state.velocity.y, state.velocity.z, owner));
+        world.spawnEntity(new EntityBomb(world, bomb, posX, posY - 0.35, posZ, state.velocity.x, state.velocity.y, state.velocity.z, owner, this));
         world.playSound(null, posX, posY, posZ, ModSounds.BOMB_RELEASE, SoundCategory.NEUTRAL, 1.0F, 1.0F);
         world.playSound(null, posX, posY, posZ, ModSounds.DRONE_BATTERY, SoundCategory.NEUTRAL, 1.0F, 0.6F);
     }
@@ -407,7 +417,10 @@ public class EntityHandFlownDrone extends Entity {
         if (!getUniqueID().equals(heldRemoteLink(player))) {
             return "message.combat_drones.need_remote";
         }
-        if (getDistanceSq(player) > type.getSignalRange() * type.getSignalRange()) {
+        // Signal runs from where the pilot stands: their body (home) while flying, since they ride the drone
+        Vec3d home = RemoteSessions.homeOf(player);
+        double distanceSq = home != null ? getDistanceSq(home.x, home.y, home.z) : getDistanceSq(player);
+        if (distanceSq > type.getSignalRange() * type.getSignalRange()) {
             return OUT_OF_RANGE;
         }
         return null;
@@ -421,6 +434,7 @@ public class EntityHandFlownDrone extends Entity {
         lastInput = unattendedInput();
         lastQueuedSequence = Integer.MIN_VALUE;
         dataManager.set(PILOT_ID, player.getEntityId());
+        RemoteSessions.startDrone(player, this);
     }
 
     private enum LinkLoss {
@@ -443,9 +457,40 @@ public class EntityHandFlownDrone extends Entity {
                     ? new HandFlownFlight.Input(lastInput.throttle, lastInput.vertical, lastInput.pitch, lastInput.roll, 0, lastInput.mode, lastInput.motorsOn)
                     : lastInput;
         }
+        EntityPlayerMP former = pilot;
         pilot = null;
         inputQueue.clear();
         dataManager.set(PILOT_ID, -1);
+        if (former != null) {
+            RemoteSessions.end(former, null); // back to their body
+        }
+    }
+
+    /** Server: the pilot's session ended elsewhere (death, logout, this drone removed): drop the link, hover in place. */
+    void releasePilot(EntityPlayerMP player) {
+        if (pilot == player) {
+            clearPilot(LinkLoss.OTHER);
+        }
+    }
+
+    @Override
+    public void setDead() {
+        if (!world.isRemote) {
+            RemoteSessions.onUnitRemoved(this); // pilot back to their body before any explosion
+            anchor.release();
+        }
+        super.setDead();
+    }
+
+    @Override
+    public void adoptChunkTicket(ForgeChunkManager.Ticket ticket) {
+        anchor.adopt(ticket);
+    }
+
+    /** The pilot rides along invisibly; centre their hitbox on the airframe. */
+    @Override
+    public double getMountedYOffset() {
+        return height / 2 - 0.55;
     }
 
     /** Server: G key. Exits FPV if already flying the remote's drone, otherwise tries to take off with it. */
@@ -649,7 +694,7 @@ public class EntityHandFlownDrone extends Entity {
     private boolean hitsEntity(AxisAlignedBB box) {
         List<Entity> touching = world.getEntitiesWithinAABBExcludingEntity(this, box);
         for (Entity entity : touching) {
-            if (entity.canBeCollidedWith() && entity.isEntityAlive()) {
+            if (entity.canBeCollidedWith() && entity.isEntityAlive() && !isPassenger(entity)) {
                 return true;
             }
         }

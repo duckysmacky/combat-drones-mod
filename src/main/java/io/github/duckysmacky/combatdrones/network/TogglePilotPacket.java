@@ -27,7 +27,8 @@ public class TogglePilotPacket implements IMessage {
         public IMessage onMessage(TogglePilotPacket message, MessageContext context) {
             EntityPlayerMP player = context.getServerHandler().player;
             FMLCommonHandler.instance().getWorldThread(context.netHandler).addScheduledTask(() -> {
-                if (RemoteSessions.isRemote(player)) {
+                // A drone's FPV session ends through the drone itself (clean exit, it hovers); a ramp unit's directly
+                if (RemoteSessions.isRemote(player) && !RemoteSessions.isDroneSession(player)) {
                     RemoteSessions.end(player, null);
                 } else {
                     EntityHandFlownDrone.togglePilot(player);
