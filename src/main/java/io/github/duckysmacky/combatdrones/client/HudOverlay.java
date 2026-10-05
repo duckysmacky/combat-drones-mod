@@ -145,7 +145,11 @@ public final class HudOverlay {
         drawText(font, throttle, left, bottom + 16, TEXT);
         float health = drone.getHealthFraction();
         drawText(font, I18n.format("hud.combat_drones.health", percent(health)), left, bottom + 16 + LINE, health < 0.5F ? WARNING : TEXT);
-
+        // Players your team's recon has spotted (boxed in the world by MarkerRenderer)
+        if (!ClientIntel.getMarks().isEmpty()) {
+            String targets = I18n.format("hud.combat_drones.targets", ClientIntel.getMarks().size());
+            drawText(font, targets, right - font.getStringWidth(targets), bottom + 16, WARNING);
+        }
 
         drawCrosshair(centerX, centerY);
         drawWarnings(font, minecraft, centerX, centerY + 24, pack != null, battery, signal);

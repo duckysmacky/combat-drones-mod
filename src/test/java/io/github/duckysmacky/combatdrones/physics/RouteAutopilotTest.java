@@ -244,4 +244,52 @@ class RouteAutopilotTest {
         }
         assertTrue(nearest > 38 && farthest < 62, "should circle at about 50 blocks, was " + nearest + ".." + farthest);
     }
+
+    /** Light loitering munition stats (loitering_light.json). */
+    private static final FixedWingFlight.Params LIGHT_MUNITION = new FixedWingFlight.Params(1.8, 0.2, 2.75);
+
+    /**
+     * Pursues a designated point from {@code (0, ORIGIN_Y + 40, 0)} heading +Z at speed 1.5 until it reaches the
+     * target's height over flat ground (terrain floor 6 blocks up, as the entity gives it); checks it hits, never
+     * climbs and never wanders off.
+     */
+    private static void assertPursuitHits(double targetX, double targetZ) {
+        double minSafeY = ORIGIN_Y + 6;
+        double targetY = ORIGIN_Y;
+        FixedWingFlight.State state = launched();
+        state.position.set(0, ORIGIN_Y + 40, 0);
+        state.speed = 1.5;
+        double startY = state.position.y;
+        double farthest = 0;
+        int tick = 0;
+        for (; tick < 600 && state.position.y > targetY; tick++) {
+            FixedWingFlight.step(state, RouteAutopilot.pursue(state, targetX, targetY, targetZ, minSafeY, LIGHT_MUNITION, true), LIGHT_MUNITION);
+            assertTrue(state.position.y <= startY + 0.5, "should never climb, reached y " + state.position.y);
+            farthest = Math.max(farthest, Math.hypot(state.position.x - targetX, state.position.z - targetZ));
+        }
+        String run = "target " + targetX + ", " + targetZ + ": ";
+        assertTrue(state.position.y <= targetY, run + "should reach the target, ended at " + state.position);
+        assertTrue(Math.hypot(state.position.x - targetX, state.position.z - targetZ) < 3, run + "should hit within 3 blocks, hit " + state.position);
+        // The old route strike took up to 160 ticks and strayed ~95 blocks on these
+        assertTrue(tick < 120, run + "should hit within 6 s, took " + tick + " ticks");
+        assertTrue(farthest < 65, run + "should stay close, strayed " + farthest + " blocks away");
+    }
+
+    @Test
+    void pursuitDivesOnATargetAhead() {
+        assertPursuitHits(0, 60);
+    }
+
+    @Test
+    void pursuitTurnsStraightInOnATargetOffToTheSide() {
+        // 120 degrees off the nose, and right behind
+        assertPursuitHits(-50, -30);
+        assertPursuitHits(0, -40);
+    }
+
+    @Test
+    void pursuitSpiralsDownOnATargetTooSteepToDive() {
+        assertPursuitHits(0, 8);
+        assertPursuitHits(5, 0);
+    }
 }

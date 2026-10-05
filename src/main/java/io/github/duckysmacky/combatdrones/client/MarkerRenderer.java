@@ -18,8 +18,9 @@ import net.minecraftforge.fml.relauncher.Side;
 import org.lwjgl.opengl.GL11;
 
 /**
- * In-world overlays while looking through one of your own units: a red cross in a square over the point it's diving
- * on, and a red box around every player your recon has spotted (brighter and named when locked). Drawn through
+ * In-world overlays while looking through one of your own units or flying a drone in FPV: a red cross in a square
+ * over the point a unit is diving on, and a red box around every player your (or, with reconIntelForAllies, your
+ * team's) recon has spotted (brighter and named when locked). Drawn through
  * terrain and grown with distance so they stay readable from altitude.
  */
 @Mod.EventBusSubscriber(modid = CombatDrones.MOD_ID, value = Side.CLIENT)
@@ -30,7 +31,7 @@ public final class MarkerRenderer {
     @SubscribeEvent
     public static void onRenderWorldLast(RenderWorldLastEvent event) {
         EntityRampUnit unit = RemoteController.getUnit();
-        if (unit == null) {
+        if (unit == null && PilotController.getPilotedDrone() == null) {
             return;
         }
         RenderManager renderManager = Minecraft.getMinecraft().getRenderManager();
@@ -45,7 +46,7 @@ public final class MarkerRenderer {
         Tessellator tessellator = Tessellator.getInstance();
         BufferBuilder buffer = tessellator.getBuffer();
         buffer.begin(GL11.GL_LINES, DefaultVertexFormats.POSITION_COLOR);
-        BlockPos point = unit.getStrikePoint();
+        BlockPos point = unit == null ? null : unit.getStrikePoint();
         if (point != null) {
             strikeCross(buffer, point.getX() + 0.5 - renderManager.viewerPosX, point.getY() + 0.05 - renderManager.viewerPosY,
                     point.getZ() + 0.5 - renderManager.viewerPosZ);

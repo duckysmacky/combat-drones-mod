@@ -25,6 +25,14 @@ public final class RouteAutopilot {
     static final double REATTACK_HEIGHT = 30.0;
     /** Speed share flown while lining up a strike: slower turns tighter; the dive itself goes in at full power. */
     static final double STRIKE_APPROACH_SPEED = Route.Speed.MEDIUM.fraction;
+    /** A pursuit dives straight down the line of sight once the target is within this many degrees of the nose. */
+    static final double PURSUIT_ALIGN_DEG = 20.0;
+    /** A pursuit only dives on a target at least this much shallower than the steepest dive. */
+    static final double PURSUIT_DIVE_MARGIN_DEG = 5.0;
+    /** Speed share a pursuit slows to while turning in: turn radius grows with the square of speed. */
+    static final double PURSUIT_TURN_SPEED = 0.55;
+    /** Steepest descent while turning in, so a target too steep to dive on is spiralled down to instead of looped. */
+    static final double PURSUIT_SPIRAL_PITCH = 35.0;
     /** Returning units start their landing approach this close to home. */
     static final double LANDING_RADIUS = 48.0;
     /** Height above home a returning unit cruises at before the approach. */
@@ -170,7 +178,7 @@ public final class RouteAutopilot {
      * Fly onto a fixed point and hit it: hold altitude (above the terrain floor) on the approach, push over into a dive
      * once the target is {@link #DIVE_START_DEG} below the horizon and lined up on the nose, and follow the line of
      * sight down at full power. If it isn't lined up, it first extends out (far enough to turn back in a straight line)
-     * and comes round for another pass. Also used for a manually designated point.
+     * and comes round for another pass. Designated points use {@link #pursue} instead.
      */
     public static FixedWingFlight.Controls strike(FixedWingFlight.State state, double targetX, double targetY, double targetZ, double minSafeY,
                                                   FixedWingFlight.Params params, boolean hasFuel) {
@@ -201,6 +209,41 @@ public final class RouteAutopilot {
         double pitch = Math.max(-FixedWingFlight.MAX_PITCH_DEG, Math.min(FixedWingFlight.MAX_DIVE_PITCH_DEG,
                 lineOfSight + (lineOfSight - state.pitch) * 0.5));
         return new FixedWingFlight.Controls(bank, pitch, hasFuel ? 1 : 0, hasFuel);
+    }
+
+    /**
+     * Go straight for a point picked from the camera (click-designate). Unlike {@link #strike} it never climbs or
+     * holds height to line up a dive: it turns in right away, slowed for a tight turn, descending toward the target
+     * along the line of sight (never below it, nor below the terrain floor) at most {@link #PURSUIT_SPIRAL_PITCH}
+     * steep, and once the target is on the nose and shallow enough it dives down the line of sight at full power. Only
+     * a target behind it or too steep to dive on, and too close to come round onto, makes it fly on straight first,
+     * and only as far as that low, slow turn needs.
+     */
+    public static FixedWingFlight.Controls pursue(FixedWingFlight.State state, double targetX, double targetY, double targetZ, double minSafeY,
+                                                  FixedWingFlight.Params params, boolean hasFuel) {
+        double bearingError = FixedWingFlight.wrap(bearing(state, targetX, targetZ) - state.heading);
+        double horizontal = Math.hypot(targetX - state.position.x, targetZ - state.position.z);
+        double lineOfSight = Math.toDegrees(Math.atan2(state.position.y - targetY, horizontal)); // positive = below the horizon
+        // Steeper than the airframe can dive: overshoot and come round lower rather than miss short of it
+        boolean reachable = lineOfSight <= FixedWingFlight.MAX_DIVE_PITCH_DEG - PURSUIT_DIVE_MARGIN_DEG;
+        if (Math.abs(bearingError) <= PURSUIT_ALIGN_DEG && reachable) {
+            double bank = FixedWingFlight.clamp(bearingError * DIVE_BANK_GAIN, FixedWingFlight.MAX_BANK_DEG);
+            double pitch = Math.max(-FixedWingFlight.MAX_PITCH_DEG, Math.min(FixedWingFlight.MAX_DIVE_PITCH_DEG,
+                    lineOfSight + (lineOfSight - state.pitch) * 0.5));
+            return new FixedWingFlight.Controls(bank, pitch, hasFuel ? 1 : 0, hasFuel);
+        }
+        // Too close to come round onto it (behind, or too steep): straight on for just that far, still descending
+        double steepest = Math.toRadians(FixedWingFlight.MAX_DIVE_PITCH_DEG - PURSUIT_DIVE_MARGIN_DEG);
+        double coneDistance = Math.max(0, state.position.y - targetY) / Math.tan(steepest);
+        double turnDiameter = 2 * state.speed * state.speed
+                / (FixedWingFlight.TURN_GRAVITY * params.agility * Math.tan(Math.toRadians(FixedWingFlight.MAX_BANK_DEG)));
+        boolean comeRound = (Math.abs(bearingError) > EXTEND_BEARING_DEG || !reachable) && horizontal < coneDistance + turnDiameter;
+        double bank = comeRound ? 0 : FixedWingFlight.clamp(bearingError * BANK_GAIN, FixedWingFlight.MAX_BANK_DEG);
+        double pitch = Math.max(-MAX_CLIMB_PITCH, Math.min(PURSUIT_SPIRAL_PITCH, lineOfSight));
+        pitch = Math.min(pitch, (state.position.y - minSafeY) * PITCH_GAIN);
+        double throttle = Math.max(0, Math.min(1, PURSUIT_TURN_SPEED * PURSUIT_TURN_SPEED
+                + (params.maxSpeed * PURSUIT_TURN_SPEED - state.speed) * 5));
+        return new FixedWingFlight.Controls(bank, pitch, hasFuel ? throttle : 0, hasFuel);
     }
 
     /** Head home at a safe height; close in, fly a shallow glideslope down onto the ground at home at slow speed. */

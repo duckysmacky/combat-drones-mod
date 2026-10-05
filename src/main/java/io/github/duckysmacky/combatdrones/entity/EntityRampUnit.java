@@ -282,7 +282,7 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder {
         landingApproach = false;
         Vec3d strikePoint = null;
         if (controls == null && designatedTarget != null) {
-            controls = RouteAutopilot.strike(flight, designatedTarget.x, designatedTarget.y, designatedTarget.z, terrainFloor(), params, fuel > 0);
+            controls = RouteAutopilot.pursue(flight, designatedTarget.x, designatedTarget.y, designatedTarget.z, terrainFloor(), params, fuel > 0);
             strikePoint = designatedTarget;
         }
         if (controls == null) {

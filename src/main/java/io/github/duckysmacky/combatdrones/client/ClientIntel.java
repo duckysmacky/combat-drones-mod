@@ -13,7 +13,10 @@ import net.minecraftforge.fml.relauncher.Side;
 import java.util.Collections;
 import java.util.List;
 
-/** What this player's recon has spotted, as last sent by the server (for the planner map and camera markers). */
+/**
+ * What this player's (or, with reconIntelForAllies, their team's) recon has spotted, as last sent by the server: for
+ * the planner map and the camera / FPV markers.
+ */
 @Mod.EventBusSubscriber(modid = CombatDrones.MOD_ID, value = Side.CLIENT)
 public final class ClientIntel {
     private static List<IntelPacket.Entry> marks = Collections.emptyList();
