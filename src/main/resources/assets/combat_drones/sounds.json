@@ -62,6 +62,13 @@
       "combat_drones:drone/hit"
     ]
   },
+  "drone.pilot_static": {
+    "category": "player",
+    "subtitle": "subtitles.combat_drones.drone.pilot_static",
+    "sounds": [
+      "combat_drones:drone/pilot_static"
+    ]
+  },
   "unit.engine": {
     "category": "neutral",
     "subtitle": "subtitles.combat_drones.unit.engine",

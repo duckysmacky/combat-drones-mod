@@ -62,6 +62,8 @@ public final class ModConfig {
     public static double boostSpeedMultiplier = 1.5;
     public static double boostFuelMultiplier = 4.0;
     public static boolean worldBorderCollision = false;
+    public static boolean pilotHintEnabled = true;
+    public static double pilotHintRange = 24.0;
 
     // [weapons]
     public static int roundsPerRifleItem = 16;
@@ -220,6 +222,10 @@ public final class ModConfig {
                     "Whether drones and ramp units collide with (and crash into) the world border. Off: they fly through it.");
             droneDamageTakenMultiplier = defaults.number("general.droneDamageTakenMultiplier", droneDamageTakenMultiplier, 0, 10,
                     "Multiplies all damage drones take from attacks (weapons, arrows, melee). Lower = harder to shoot down.");
+            pilotHintEnabled = defaults.get("general.pilotHintEnabled", pilotHintEnabled,
+                    "Pilots' stand-in bodies give off radio static and a blinking red TX light, so players can find someone flying a drone or plane.");
+            pilotHintRange = defaults.number("general.pilotHintRange", pilotHintRange, 8, 64,
+                    "How far away a pilot's radio static can be heard, in blocks (quieter further out).");
 
             roundsPerRifleItem = (int) defaults.number("weapons.roundsPerRifleItem", roundsPerRifleItem, 1, 256,
                     "Gun rounds one Rifle Rounds item loads into a Gunship Plane's belt.");

@@ -24,6 +24,8 @@ public final class ModSounds {
     public static final SoundEvent DRONE_ATTACH = create("drone.attach");
     public static final SoundEvent DRONE_CONNECT = create("drone.connect");
     public static final SoundEvent DRONE_HIT = create("drone.hit");
+    /** Radio static and telemetry chirps given off by a pilot's stand-in body, so others can find them. */
+    public static final SoundEvent DRONE_PILOT_STATIC = create("drone.pilot_static");
     /** Propeller engine of a flying ramp-launched unit. */
     public static final SoundEvent UNIT_ENGINE = create("unit.engine");
     public static final SoundEvent UNIT_LAUNCH = create("unit.launch");
@@ -53,7 +55,7 @@ public final class ModSounds {
 
     @SubscribeEvent
     public static void registerSounds(RegistryEvent.Register<SoundEvent> event) {
-        event.getRegistry().registerAll(DRONE_MOTOR, DRONE_MOTOR_FAR, DRONE_LINK, DRONE_BEEP, DRONE_BATTERY, DRONE_ATTACH, DRONE_CONNECT, DRONE_HIT, UNIT_ENGINE, UNIT_LAUNCH,
+        event.getRegistry().registerAll(DRONE_MOTOR, DRONE_MOTOR_FAR, DRONE_LINK, DRONE_BEEP, DRONE_BATTERY, DRONE_ATTACH, DRONE_CONNECT, DRONE_HIT, DRONE_PILOT_STATIC, UNIT_ENGINE, UNIT_LAUNCH,
                 GUNSHIP_ROCKET, GUNSHIP_GUN, UNIT_BOOST, BOMB_RELEASE, EXPLOSION_NEAR, EXPLOSION_FAR, BULLET_IMPACT, BULLET_FLYBY);
         event.getRegistry().registerAll(ENGINES);
     }

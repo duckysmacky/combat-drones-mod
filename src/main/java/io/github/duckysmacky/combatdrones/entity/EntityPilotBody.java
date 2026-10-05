@@ -2,6 +2,8 @@ package io.github.duckysmacky.combatdrones.entity;
 
 import com.google.common.base.Optional;
 import io.github.duckysmacky.combatdrones.CombatDrones;
+import io.github.duckysmacky.combatdrones.ModSounds;
+import io.github.duckysmacky.combatdrones.config.ModConfig;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.player.EntityPlayer;
@@ -14,10 +16,14 @@ import net.minecraft.network.datasync.EntityDataManager;
 import net.minecraft.scoreboard.Team;
 import net.minecraft.util.DamageSource;
 import net.minecraft.util.EnumHandSide;
+import net.minecraft.util.EnumParticleTypes;
 import net.minecraft.util.NonNullList;
+import net.minecraft.util.SoundCategory;
 import net.minecraft.util.math.ChunkPos;
 import net.minecraft.util.math.MathHelper;
+import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
+import net.minecraft.world.WorldServer;
 import net.minecraftforge.common.ForgeChunkManager;
 
 import javax.annotation.Nullable;
@@ -83,6 +89,28 @@ public class EntityPilotBody extends EntityLivingBase {
                 chunkTicket.bindEntity(this);
                 ForgeChunkManager.forceChunk(chunkTicket, new ChunkPos(MathHelper.floor(posX) >> 4, MathHelper.floor(posZ) >> 4));
             }
+        }
+        if (ModConfig.pilotHintEnabled) {
+            giveAwayPilot();
+        }
+    }
+
+    /**
+     * Radio static every 2 s and a red TX light blinking at the goggles, so other players can hunt down someone
+     * flying from a hiding spot. Sent from the server, so it's the same for everyone and can't be turned off per client.
+     */
+    private void giveAwayPilot() {
+        int phase = ticksExisted + getEntityId(); // bodies spawned together don't crackle in sync
+        if (phase % 40 == 0) {
+            // A sound reaches 16 * volume blocks and fades linearly over that distance
+            world.playSound(null, posX, posY + getEyeHeight(), posZ, ModSounds.DRONE_PILOT_STATIC, SoundCategory.PLAYERS,
+                    (float) (ModConfig.pilotHintRange / 16), 0.9F + rand.nextFloat() * 0.2F);
+        }
+        if (phase % 20 == 0) {
+            Vec3d look = getLookVec();
+            // count 0 makes the offsets a colour; all zero is vanilla's redstone red
+            ((WorldServer) world).spawnParticle(EnumParticleTypes.REDSTONE, posX + look.x * 0.3, posY + getEyeHeight() + look.y * 0.3,
+                    posZ + look.z * 0.3, 0, 0.0, 0.0, 0.0, 1.0);
         }
     }
 

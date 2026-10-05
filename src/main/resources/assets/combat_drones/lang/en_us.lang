@@ -173,6 +173,7 @@ message.combat_drones.signal_lost=Signal lost: the drone keeps flying on its las
 subtitles.combat_drones.drone.battery=Battery clicks in
 subtitles.combat_drones.drone.attach=Payload attached
 subtitles.combat_drones.drone.hit=Drone hit
+subtitles.combat_drones.drone.pilot_static=Radio static
 hud.combat_drones.health=HP %s%%
 hud.combat_drones.plane_status=HDG %s   ALT %s
 hud.combat_drones.mode.view=VIEW
