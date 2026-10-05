@@ -14,6 +14,7 @@ import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.network.play.server.SPacketSetPassengers;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.util.DamageSource;
 import net.minecraft.util.EnumHand;
 import net.minecraft.util.math.Vec3d;
@@ -27,6 +28,8 @@ import net.minecraftforge.event.entity.player.AttackEntityEvent;
 import net.minecraftforge.event.entity.player.EntityItemPickupEvent;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent;
 import net.minecraftforge.event.entity.player.PlayerPickupXpEvent;
+import net.minecraftforge.event.world.ChunkWatchEvent;
+import net.minecraftforge.fml.common.FMLCommonHandler;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.PlayerEvent;
@@ -35,8 +38,10 @@ import net.minecraftforge.fml.common.gameevent.TickEvent;
 import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -83,6 +88,12 @@ public final class RemoteSessions {
     private static final int LOOK_STALE_TICKS = 5;
     /** Blocks added around a target's hitbox when checking whether the recon camera is on it. */
     private static final double LOCK_BOX_MARGIN = 1.5;
+    /** How long after a session teleport newly sent chunks still get their entities re-checked for the player. */
+    private static final int RETRACK_WINDOW_TICKS = 200;
+    /** Players a session recently teleported, until when (server tick). */
+    private static final Map<UUID, Integer> RETRACK_UNTIL = new HashMap<>();
+    /** Of those, players sent a chunk this tick. */
+    private static final Set<UUID> RETRACK_NOW = new HashSet<>();
     /** Set while the body forwards a hit to its player, so the "remote players can't be hurt" rule lets it through. */
     private static boolean forwardingBodyDamage;
 
@@ -179,6 +190,7 @@ public final class RemoteSessions {
         SESSIONS.put(session.player.getUniqueID(), session);
         EntityPlayerMP player = session.player;
         player.connection.setPlayerLocation(session.vehicle.posX, session.vehicle.posY, session.vehicle.posZ, player.rotationYaw, player.rotationPitch);
+        retrackAfterTeleport(player);
         player.startRiding(session.vehicle, true);
         NBTTagCompound home = player.getEntityData().getCompoundTag(HOME_TAG);
         ModNetwork.CHANNEL.sendTo(new RemoteSessionPacket(session.vehicle.getEntityId(), session.control, session.drone,
@@ -194,8 +206,11 @@ public final class RemoteSessions {
         if (player.getRidingEntity() == session.vehicle) {
             player.dismountRidingEntity();
             // Tell the client about the dismount before the teleport, or it would apply the teleport while still
-            // riding and snap back onto the unit
-            player.connection.sendPacket(new SPacketSetPassengers(session.vehicle));
+            // riding and snap back onto the unit. Watchers too: they'd lose the teleport the same way and, once the
+            // unit is gone, see the (now visible) player standing where it went down.
+            SPacketSetPassengers passengers = new SPacketSetPassengers(session.vehicle);
+            player.connection.sendPacket(passengers);
+            player.getServerWorld().getEntityTracker().sendToTracking(session.vehicle, passengers);
         }
         returnHome(player);
         player.setInvisible(session.wasInvisible);
@@ -224,6 +239,35 @@ public final class RemoteSessions {
         data.removeTag(HOME_TAG);
         player.connection.setPlayerLocation(home.getDouble("X"), home.getDouble("Y"), home.getDouble("Z"), home.getFloat("Yaw"), home.getFloat("Pitch"));
         player.fallDistance = 0;
+        retrackAfterTeleport(player);
+    }
+
+    /**
+     * Vanilla quirk: after a teleport the tracker checks which entities the player should see right away, before the
+     * chunks there count as sent, so it skips them all. Moving entities re-check themselves soon; still ones (launch
+     * ramps, stand-in bodies) stayed invisible until the player walked a few blocks. So for a while after a session
+     * teleport, every chunk sent to the player triggers a fresh check.
+     */
+    private static void retrackAfterTeleport(EntityPlayerMP player) {
+        RETRACK_UNTIL.put(player.getUniqueID(), player.server.getTickCounter() + RETRACK_WINDOW_TICKS);
+    }
+
+    @SubscribeEvent
+    public static void onChunkWatch(ChunkWatchEvent.Watch event) {
+        if (RETRACK_UNTIL.containsKey(event.getPlayer().getUniqueID())) {
+            RETRACK_NOW.add(event.getPlayer().getUniqueID());
+        }
+    }
+
+    private static void retrackWatchers(MinecraftServer server) {
+        for (UUID playerId : RETRACK_NOW) {
+            EntityPlayerMP player = server.getPlayerList().getPlayerByUUID(playerId);
+            if (player != null) {
+                player.getServerWorld().getEntityTracker().updateVisibility(player);
+            }
+        }
+        RETRACK_NOW.clear();
+        RETRACK_UNTIL.values().removeIf(until -> server.getTickCounter() > until);
     }
 
     public static boolean isRemote(EntityPlayer player) {
@@ -291,7 +335,14 @@ public final class RemoteSessions {
 
     @SubscribeEvent
     public static void onServerTick(TickEvent.ServerTickEvent event) {
-        if (event.phase != TickEvent.Phase.END || SESSIONS.isEmpty()) {
+        if (event.phase != TickEvent.Phase.END) {
+            return;
+        }
+        MinecraftServer server = FMLCommonHandler.instance().getMinecraftServerInstance();
+        if (server != null && !RETRACK_UNTIL.isEmpty()) {
+            retrackWatchers(server);
+        }
+        if (SESSIONS.isEmpty()) {
             return;
         }
         for (Session session : new ArrayList<>(SESSIONS.values())) {

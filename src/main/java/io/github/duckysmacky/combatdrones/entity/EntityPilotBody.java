@@ -11,6 +11,7 @@ import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.network.datasync.DataParameter;
 import net.minecraft.network.datasync.DataSerializers;
 import net.minecraft.network.datasync.EntityDataManager;
+import net.minecraft.scoreboard.Team;
 import net.minecraft.util.DamageSource;
 import net.minecraft.util.EnumHandSide;
 import net.minecraft.util.NonNullList;
@@ -92,6 +93,18 @@ public class EntityPilotBody extends EntityLivingBase {
             ForgeChunkManager.releaseTicket(chunkTicket);
             chunkTicket = null;
         }
+    }
+
+    /**
+     * The owner's scoreboard team (vanilla keeps teams by player name, which is the body's name tag). Without it the
+     * always-on name tag ignored the team's nametagVisibility and showed to enemies; this also gives it the team's
+     * colour and prefix, just like the player.
+     */
+    @Nullable
+    @Override
+    public Team getTeam() {
+        String name = getCustomNameTag();
+        return name.isEmpty() ? null : world.getScoreboard().getPlayersTeam(name);
     }
 
     /** Every hit lands on the real player; the body itself never loses health. */
