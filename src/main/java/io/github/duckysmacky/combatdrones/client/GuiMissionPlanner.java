@@ -21,6 +21,7 @@ import net.minecraft.client.renderer.Tessellator;
 import net.minecraft.client.renderer.vertex.DefaultVertexFormats;
 import net.minecraft.client.resources.I18n;
 import net.minecraft.entity.Entity;
+import net.minecraft.world.border.WorldBorder;
 import org.lwjgl.input.Keyboard;
 import org.lwjgl.input.Mouse;
 import org.lwjgl.opengl.GL11;
@@ -70,6 +71,7 @@ public class GuiMissionPlanner extends GuiScreen {
     private static final int BUTTON_MARK = 12;
     private static final int TARGET_COLOR = 0xFFFF4040;
     private static final int LOCKED_COLOR = 0xFFFF2020;
+    private static final int BORDER_COLOR = 0xC0FF5050;
 
     private PlannerOpenPacket view;
     /** Index into view.units of the unit being edited (always 0 in ramp mode). */
@@ -354,6 +356,7 @@ public class GuiMissionPlanner extends GuiScreen {
         BufferBuilder buffer = tessellator.getBuffer();
         buffer.begin(GL11.GL_LINES, DefaultVertexFormats.POSITION_COLOR);
         drawGrid(buffer);
+        drawWorldBorder(buffer);
         if (unit != null) {
             drawRoute(buffer, unit);
             drawTarget(buffer);
@@ -429,6 +432,15 @@ public class GuiMissionPlanner extends GuiScreen {
         for (double worldZ = firstZ; toScreenY(worldZ) <= mapBottom; worldZ += spacing) {
             line(buffer, mapLeft, toScreenY(worldZ), mapRight, toScreenY(worldZ), GRID_COLOR);
         }
+    }
+
+    /** The world border (the playable area), as the client knows it from vanilla's border packet. */
+    private void drawWorldBorder(BufferBuilder buffer) {
+        WorldBorder border = mc.world.getWorldBorder();
+        clippedLine(buffer, border.minX(), border.minZ(), border.maxX(), border.minZ(), BORDER_COLOR);
+        clippedLine(buffer, border.maxX(), border.minZ(), border.maxX(), border.maxZ(), BORDER_COLOR);
+        clippedLine(buffer, border.maxX(), border.maxZ(), border.minX(), border.maxZ(), BORDER_COLOR);
+        clippedLine(buffer, border.minX(), border.maxZ(), border.minX(), border.minZ(), BORDER_COLOR);
     }
 
     /** Destroy target as a red cross, joined to the last waypoint when Destroy is selected. */

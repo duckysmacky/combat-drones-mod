@@ -71,7 +71,10 @@ format); once one is edited there, remove it from `MODELS` in `gen_models.py` so
 ## Server admin
 
 - All balance knobs live in `config/combat_drones.toml`. `/combat_drones config_reload` (op) re-reads it in game
-  and pushes the new drone stats to every player; a file that doesn't parse is rejected and the old values stay.
+  for the server and every player (each client re-reads its own `[client]` options) and lists what changed; a file
+  that doesn't parse is rejected and the old values stay. Players can apply their own `[client]` edits with
+  `/combat_drones reload_client_config`.
+- Drones fly through the world border unless `worldBorderCollision = true`; the Mission Planner map shows the border.
 - Friendly fire follows vanilla teams: drone blasts, shrapnel, gunfire and rockets are credited to the pilot, so
   `/scoreboard teams option <team> friendlyfire false` protects teammates.
 - Recon intel is owner-only by default; `reconIntelForAllies = true` shares it with the owner's scoreboard team

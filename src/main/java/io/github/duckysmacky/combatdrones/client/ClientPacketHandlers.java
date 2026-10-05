@@ -1,5 +1,7 @@
 package io.github.duckysmacky.combatdrones.client;
 
+import io.github.duckysmacky.combatdrones.CombatDrones;
+import io.github.duckysmacky.combatdrones.config.ModConfig;
 import io.github.duckysmacky.combatdrones.entity.EntityHandFlownDrone;
 import io.github.duckysmacky.combatdrones.network.DroneStatePacket;
 import io.github.duckysmacky.combatdrones.network.EffectPacket;
@@ -15,6 +17,8 @@ import io.github.duckysmacky.combatdrones.type.DroneTypes;
 import net.minecraft.client.Minecraft;
 import net.minecraft.entity.Entity;
 import net.minecraft.util.math.Vec3d;
+import net.minecraft.util.text.TextComponentString;
+import net.minecraft.util.text.TextFormatting;
 
 /** Client-side bodies of client-bound packet handlers; only ever invoked on the client thread. */
 public final class ClientPacketHandlers {
@@ -24,6 +28,21 @@ public final class ClientPacketHandlers {
     public static void onTypeSync(TypeSyncPacket packet) {
         DroneTypes.applyServerTypes(packet.getTypesJson());
         packet.applyEquipment();
+    }
+
+    public static void onClientConfigReload() {
+        Minecraft minecraft = Minecraft.getMinecraft();
+        String message;
+        try {
+            ModConfig.reloadClient();
+            message = TextFormatting.GREEN + "[client] options of " + ModConfig.FILE_NAME + " reloaded";
+        } catch (RuntimeException e) {
+            CombatDrones.logger.error("Client config reload failed, keeping the previous values", e);
+            message = TextFormatting.RED + "Couldn't reload " + ModConfig.FILE_NAME + ", keeping the previous values: " + e.getMessage();
+        }
+        if (minecraft.player != null) {
+            minecraft.player.sendMessage(new TextComponentString(message));
+        }
     }
 
     public static void onPlannerOpen(PlannerOpenPacket packet) {

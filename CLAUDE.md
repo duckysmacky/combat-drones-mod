@@ -131,6 +131,9 @@ Everything tunable lives in **one TOML file**, `config/combat_drones.toml`
 `[general]` section for global server knobs, `[client]` for per-player
 options, and `[drones.<id>]` for per-type numeric stats, which default to the
 bundled `assets/combat_drones/drone_types/<id>.json`. Missing keys are written
-back with defaults, and the server's drone stats are synced to clients on
-login. Balance numbers never get hardcoded. See `docs/GAMEPLAY_SPEC.md` →
+back with defaults, and the server's drone stats (plus the few server settings
+client prediction needs, in `TypeSyncPacket`) are synced to clients on login.
+`/combat_drones config_reload` (op) reloads the server and makes every client
+re-read its own `[client]` table; `/combat_drones reload_client_config` does
+just the sender's `[client]`. Balance numbers never get hardcoded. See `docs/GAMEPLAY_SPEC.md` →
 Config for the full list of expected knobs.

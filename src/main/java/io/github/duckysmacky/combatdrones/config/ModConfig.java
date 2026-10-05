@@ -14,7 +14,9 @@ import javax.annotation.Nullable;
 import java.io.File;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -24,7 +26,8 @@ import java.util.Map;
  *
  * <ul>
  *   <li>{@code [general]}: global server balance knobs.</li>
- *   <li>{@code [client]}: options for your own client only; a server ignores them.</li>
+ *   <li>{@code [client]}: options for your own client only; a server ignores them. Re-read alone by
+ *       {@link #reloadClient}.</li>
  *   <li>{@code [batteries.<size>]}: battery pack capacity and weight multipliers, synced to clients.</li>
  *   <li>{@code [bombs.<size>]}: bomb bay size, blast power and weight, synced to clients.</li>
  *   <li>{@code [drones.<id>]}: per-type balance stats, defaulting to the bundled drone type data. The server's
@@ -58,6 +61,7 @@ public final class ModConfig {
     public static boolean reconIntelForAllies = false;
     public static double boostSpeedMultiplier = 1.5;
     public static double boostFuelMultiplier = 4.0;
+    public static boolean worldBorderCollision = false;
 
     // [weapons]
     public static int roundsPerRifleItem = 16;
@@ -114,9 +118,10 @@ public final class ModConfig {
     /**
      * Re-reads the file in game: back to compiled defaults and bundled drone stats, then load as at startup. If the
      * file can't be read (a TOML syntax error, say), everything goes back to the values in use before and the error
-     * is rethrown for the caller to report.
+     * is rethrown for the caller to report. Returns the settings that changed, as "name: old -> new" (drone, battery
+     * and bomb tables aren't listed).
      */
-    public static void reload() {
+    public static List<String> reload() {
         if (configDirectory == null) {
             throw new IllegalStateException("Config was never loaded");
         }
@@ -131,6 +136,33 @@ public final class ModConfig {
             DroneTypes.restore(previousTypes);
             throw e;
         }
+        List<String> changes = new ArrayList<>();
+        for (Map.Entry<Field, Object> now : currentValues().entrySet()) {
+            Object before = previous.get(now.getKey());
+            if (!now.getValue().equals(before)) {
+                changes.add(now.getKey().getName() + ": " + before + " -> " + now.getValue());
+            }
+        }
+        return changes;
+    }
+
+    /**
+     * Client: re-reads only the {@code [client]} table of this client's own file. Everything else on a client comes
+     * from the server it's connected to (or, in single player, from the full reload the integrated server just did).
+     */
+    public static void reloadClient() {
+        if (configDirectory == null) {
+            throw new IllegalStateException("Config was never loaded");
+        }
+        try (CommentedFileConfig config = open(new File(configDirectory, FILE_NAME))) {
+            config.load();
+            Defaults defaults = new Defaults(config);
+            loadClient(defaults);
+            defaults.comment("client", CLIENT_COMMENT);
+            if (defaults.changed) {
+                config.save();
+            }
+        }
     }
 
     public static RouteValidator.Limits routeLimits() {
@@ -141,7 +173,7 @@ public final class ModConfig {
     public static void load(File configDir) {
         configDirectory = configDir;
         File file = new File(configDir, FILE_NAME);
-        try (CommentedFileConfig config = CommentedFileConfig.builder(file, TomlFormat.instance()).preserveInsertionOrder().sync().build()) {
+        try (CommentedFileConfig config = open(file)) {
             config.load();
             Defaults defaults = new Defaults(config);
 
@@ -184,6 +216,8 @@ public final class ModConfig {
                     "Top speed multiplier while a remotely controlled loitering munition boosts (Space).");
             boostFuelMultiplier = defaults.number("general.boostFuelMultiplier", boostFuelMultiplier, 1, 20,
                     "Fuel burn multiplier while boosting.");
+            worldBorderCollision = defaults.get("general.worldBorderCollision", worldBorderCollision,
+                    "Whether drones and ramp units collide with (and crash into) the world border. Off: they fly through it.");
             droneDamageTakenMultiplier = defaults.number("general.droneDamageTakenMultiplier", droneDamageTakenMultiplier, 0, 10,
                     "Multiplies all damage drones take from attacks (weapons, arrows, melee). Lower = harder to shoot down.");
 
@@ -200,11 +234,7 @@ public final class ModConfig {
             gunHitMargin = defaults.number("weapons.gunHitMargin", gunHitMargin, 0, 2,
                     "Blocks added around targets' hitboxes for gun rounds, so fast passes still connect.");
 
-            invertMousePitch = defaults.get("client.invertMousePitch", invertMousePitch, "Invert vertical mouse movement when flying a drone in FPV.");
-            planeMouseSensitivity = defaults.number("client.planeMouseSensitivity", planeMouseSensitivity, 0.1, 5,
-                    "Mouse sensitivity when flying a ramp unit by hand (1 = default).");
-            staticIntensity = defaults.number("client.staticIntensity", staticIntensity, 0, 1,
-                    "Strength of the analog-goggle static while flying (0 = off). It grows as the signal weakens.");
+            loadClient(defaults);
 
             for (BatteryPack pack : BatteryPack.values()) {
                 String table = "batteries." + pack.key();
@@ -228,7 +258,7 @@ public final class ModConfig {
             // Table comments last: a comment can only attach to a table that exists
             defaults.comment("general", "Global balance settings. On a server these apply to everyone.");
             defaults.comment("weapons", "Gunship Plane weapons, fired only under manual control.");
-            defaults.comment("client", "Options for your own client only.");
+            defaults.comment("client", CLIENT_COMMENT);
             defaults.comment("batteries", "Battery pack sizes for hand-flown drones. capacityMultiplier scales a drone's base capacity "
                     + "(defined for a Standard pack); performanceMultiplier scales its top speed and acceleration (pack weight).");
             defaults.comment("bombs", "Bombs for DJI-style drones. bayUnits: space taken in a drone's bomb bay (its payloadCapacity); "
@@ -247,6 +277,31 @@ public final class ModConfig {
                 config.save();
             }
         }
+    }
+
+    private static Object compiledDefault(String fieldName) {
+        for (Map.Entry<Field, Object> entry : COMPILED_DEFAULTS.entrySet()) {
+            if (entry.getKey().getName().equals(fieldName)) {
+                return entry.getValue();
+            }
+        }
+        throw new IllegalArgumentException("No config field " + fieldName);
+    }
+
+    private static CommentedFileConfig open(File file) {
+        return CommentedFileConfig.builder(file, TomlFormat.instance()).preserveInsertionOrder().sync().build();
+    }
+
+    /**
+     * Falls back on compiled defaults rather than current values: {@link #reloadClient} can't reset the shared statics
+     * first, since in single player the integrated server reads them at the same time.
+     */
+    private static void loadClient(Defaults defaults) {
+        invertMousePitch = defaults.get("client.invertMousePitch", (Boolean) compiledDefault("invertMousePitch"), "Invert vertical mouse movement when flying a drone in FPV.");
+        planeMouseSensitivity = defaults.number("client.planeMouseSensitivity", (Double) compiledDefault("planeMouseSensitivity"), 0.1, 5,
+                "Mouse sensitivity when flying a ramp unit by hand (1 = default).");
+        staticIntensity = defaults.number("client.staticIntensity", (Double) compiledDefault("staticIntensity"), 0, 1,
+                "Strength of the analog-goggle static while flying (0 = off). It grows as the signal weakens.");
     }
 
     private static void applyDroneTable(Defaults defaults, DroneType type) {
@@ -275,6 +330,8 @@ public final class ModConfig {
     }
 
     private static final String DEFAULT_MARK = "Default: ";
+    private static final String CLIENT_COMMENT = "Options for your own client only. Apply edits with /combat_drones reload_client_config "
+            + "(an op's config_reload also reloads everyone's).";
 
     /**
      * Whether a stored value should follow the (possibly new) default: yes if it still equals the default recorded

@@ -1,6 +1,7 @@
 package io.github.duckysmacky.combatdrones.network;
 
 import io.github.duckysmacky.combatdrones.client.ClientPacketHandlers;
+import io.github.duckysmacky.combatdrones.config.ModConfig;
 import io.github.duckysmacky.combatdrones.type.BatteryPack;
 import io.github.duckysmacky.combatdrones.type.BombType;
 import io.github.duckysmacky.combatdrones.type.DroneType;
@@ -15,7 +16,10 @@ import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-/** Server to client on login: every drone type as JSON keyed by ID, plus battery pack and bomb values. */
+/**
+ * Server to client on login and config reload: every drone type as JSON keyed by ID, battery pack and bomb values, and
+ * the server settings client-side prediction depends on.
+ */
 public class TypeSyncPacket implements IMessage {
     private final Map<String, String> typesJson = new LinkedHashMap<>();
     private final double[] packCapacity = new double[BatteryPack.values().length];
@@ -23,6 +27,7 @@ public class TypeSyncPacket implements IMessage {
     private final int[] bombBayUnits = new int[BombType.values().length];
     private final double[] bombBlast = new double[BombType.values().length];
     private final double[] bombWeight = new double[BombType.values().length];
+    private boolean worldBorderCollision;
 
     public TypeSyncPacket() {
     }
@@ -40,9 +45,10 @@ public class TypeSyncPacket implements IMessage {
             bombBlast[bomb.ordinal()] = bomb.getBlastPower();
             bombWeight[bomb.ordinal()] = bomb.getWeight();
         }
+        worldBorderCollision = ModConfig.worldBorderCollision;
     }
 
-    /** Client side: adopt the server's battery pack and bomb values. */
+    /** Client side: adopt the server's battery pack and bomb values and synced settings. */
     public void applyEquipment() {
         for (BatteryPack pack : BatteryPack.values()) {
             pack.setMultipliers(packCapacity[pack.ordinal()], packPerformance[pack.ordinal()]);
@@ -50,6 +56,7 @@ public class TypeSyncPacket implements IMessage {
         for (BombType bomb : BombType.values()) {
             bomb.set(bombBayUnits[bomb.ordinal()], bombBlast[bomb.ordinal()], bombWeight[bomb.ordinal()]);
         }
+        ModConfig.worldBorderCollision = worldBorderCollision;
     }
 
     public Map<String, String> getTypesJson() {
@@ -72,6 +79,7 @@ public class TypeSyncPacket implements IMessage {
             bombBlast[index] = Math.max(0, Math.min(20, buf.readDouble()));
             bombWeight[index] = Math.max(0, Math.min(0.5, buf.readDouble()));
         }
+        worldBorderCollision = buf.readBoolean();
     }
 
     @Override
@@ -90,6 +98,7 @@ public class TypeSyncPacket implements IMessage {
             buf.writeDouble(bombBlast[index]);
             buf.writeDouble(bombWeight[index]);
         }
+        buf.writeBoolean(worldBorderCollision);
     }
 
     public static class Handler implements IMessageHandler<TypeSyncPacket, IMessage> {
