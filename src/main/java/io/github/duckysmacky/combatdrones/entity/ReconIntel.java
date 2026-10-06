@@ -162,7 +162,8 @@ public final class ReconIntel {
     static boolean hasLineOfSight(World world, Vec3d from, Entity target) {
         Vec3d eyes = new Vec3d(target.posX, target.posY + target.getEyeHeight(), target.posZ);
         Vec3d middle = new Vec3d(target.posX, target.posY + target.height / 2, target.posZ);
-        return world.rayTraceBlocks(from, eyes, false, true, false) == null || world.rayTraceBlocks(from, middle, false, true, false) == null;
+        // Raytrace.blocks: vanilla's raytrace gives up past ~115 blocks diagonally and would report a clear view
+        return Raytrace.blocks(world, from, eyes) == null || Raytrace.blocks(world, from, middle) == null;
     }
 
     /** Active lock: the target is tracked live for activeLockDurationSeconds. */

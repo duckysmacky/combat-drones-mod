@@ -18,6 +18,7 @@ import net.minecraft.client.entity.EntityPlayerSP;
 import net.minecraft.client.gui.GuiIngameMenu;
 import net.minecraft.entity.Entity;
 import net.minecraft.util.MovementInput;
+import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.RayTraceResult;
 import net.minecraft.util.math.Vec3d;
@@ -46,8 +47,10 @@ public final class RemoteController {
     /** Camera tilt limits (vanilla pitch convention: positive = down); it pans all the way round. */
     private static final float LOOK_UP_LIMIT = -30.0F;
     private static final float LOOK_DOWN_LIMIT = 90.0F;
-    /** How far the camera looks for something to hold on to when you aim it. */
-    private static final double ANCHOR_RANGE = 256.0;
+    /** How far the camera looks for a block or entity to hold on to when you aim it. */
+    private static final double ANCHOR_RANGE = 512.0;
+    /** How far the camera holds on to an estimated ground point when the line finds nothing (unloaded terrain). */
+    private static final double GROUND_FALLBACK_RANGE = 2048.0;
     private static final int MAX_ZOOM = 8;
     /** Mouse pushes a virtual stick (degrees -> stick units) that springs back to centre, like FPV angle mode. */
     private static final double MOUSE_STICK_GAIN = 1.0 / 15.0;
@@ -321,12 +324,30 @@ public final class RemoteController {
         cameraPitch = Math.min(LOOK_DOWN_LIMIT, pitch);
     }
 
-    /** Picks what's under the crosshair to hold on to: an entity, else the block it hits, else nothing. */
+    /**
+     * Picks what's under the crosshair to hold on to: an entity, else the block it hits, else (aiming below the horizon
+     * at terrain this client hasn't loaded) the point where the line meets the ground level under the unit, else
+     * nothing (the sky).
+     */
     private static void reanchor(Vec3d eye) {
-        Vec3d end = eye.add(Vec3d.fromPitchYaw(cameraPitch, cameraYaw).scale(ANCHOR_RANGE));
-        RayTraceResult hit = Raytrace.firstResult(unit.world, eye, end, unit);
+        Vec3d direction = Vec3d.fromPitchYaw(cameraPitch, cameraYaw);
+        RayTraceResult hit = Raytrace.firstResult(unit.world, eye, eye.add(direction.scale(ANCHOR_RANGE)), unit);
         anchorEntity = hit != null ? hit.entityHit : null;
-        anchorPoint = hit != null && hit.entityHit == null ? hit.hitVec : null;
+        anchorPoint = hit != null ? (hit.entityHit == null ? hit.hitVec : null) : groundPoint(eye, direction);
+    }
+
+    /**
+     * Where the line from {@code eye} meets the ground height under the unit (its own chunk is always loaded), or null
+     * when it never comes down that far.
+     */
+    @Nullable
+    private static Vec3d groundPoint(Vec3d eye, Vec3d direction) {
+        double groundY = unit.world.getHeight(new BlockPos(unit)).getY();
+        if (direction.y > -1e-3 || eye.y <= groundY) {
+            return null;
+        }
+        double distance = (eye.y - groundY) / -direction.y;
+        return distance > GROUND_FALLBACK_RANGE ? null : eye.add(direction.scale(distance));
     }
 
     /** Mouse movement since the last call, in degrees (x right, y down), for the stick. */

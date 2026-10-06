@@ -53,6 +53,7 @@ public final class ModConfig {
     public static double minLaunchFuel = 0.25;
     public static double lowFuelFraction = 0.15;
     public static double maxMarkDistance = 256.0;
+    public static double designateRange = 512.0;
     public static double detectionSweepRadius = 64.0;
     public static double detectionDecaySeconds = 15.0;
     public static double activeLockRange = 192.0;
@@ -202,7 +203,10 @@ public final class ModConfig {
             lowFuelFraction = defaults.number("general.lowFuelFraction", lowFuelFraction, 0, 1,
                     "Fuel share at which a loitering unit stops circling: munitions dive on their last waypoint, planes fly home and land.");
             maxMarkDistance = defaults.number("general.maxMarkDistance", maxMarkDistance, 16, 1024,
-                    "How far a target can be marked with the Mission Planner, or designated from a munition's camera, in blocks.");
+                    "How far a target can be marked with the Mission Planner, in blocks.");
+            designateRange = defaults.number("general.designateRange", designateRange, 16, 1024,
+                    "How far a point can be clicked from a click-designate munition's camera (light munition), in blocks. Long clicks "
+                            + "may load the chunks along the line on the server.");
             detectionSweepRadius = defaults.number("general.detectionSweepRadius", detectionSweepRadius, 8, 256,
                     "How far a recon UAV spots players in its line of sight, in blocks (half against sneaking players).");
             detectionDecaySeconds = defaults.number("general.detectionDecaySeconds", detectionDecaySeconds, 1, 600,

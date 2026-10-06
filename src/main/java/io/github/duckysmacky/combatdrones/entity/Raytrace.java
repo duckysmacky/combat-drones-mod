@@ -10,7 +10,30 @@ import javax.annotation.Nullable;
 
 /** Line-of-fire checks that see both blocks and entities (vanilla's block raytrace ignores entities). */
 public final class Raytrace {
+    /** Longest leg handed to vanilla's block raytrace: it gives up after 200 block steps (~115 blocks diagonally). */
+    private static final double LEG_LENGTH = 64.0;
+
     private Raytrace() {
+    }
+
+    /**
+     * First block on the line from {@code start} to {@code end}, at any length. Vanilla's raytrace stops after 200 block
+     * steps and reports a miss, so long lines are traced in legs.
+     */
+    @Nullable
+    public static RayTraceResult blocks(World world, Vec3d start, Vec3d end) {
+        Vec3d line = end.subtract(start);
+        int legs = Math.max(1, (int) Math.ceil(line.length() / LEG_LENGTH));
+        Vec3d from = start;
+        for (int leg = 1; leg <= legs; leg++) {
+            Vec3d to = leg == legs ? end : start.add(line.scale((double) leg / legs));
+            RayTraceResult hit = world.rayTraceBlocks(from, to, false, true, false);
+            if (hit != null) {
+                return hit;
+            }
+            from = to;
+        }
+        return null;
     }
 
     /** Where the line from {@code start} to {@code end} first hits a block or entity, or null if nothing. */
@@ -32,7 +55,7 @@ public final class Raytrace {
     /** As {@link #firstResult(World, Vec3d, Vec3d, Entity)}, with entity hitboxes grown by {@code margin} blocks. */
     @Nullable
     public static RayTraceResult firstResult(World world, Vec3d start, Vec3d end, @Nullable Entity ignored, double margin) {
-        RayTraceResult result = world.rayTraceBlocks(start, end, false, true, false);
+        RayTraceResult result = blocks(world, start, end);
         Vec3d limit = result != null ? result.hitVec : end;
         double best = start.squareDistanceTo(limit);
         AxisAlignedBB area = new AxisAlignedBB(start.x, start.y, start.z, limit.x, limit.y, limit.z).grow(1 + margin);

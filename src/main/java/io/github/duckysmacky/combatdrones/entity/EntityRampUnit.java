@@ -489,7 +489,7 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder {
 
     /**
      * Server: click-designate. Raytraces from the unit along the controller's camera direction (up to
-     * maxMarkDistance) and strikes whatever block or entity it hits first; the point is fixed once picked.
+     * designateRange) and strikes whatever block or entity it hits first; the point is fixed once picked.
      */
     public void designate(EntityPlayerMP sender, Vec3d direction) {
         DroneType type = getDroneType();
@@ -499,7 +499,7 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder {
         }
         designateCooldown = DESIGNATE_COOLDOWN_TICKS;
         Vec3d start = new Vec3d(posX, posY + height / 2, posZ);
-        Vec3d end = start.add(direction.normalize().scale(ModConfig.maxMarkDistance));
+        Vec3d end = start.add(direction.normalize().scale(ModConfig.designateRange));
         Vec3d hit = Raytrace.firstHit(world, start, end, this);
         if (hit == null) {
             sender.sendStatusMessage(new TextComponentTranslation("message.combat_drones.remote.nothing_there"), true);

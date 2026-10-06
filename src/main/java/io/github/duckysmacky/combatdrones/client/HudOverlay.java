@@ -3,6 +3,7 @@ package io.github.duckysmacky.combatdrones.client;
 import io.github.duckysmacky.combatdrones.CombatDrones;
 import io.github.duckysmacky.combatdrones.entity.EntityHandFlownDrone;
 import io.github.duckysmacky.combatdrones.entity.EntityRampUnit;
+import io.github.duckysmacky.combatdrones.entity.Raytrace;
 import io.github.duckysmacky.combatdrones.physics.HandFlownFlight;
 import io.github.duckysmacky.combatdrones.type.BatteryPack;
 import io.github.duckysmacky.combatdrones.type.BombType;
@@ -368,7 +369,7 @@ public final class HudOverlay {
     /** Height above the first solid block below the drone, or -1 if there's none within range. */
     private static double altitudeAboveGround(Minecraft minecraft, Entity entity) {
         Vec3d from = new Vec3d(entity.posX, entity.posY, entity.posZ);
-        RayTraceResult hit = minecraft.world.rayTraceBlocks(from, from.add(0, -ALTIMETER_RANGE, 0), false, true, false);
+        RayTraceResult hit = Raytrace.blocks(minecraft.world, from, from.add(0, -ALTIMETER_RANGE, 0));
         return hit == null || hit.typeOfHit != RayTraceResult.Type.BLOCK ? -1 : entity.posY - hit.hitVec.y;
     }
 
