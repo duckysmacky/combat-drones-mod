@@ -77,5 +77,7 @@ format); once one is edited there, remove it from `MODELS` in `gen_models.py` so
 - Drones fly through the world border unless `worldBorderCollision = true`; the Mission Planner map shows the border.
 - Friendly fire follows vanilla teams: drone blasts, shrapnel, gunfire and rockets are credited to the pilot, so
   `/scoreboard teams option <team> friendlyfire false` protects teammates.
-- Recon intel is owner-only by default; `reconIntelForAllies = true` shares it with the owner's scoreboard team
-  (leave it off for free-for-all games that put everyone on one team).
+- Recon intel is shared with the owner's scoreboard team: `reconIntelForAllies` (sightings) and `activeLockForAllies`
+  (locks, boxed in the world while the owner watches through the UAV; always with `alwaysShowActiveLock`). Teams in
+  `ignoredTeams` (default `["ffa"]`, for free-for-all games that put everyone on one team) aren't teammates: they spot
+  each other and share nothing.

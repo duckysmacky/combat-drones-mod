@@ -12,7 +12,10 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-/** Server to a unit owner: everything their recon currently has spotted (replaces the previous list). */
+/**
+ * Server to a player: everything their own (or their teammates') recon has spotted that they may see. Replaces the
+ * previous list.
+ */
 public class IntelPacket implements IMessage {
     private static final int MAX_ENTRIES = 64;
 
@@ -24,14 +27,17 @@ public class IntelPacket implements IMessage {
         public final boolean locked;
         /** 1 = fresh (or locked), falling to 0 as a passive sighting goes stale. */
         public final float freshness;
+        /** A lock shown in the world even outside a camera (the owner is watching through the UAV, or alwaysShowActiveLock). */
+        public final boolean inWorld;
 
-        public Entry(double x, double y, double z, String name, boolean locked, float freshness) {
+        public Entry(double x, double y, double z, String name, boolean locked, float freshness, boolean inWorld) {
             this.x = x;
             this.y = y;
             this.z = z;
             this.name = name;
             this.locked = locked;
             this.freshness = freshness;
+            this.inWorld = inWorld;
         }
     }
 
@@ -53,7 +59,8 @@ public class IntelPacket implements IMessage {
         int count = Math.min(buf.readUnsignedByte(), MAX_ENTRIES);
         entries = new ArrayList<>(count);
         for (int index = 0; index < count; index++) {
-            entries.add(new Entry(buf.readDouble(), buf.readDouble(), buf.readDouble(), ByteBufUtils.readUTF8String(buf), buf.readBoolean(), buf.readFloat()));
+            entries.add(new Entry(buf.readDouble(), buf.readDouble(), buf.readDouble(), ByteBufUtils.readUTF8String(buf), buf.readBoolean(), buf.readFloat(),
+                    buf.readBoolean()));
         }
     }
 
@@ -68,6 +75,7 @@ public class IntelPacket implements IMessage {
             ByteBufUtils.writeUTF8String(buf, entry.name);
             buf.writeBoolean(entry.locked);
             buf.writeFloat(entry.freshness);
+            buf.writeBoolean(entry.inWorld);
         }
     }
 

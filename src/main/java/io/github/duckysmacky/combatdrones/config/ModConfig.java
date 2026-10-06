@@ -15,6 +15,7 @@ import java.io.File;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -58,7 +59,10 @@ public final class ModConfig {
     public static double lockConeDegrees = 6.0;
     public static int activeLockHoldTicks = 30;
     public static double activeLockDurationSeconds = 60.0;
-    public static boolean reconIntelForAllies = false;
+    public static boolean reconIntelForAllies = true;
+    public static boolean activeLockForAllies = true;
+    public static boolean alwaysShowActiveLock = false;
+    public static List<String> ignoredTeams = Collections.singletonList("ffa");
     public static double boostSpeedMultiplier = 1.5;
     public static double boostFuelMultiplier = 4.0;
     public static boolean worldBorderCollision = false;
@@ -96,7 +100,7 @@ public final class ModConfig {
         Map<Field, Object> values = new LinkedHashMap<>();
         for (Field field : ModConfig.class.getDeclaredFields()) {
             int modifiers = field.getModifiers();
-            if (Modifier.isStatic(modifiers) && !Modifier.isFinal(modifiers) && field.getType().isPrimitive()) {
+            if (Modifier.isStatic(modifiers) && !Modifier.isFinal(modifiers) && (field.getType().isPrimitive() || field.getType() == List.class)) {
                 try {
                     values.put(field, field.get(null));
                 } catch (IllegalAccessException e) {
@@ -212,8 +216,16 @@ public final class ModConfig {
             activeLockDurationSeconds = defaults.number("general.activeLockDurationSeconds", activeLockDurationSeconds, 1, 600,
                     "How long a locked player is tracked live on the owner's map and cameras, in seconds.");
             reconIntelForAllies = defaults.get("general.reconIntelForAllies", reconIntelForAllies,
-                    "Share recon UAV intel (spotted players) with the owner's vanilla scoreboard teammates, who are then never "
-                            + "spotted themselves. Off: only the owner sees it (use this for free-for-all games that put everyone on one team).");
+                    "Share recon UAV sightings (spotted players, on the planner map and in their own cameras) with the owner's vanilla "
+                            + "scoreboard teammates. Off: only the owner sees them.");
+            activeLockForAllies = defaults.get("general.activeLockForAllies", activeLockForAllies,
+                    "Share active locks (players locked from the recon camera, tracked live) with the owner's teammates. They see the "
+                            + "locked player boxed in the world while the owner is in the UAV camera.");
+            alwaysShowActiveLock = defaults.get("general.alwaysShowActiveLock", alwaysShowActiveLock,
+                    "Keep locked players boxed in the world for the whole lock, even after the owner leaves the UAV camera.");
+            ignoredTeams = defaults.list("general.ignoredTeams", ignoredTeams,
+                    "Scoreboard teams (case-insensitive) whose members aren't teammates for recon: they spot and lock each other and "
+                            + "share nothing. For free-for-all games that put everyone on one team.");
             boostSpeedMultiplier = defaults.number("general.boostSpeedMultiplier", boostSpeedMultiplier, 1, 4,
                     "Top speed multiplier while a remotely controlled loitering munition boosts (Space).");
             boostFuelMultiplier = defaults.number("general.boostFuelMultiplier", boostFuelMultiplier, 1, 20,
@@ -393,6 +405,19 @@ public final class ModConfig {
 
         boolean get(String path, boolean fallback, String description) {
             return (Boolean) track(path, fallback, description, Boolean.class, false);
+        }
+
+        /** A list of strings, kept unmodifiable; anything else in the list resets it to the default. */
+        @SuppressWarnings("unchecked")
+        List<String> list(String path, List<String> fallback, String description) {
+            List<Object> value = (List<Object>) track(path, fallback, description, List.class, false);
+            for (Object element : value) {
+                if (!(element instanceof String)) {
+                    CombatDrones.logger.error("{} in {} must list only strings, using {}", path, FILE_NAME, fallback);
+                    return fallback;
+                }
+            }
+            return Collections.unmodifiableList(new ArrayList<>((List<String>) (List<?>) value));
         }
 
         double number(String path, double fallback, double min, double max, @Nullable String description) {

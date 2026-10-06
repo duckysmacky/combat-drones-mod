@@ -9,6 +9,7 @@ import io.github.duckysmacky.combatdrones.type.DroneType;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.EntityPlayerMP;
+import net.minecraft.scoreboard.Team;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraft.util.math.Vec3d;
@@ -31,8 +32,9 @@ import java.util.UUID;
 
 /**
  * Server-side intel from sensor units (the recon UAV): who each owner's recon has spotted, where, and until when.
- * Marks belong to the unit's owner alone. A passive sighting holds the last-seen position for detectionDecaySeconds;
- * an active lock (from the recon camera) follows the target live for activeLockDurationSeconds.
+ * A passive sighting holds the last-seen position for detectionDecaySeconds; an active lock (from the recon camera)
+ * follows the target live for activeLockDurationSeconds. Marks belong to the unit's owner; teammates (same vanilla
+ * team, unless it's in ignoredTeams) get sightings with reconIntelForAllies and locks with activeLockForAllies.
  */
 @Mod.EventBusSubscriber(modid = CombatDrones.MOD_ID)
 public final class ReconIntel {
@@ -45,9 +47,14 @@ public final class ReconIntel {
         final UUID targetId;
         String name;
         int dimension;
+        /** Where the target is: the last sighting, or live while locked. */
         double x;
         double y;
         double z;
+        /** Where it was last actually seen: all a teammate without shared locks gets. */
+        double seenX;
+        double seenY;
+        double seenZ;
         long expiresAt;
         long lockedUntil;
 
@@ -86,7 +93,7 @@ public final class ReconIntel {
 
     /**
      * Whether {@code entity} is someone a recon owned by {@code owner} reports: any visible player (not spectating)
-     * who isn't an ally, or a non-ally's stand-in body. Invisible players, remote pilots riding their units included,
+     * who isn't a teammate, or a non-teammate's stand-in body. Invisible players, remote pilots riding their units included,
      * stay hidden.
      */
     static boolean isEnemy(UUID owner, @Nullable Entity entity) {
@@ -95,7 +102,7 @@ public final class ReconIntel {
         }
         if (entity instanceof EntityPlayer) {
             EntityPlayer player = (EntityPlayer) entity;
-            return !isAlly(owner, player) && !player.isSpectator() && !player.isInvisible();
+            return !isTeammate(owner, player) && !player.isSpectator() && !player.isInvisible();
         }
         if (!(entity instanceof EntityPilotBody)) {
             return false;
@@ -107,23 +114,33 @@ public final class ReconIntel {
         // Bodies only exist while their player is online and remote, so the player can be looked up
         MinecraftServer server = FMLCommonHandler.instance().getMinecraftServerInstance();
         EntityPlayer bodyPlayer = server == null ? null : server.getPlayerList().getPlayerByUUID(bodyOwner);
-        return bodyPlayer == null || !isAlly(owner, bodyPlayer);
+        return bodyPlayer == null || !isTeammate(owner, bodyPlayer);
     }
 
     /**
-     * Whether {@code player} is on {@code owner}'s side for recon intel: the owner, and, with reconIntelForAllies on,
-     * players on the owner's vanilla scoreboard team (off by default: a free-for-all game typically puts everyone on
-     * one team).
+     * Whether {@code player} is on {@code owner}'s side: the owner, or a player on the owner's vanilla scoreboard team,
+     * unless that team is in ignoredTeams (a free-for-all game typically puts everyone on one team). Teammates are never
+     * spotted or locked; whether they get the owner's intel is up to the sharing settings.
      */
-    static boolean isAlly(UUID owner, EntityPlayer player) {
+    static boolean isTeammate(UUID owner, EntityPlayer player) {
         if (owner.equals(player.getUniqueID())) {
             return true;
         }
-        if (!ModConfig.reconIntelForAllies || player.getTeam() == null) {
+        Team team = player.getTeam();
+        if (team == null || isIgnoredTeam(team.getName())) {
             return false;
         }
         String ownerName = nameOf(owner);
-        return ownerName != null && player.getTeam().getMembershipCollection().contains(ownerName);
+        return ownerName != null && team.getMembershipCollection().contains(ownerName);
+    }
+
+    static boolean isIgnoredTeam(String teamName) {
+        for (String ignored : ModConfig.ignoredTeams) {
+            if (ignored.equalsIgnoreCase(teamName)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** The owner's name, even while they're offline (scoreboard teams are kept by name). */
@@ -161,6 +178,9 @@ public final class ReconIntel {
         mark.x = target.posX;
         mark.y = target.posY;
         mark.z = target.posZ;
+        mark.seenX = target.posX;
+        mark.seenY = target.posY;
+        mark.seenZ = target.posZ;
         // A passive sighting never cuts a lock short
         mark.expiresAt = Math.max(mark.expiresAt, now + (long) (ModConfig.detectionDecaySeconds * 20));
         if (lock) {
@@ -213,24 +233,27 @@ public final class ReconIntel {
         }
     }
 
-    /** Sends a player the marks of every recon owner they're allied with (just their own, by default). */
+    /** Sends a player the marks they may see: their own recon's, and their teammates' as far as those are shared. */
     private static void sync(EntityPlayerMP player, long now) {
-        // The same target spotted by several allied recons shows once: the freshest (a lock beats any sighting)
+        // The same target spotted by several recons shows once: the freshest (a lock beats any sighting)
         Map<UUID, IntelPacket.Entry> merged = new HashMap<>();
         for (Map.Entry<UUID, Map<UUID, Mark>> owner : MARKS.entrySet()) {
-            if (!isAlly(owner.getKey(), player)) {
+            boolean own = owner.getKey().equals(player.getUniqueID());
+            if (!own && !isTeammate(owner.getKey(), player)) {
                 continue;
             }
+            boolean ownerViewing = RemoteSessions.isViewingUnit(owner.getKey());
             for (Mark mark : owner.getValue().values()) {
-                if (mark.dimension != player.dimension) {
+                IntelPacket.Entry entry = mark.dimension == player.dimension ? viewOf(mark, now, own, ownerViewing) : null;
+                if (entry == null) {
                     continue;
                 }
-                boolean locked = now <= mark.lockedUntil;
-                float remaining = locked ? 1 : (float) Math.max(0, (mark.expiresAt - now) / (ModConfig.detectionDecaySeconds * 20));
                 IntelPacket.Entry known = merged.get(mark.targetId);
-                if (known == null || (locked && !known.locked) || (locked == known.locked && remaining > known.freshness)) {
-                    merged.put(mark.targetId, new IntelPacket.Entry(mark.x, mark.y, mark.z, mark.name, locked, remaining));
-                }
+                IntelPacket.Entry best = known == null || (entry.locked && !known.locked)
+                        || (entry.locked == known.locked && entry.freshness > known.freshness) ? entry : known;
+                // Shown in the world if any owner's lock on it is
+                boolean inWorld = entry.inWorld || (known != null && known.inWorld);
+                merged.put(mark.targetId, inWorld && !best.inWorld ? withInWorld(best) : best);
             }
         }
         List<IntelPacket.Entry> entries = new ArrayList<>(merged.values());
@@ -244,5 +267,30 @@ public final class ReconIntel {
             SHOWING.add(player.getUniqueID());
         }
         ModNetwork.CHANNEL.sendTo(new IntelPacket(entries), player);
+    }
+
+    /**
+     * What one viewer gets of a mark, or null for nothing: the owner ({@code own}) sees it all; a teammate gets the
+     * lock with activeLockForAllies, else the last sighting with reconIntelForAllies while it's fresh. A lock shows in
+     * the world outside cameras while its owner watches through a UAV ({@code ownerViewing}), or always with
+     * alwaysShowActiveLock.
+     */
+    @Nullable
+    static IntelPacket.Entry viewOf(Mark mark, long now, boolean own, boolean ownerViewing) {
+        boolean locked = now <= mark.lockedUntil;
+        boolean sighted = now <= mark.expiresAt;
+        boolean inWorld = ModConfig.alwaysShowActiveLock || ownerViewing;
+        if (locked && (own || ModConfig.activeLockForAllies)) {
+            return new IntelPacket.Entry(mark.x, mark.y, mark.z, mark.name, true, 1, inWorld);
+        }
+        if (sighted && (own || ModConfig.reconIntelForAllies)) {
+            float freshness = (float) Math.max(0, (mark.expiresAt - now) / (ModConfig.detectionDecaySeconds * 20));
+            return new IntelPacket.Entry(mark.seenX, mark.seenY, mark.seenZ, mark.name, false, freshness, false);
+        }
+        return null;
+    }
+
+    private static IntelPacket.Entry withInWorld(IntelPacket.Entry entry) {
+        return new IntelPacket.Entry(entry.x, entry.y, entry.z, entry.name, entry.locked, entry.freshness, true);
     }
 }

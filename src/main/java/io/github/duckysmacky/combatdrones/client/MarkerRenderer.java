@@ -17,10 +17,14 @@ import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.relauncher.Side;
 import org.lwjgl.opengl.GL11;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * In-world overlays while looking through one of your own units or flying a drone in FPV: a red cross in a square
- * over the point a unit is diving on, and a red box around every player your (or, with reconIntelForAllies, your
- * team's) recon has spotted (brighter and named when locked). Drawn through
+ * over the point a unit is diving on, and a red box around every player your (or your team's) recon has spotted
+ * (brighter and named when locked). On foot only locks the server flags for the world show (their owner is watching
+ * through the UAV, or alwaysShowActiveLock). Drawn through
  * terrain and grown with distance so they stay readable from altitude.
  */
 @Mod.EventBusSubscriber(modid = CombatDrones.MOD_ID, value = Side.CLIENT)
@@ -31,7 +35,15 @@ public final class MarkerRenderer {
     @SubscribeEvent
     public static void onRenderWorldLast(RenderWorldLastEvent event) {
         EntityRampUnit unit = RemoteController.getUnit();
-        if (unit == null && PilotController.getPilotedDrone() == null) {
+        // Through a camera every mark shows; on foot only locks flagged for the world
+        boolean inCamera = unit != null || PilotController.getPilotedDrone() != null;
+        List<IntelPacket.Entry> marks = new ArrayList<>();
+        for (IntelPacket.Entry mark : marks) {
+            if (inCamera || mark.inWorld) {
+                marks.add(mark);
+            }
+        }
+        if (!inCamera && marks.isEmpty()) {
             return;
         }
         RenderManager renderManager = Minecraft.getMinecraft().getRenderManager();
@@ -51,7 +63,7 @@ public final class MarkerRenderer {
             strikeCross(buffer, point.getX() + 0.5 - renderManager.viewerPosX, point.getY() + 0.05 - renderManager.viewerPosY,
                     point.getZ() + 0.5 - renderManager.viewerPosZ);
         }
-        for (IntelPacket.Entry mark : ClientIntel.getMarks()) {
+        for (IntelPacket.Entry mark : marks) {
             float alpha = mark.locked ? 1.0F : 0.35F + 0.5F * Math.max(0, Math.min(1, mark.freshness));
             box(buffer, mark.x - renderManager.viewerPosX, mark.y - renderManager.viewerPosY, mark.z - renderManager.viewerPosZ, alpha);
         }
@@ -59,7 +71,7 @@ public final class MarkerRenderer {
         GlStateManager.glLineWidth(1.0F);
         GlStateManager.enableTexture2D();
         // Names of locked targets, as nameplates facing the camera
-        for (IntelPacket.Entry mark : ClientIntel.getMarks()) {
+        for (IntelPacket.Entry mark : marks) {
             if (mark.locked) {
                 double x = mark.x - renderManager.viewerPosX;
                 double y = mark.y - renderManager.viewerPosY;

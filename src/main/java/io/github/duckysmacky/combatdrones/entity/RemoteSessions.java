@@ -180,6 +180,12 @@ public final class RemoteSessions {
         return new Vec3d(home.getDouble("X"), home.getDouble("Y"), home.getDouble("Z"));
     }
 
+    /** True while the player (online or not, by ID) watches or flies one of their ramp units (not an FPV drone). */
+    static boolean isViewingUnit(UUID playerId) {
+        Session session = SESSIONS.get(playerId);
+        return session != null && !session.drone;
+    }
+
     /** True while the player flies a hand-flown drone from a body (as opposed to a ramp unit session). */
     public static boolean isDroneSession(EntityPlayer player) {
         Session session = SESSIONS.get(player.getUniqueID());
