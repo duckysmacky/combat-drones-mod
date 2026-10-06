@@ -170,5 +170,40 @@
       "combat_drones:explosion/far3",
       "combat_drones:explosion/far4"
     ]
+  },
+  "missile.ignition": {
+    "category": "neutral",
+    "subtitle": "subtitles.combat_drones.missile.ignition",
+    "sounds": [
+      "combat_drones:missile/ignition"
+    ]
+  },
+  "missile.liftoff": {
+    "category": "neutral",
+    "subtitle": "subtitles.combat_drones.missile.liftoff",
+    "sounds": [
+      "combat_drones:missile/liftoff"
+    ]
+  },
+  "missile.engine": {
+    "category": "neutral",
+    "subtitle": "subtitles.combat_drones.missile.engine",
+    "sounds": [
+      "combat_drones:missile/engine"
+    ]
+  },
+  "missile.scream": {
+    "category": "neutral",
+    "subtitle": "subtitles.combat_drones.missile.scream",
+    "sounds": [
+      "combat_drones:missile/scream"
+    ]
+  },
+  "missile.alarm": {
+    "category": "master",
+    "subtitle": "subtitles.combat_drones.missile.alarm",
+    "sounds": [
+      "combat_drones:missile/alarm"
+    ]
   }
 }

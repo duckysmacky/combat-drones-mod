@@ -3,6 +3,7 @@ package io.github.duckysmacky.combatdrones.entity;
 import io.github.duckysmacky.combatdrones.CombatDrones;
 import io.github.duckysmacky.combatdrones.ModContent;
 import io.github.duckysmacky.combatdrones.config.ModConfig;
+import io.github.duckysmacky.combatdrones.item.ItemMissileTablet;
 import io.github.duckysmacky.combatdrones.network.LockProgressPacket;
 import io.github.duckysmacky.combatdrones.network.ModNetwork;
 import io.github.duckysmacky.combatdrones.physics.LockTracker;
@@ -107,7 +108,8 @@ public final class RemoteSessions {
     @Nullable
     public static String start(EntityPlayerMP player, EntityRampUnit unit, boolean control) {
         DroneType type = unit.getDroneType();
-        if (unit.isDead || type == null || unit.world != player.world || !player.getUniqueID().equals(unit.getOwner())) {
+        if (unit.isDead || type == null || unit.world != player.world || !player.getUniqueID().equals(unit.getOwner())
+                || type.getCategory() != DroneType.Category.RAMP_AUTOPILOT) {
             return "message.combat_drones.planner.unit_gone";
         }
         if (!isHoldingPlanner(player)) {
@@ -133,6 +135,22 @@ public final class RemoteSessions {
             }
         }
         begin(player, unit, false, control);
+        return null;
+    }
+
+    /**
+     * Server: a cruise missile arriving over its strike point, flown by its owner from the Missile Control Tablet. Returns why
+     * they can't take it (it then dives unguided), or null. Any other session they're in ends first.
+     */
+    @Nullable
+    public static String startMissile(EntityPlayerMP player, EntityCruiseMissile missile) {
+        if (missile.getPadId() == null || !ItemMissileTablet.isHoldingLinked(player, missile.getPadId())) {
+            return "message.combat_drones.tablet.unguided";
+        }
+        if (SESSIONS.containsKey(player.getUniqueID())) {
+            end(player, null);
+        }
+        begin(player, missile, false, true);
         return null;
     }
 
@@ -357,6 +375,15 @@ public final class RemoteSessions {
                 end(player, null);
             } else if (session.vehicle.isDead || session.vehicle.world != player.world) {
                 end(player, "message.combat_drones.remote.unit_lost");
+            } else if (session.vehicle instanceof EntityCruiseMissile) {
+                UUID padId = ((EntityCruiseMissile) session.vehicle).getPadId();
+                if (padId == null || !ItemMissileTablet.isHoldingLinked(player, padId)) {
+                    end(player, "message.combat_drones.remote.need_tablet"); // it dives on, unguided
+                } else if (player.getRidingEntity() != session.vehicle || session.body.isDead) {
+                    end(player, "message.combat_drones.remote.link_lost");
+                } else {
+                    player.setInvisible(true);
+                }
             } else if (!session.drone && !isHoldingPlanner(player)) {
                 // (A drone's own pilot checks run in its tick: goggles, remote, signal from home)
                 end(player, "message.combat_drones.remote.need_planner");

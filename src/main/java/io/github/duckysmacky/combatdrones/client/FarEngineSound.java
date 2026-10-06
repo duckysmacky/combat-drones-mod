@@ -28,9 +28,13 @@ public class FarEngineSound extends MovingSound {
     private double motionZ;
     private boolean boosting;
     private int ticksSinceUpdate;
+    /** A cruise missile coming down: its scream instead of the engine, rising in pitch. */
+    private final boolean diving;
+    private int ticksPlayed;
 
     FarEngineSound(EngineSoundPacket.Entry entry, DroneType type) {
-        super(ModSounds.engine(type.getEngineSound(), ModSounds.UNIT_ENGINE), SoundCategory.NEUTRAL);
+        super(isDive(entry, type) ? ModSounds.MISSILE_SCREAM : ModSounds.engine(type.getEngineSound(), ModSounds.UNIT_ENGINE), SoundCategory.NEUTRAL);
+        this.diving = isDive(entry, type);
         this.entityId = entry.entityId;
         this.type = type;
         repeat = true;
@@ -38,6 +42,10 @@ public class FarEngineSound extends MovingSound {
         volume = (float) Math.max(1.0, type.getMotorSoundRange() / 16.0);
         refresh(entry);
         update();
+    }
+
+    private static boolean isDive(EngineSoundPacket.Entry entry, DroneType type) {
+        return type.getCategory() == DroneType.Category.VERTICAL_STRIKE && entry.motionY < 0;
     }
 
     /** Null if the type is unknown on this client. */
@@ -70,6 +78,10 @@ public class FarEngineSound extends MovingSound {
         xPosF = (float) x;
         yPosF = (float) y;
         zPosF = (float) z;
+        if (diving) {
+            pitch = UnitEngineSound.screamPitch(++ticksPlayed, boosting);
+            return;
+        }
         double speed = Math.sqrt(motionX * motionX + motionY * motionY + motionZ * motionZ);
         double speedFraction = type.getMaxSpeed() <= 0 ? 0.8 : speed / type.getMaxSpeed();
         pitch = 0.8F + 0.4F * (float) Math.max(0, Math.min(1, speedFraction)) + (boosting ? 0.25F : 0);

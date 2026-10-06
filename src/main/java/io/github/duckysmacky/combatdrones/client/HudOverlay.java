@@ -1,6 +1,8 @@
 package io.github.duckysmacky.combatdrones.client;
 
 import io.github.duckysmacky.combatdrones.CombatDrones;
+import io.github.duckysmacky.combatdrones.config.ModConfig;
+import io.github.duckysmacky.combatdrones.entity.EntityCruiseMissile;
 import io.github.duckysmacky.combatdrones.entity.EntityHandFlownDrone;
 import io.github.duckysmacky.combatdrones.entity.EntityRampUnit;
 import io.github.duckysmacky.combatdrones.entity.Raytrace;
@@ -12,6 +14,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.ScaledResolution;
+import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.client.resources.I18n;
 import net.minecraft.entity.Entity;
 import net.minecraft.util.math.MathHelper;
@@ -60,7 +63,16 @@ public final class HudOverlay {
     private static final double HEADING_PIXELS_PER_DEGREE = 1.2;
     private static final int HEADING_TICK = 15;
 
+    /** How long the INBOUND banner stays up (ms). */
+    private static final long STRIKE_ALERT_MILLIS = 6000;
+    private static long strikeAlertUntil;
+
     private HudOverlay() {
+    }
+
+    /** A cruise missile started diving nearby: show the INBOUND banner for a few seconds. */
+    static void showStrikeAlert() {
+        strikeAlertUntil = Minecraft.getSystemTime() + STRIKE_ALERT_MILLIS;
     }
 
     @SubscribeEvent
@@ -74,6 +86,9 @@ public final class HudOverlay {
     public static void onRenderPost(RenderGameOverlayEvent.Post event) {
         if (event.getType() != ElementType.ALL) {
             return;
+        }
+        if (Minecraft.getSystemTime() < strikeAlertUntil) {
+            drawStrikeAlert(event.getResolution());
         }
         EntityRampUnit unit = RemoteController.getUnit();
         if (unit != null) {
@@ -162,6 +177,10 @@ public final class HudOverlay {
         if (type == null) {
             return;
         }
+        if (unit instanceof EntityCruiseMissile) {
+            drawMissileHud(resolution, (EntityCruiseMissile) unit);
+            return;
+        }
         Minecraft minecraft = Minecraft.getMinecraft();
         FontRenderer font = minecraft.fontRenderer;
         int centerX = resolution.getScaledWidth() / 2;
@@ -221,6 +240,65 @@ public final class HudOverlay {
         } else if (fuel < LOW_BATTERY && (minecraft.world.getTotalWorldTime() / 10) % 2 == 0) {
             drawCentered(font, I18n.format("hud.combat_drones.warning.low_fuel"), centerX, centerY + 24, WARNING);
         }
+    }
+
+    /**
+     * Cruise missile dive: speed and altitude ladders, time to impact, BOOST, and a cone gauge (bottom right) showing
+     * how far the nose is tilted off straight down, out to the steering limit.
+     */
+    private static void drawMissileHud(ScaledResolution resolution, EntityCruiseMissile missile) {
+        Minecraft minecraft = Minecraft.getMinecraft();
+        FontRenderer font = minecraft.fontRenderer;
+        int centerX = resolution.getScaledWidth() / 2;
+        int centerY = resolution.getScaledHeight() / 2;
+        int left = centerX - HALF_WIDTH;
+        int right = centerX + HALF_WIDTH;
+        int top = centerY - HALF_HEIGHT;
+        int bottom = centerY + HALF_HEIGHT;
+        double speed = missile.getSyncedSpeed();
+        double altitude = altitudeAboveGround(minecraft, missile);
+
+        drawText(font, I18n.format("hud.combat_drones.mode.missile"), left, top, TEXT);
+        boolean blink = (minecraft.world.getTotalWorldTime() / 10) % 2 == 0;
+        drawText(font, I18n.format("hud.combat_drones.warhead_armed"), left, top + LINE, blink ? WARNING : 0xAA3333);
+        if (missile.isBoosting()) {
+            drawText(font, I18n.format("hud.combat_drones.boost"), left, top + LINE * 2, 0xFFAA00);
+        }
+        if (!missile.isDiving()) {
+            // Holding over the target: big countdown to the dive
+            GlStateManager.pushMatrix();
+            GlStateManager.translate(centerX, centerY - 34, 0);
+            GlStateManager.scale(2, 2, 1);
+            drawCentered(font, I18n.format("hud.combat_drones.arming", (missile.getHoldTicksLeft() + 19) / 20), 0, 0, blink ? WARNING : 0xFFAA00);
+            GlStateManager.popMatrix();
+        } else if (altitude >= 0 && speed > 0.01) {
+            // Vertical closing speed: the nose is never more than the cone off straight down
+            double sink = speed * Math.cos(Math.toRadians(Math.hypot(missile.getTiltForward(), missile.getTiltRight())));
+            String impact = I18n.format("hud.combat_drones.impact_in", String.format(Locale.ROOT, "%.1f", altitude / sink / 20));
+            drawText(font, impact, right - font.getStringWidth(impact), top, WARNING);
+        }
+        drawLadder(font, left, centerY, speed * 72, SPEED_PIXELS_PER_KMH, SPEED_TICK, true);
+        if (altitude >= 0) {
+            drawLadder(font, right, centerY, altitude, ALTITUDE_PIXELS_PER_METER, ALTITUDE_TICK, false);
+        }
+        float health = missile.getHealthFraction();
+        drawText(font, I18n.format("hud.combat_drones.health", percent(health)), left, bottom + 16 + LINE, health < 0.5F ? WARNING : TEXT);
+
+        // Cone gauge: outer ring = steering limit, dot = where the nose points (up = forward on screen)
+        int gaugeX = right - 14;
+        int gaugeY = bottom + 4;
+        int radius = 12;
+        for (int step = 0; step < 32; step++) {
+            double angle = Math.PI * 2 * step / 32;
+            int x = gaugeX + (int) Math.round(Math.cos(angle) * radius);
+            int y = gaugeY + (int) Math.round(Math.sin(angle) * radius);
+            Gui.drawRect(x, y, x + 1, y + 1, LINE_COLOR);
+        }
+        double cone = Math.max(1, ModConfig.steerConeDegrees); // synced from the server
+        int dotX = gaugeX + (int) Math.round(missile.getTiltRight() / cone * radius);
+        int dotY = gaugeY - (int) Math.round(missile.getTiltForward() / cone * radius);
+        Gui.drawRect(dotX - 1, dotY - 1, dotX + 2, dotY + 2, WARNING);
+        drawCrosshair(centerX, centerY);
     }
 
     /** Recon lock: brackets closing in on the crosshair as the lock builds, then LOCKED. */
@@ -364,6 +442,22 @@ public final class HudOverlay {
         if (signal < LOW_SIGNAL) {
             drawCentered(font, I18n.format("hud.combat_drones.warning.low_signal"), centerX, y, WARNING);
         }
+    }
+
+    /** Blinking red banner at the top of the screen, double size: a cruise missile is diving on this area. */
+    private static void drawStrikeAlert(ScaledResolution resolution) {
+        FontRenderer font = Minecraft.getMinecraft().fontRenderer;
+        int centerX = resolution.getScaledWidth() / 2;
+        boolean bright = (Minecraft.getSystemTime() / 250) % 2 == 0;
+        String title = I18n.format("hud.combat_drones.strike_alert");
+        int halfWidth = font.getStringWidth(title) + 12;
+        Gui.drawRect(centerX - halfWidth, 18, centerX + halfWidth, 52, bright ? 0xB0A01010 : 0x90400808);
+        GlStateManager.pushMatrix();
+        GlStateManager.translate(centerX, 22, 0);
+        GlStateManager.scale(2, 2, 1);
+        drawCentered(font, title, 0, 0, bright ? 0xFFFFFF : 0xFFAAAA);
+        GlStateManager.popMatrix();
+        drawCentered(font, I18n.format("hud.combat_drones.strike_alert.sub"), centerX, 41, 0xFFDDDD);
     }
 
     /** Height above the first solid block below the drone, or -1 if there's none within range. */

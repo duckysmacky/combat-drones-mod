@@ -1,8 +1,10 @@
 package io.github.duckysmacky.combatdrones;
 
 import io.github.duckysmacky.combatdrones.entity.EntityBomb;
+import io.github.duckysmacky.combatdrones.entity.EntityCruiseMissile;
 import io.github.duckysmacky.combatdrones.entity.EntityHandFlownDrone;
 import io.github.duckysmacky.combatdrones.entity.EntityLaunchRamp;
+import io.github.duckysmacky.combatdrones.entity.EntityMissilePad;
 import io.github.duckysmacky.combatdrones.entity.EntityPilotBody;
 import io.github.duckysmacky.combatdrones.entity.EntityRampUnit;
 import io.github.duckysmacky.combatdrones.entity.EntityRocket;
@@ -12,8 +14,10 @@ import io.github.duckysmacky.combatdrones.item.ItemBomb;
 import io.github.duckysmacky.combatdrones.item.ItemDrone;
 import io.github.duckysmacky.combatdrones.item.ItemGoggles;
 import io.github.duckysmacky.combatdrones.item.ItemLaunchRamp;
+import io.github.duckysmacky.combatdrones.item.ItemMissilePad;
 import io.github.duckysmacky.combatdrones.item.ItemMissionPlanner;
 import io.github.duckysmacky.combatdrones.item.ItemRemote;
+import io.github.duckysmacky.combatdrones.item.ItemMissileTablet;
 import io.github.duckysmacky.combatdrones.item.ItemWithTooltip;
 import io.github.duckysmacky.combatdrones.type.BatteryPack;
 import io.github.duckysmacky.combatdrones.type.BombType;
@@ -62,7 +66,7 @@ public final class ModContent {
 
     /** Hand-flown, then ramp-launched drones in this order; types not listed go last in their group. */
     private static final List<String> DRONE_TAB_ORDER = Arrays.asList("racer_micro", "racer_standard", "racer_longrange", "dji_drone",
-            "loitering_light", "loitering_heavy", "gunship_rocket", "gunship_gun", "recon_uav");
+            "loitering_light", "loitering_heavy", "gunship_rocket", "gunship_gun", "recon_uav", "cruise_missile");
 
     /**
      * Creative tab position: FPV gear (0+), hand-flown drones (100+), batteries and payloads (200+), ramp gear (400+),
@@ -80,7 +84,7 @@ public final class ModContent {
         List<List<Item>> groups = Arrays.asList(
                 Arrays.asList(fpvRemote, fpvGoggles),
                 Arrays.asList(lightBattery, standardBattery, heavyBattery, fragGrenade, bombLight, bomb, bombHeavy),
-                Arrays.asList(launchRamp, missionPlanner, fuelCan),
+                Arrays.asList(launchRamp, missionPlanner, fuelCan, missilePad, missileTablet),
                 Arrays.asList(rocket, rifleRounds));
         for (int group = 0; group < groups.size(); group++) {
             int index = groups.get(group).indexOf(item);
@@ -99,6 +103,8 @@ public final class ModContent {
     public static final List<Item> ITEMS = new ArrayList<>();
 
     public static Item launchRamp;
+    public static Item missilePad;
+    public static Item missileTablet;
     public static Block rearmStation;
 
     public static Item lightBattery;
@@ -132,6 +138,8 @@ public final class ModContent {
         fpvRemote = register(event, named(new ItemRemote(), "fpv_remote"));
         fpvGoggles = register(event, named(new ItemGoggles(GOGGLES_MATERIAL), "fpv_goggles"));
         missionPlanner = register(event, named(new ItemMissionPlanner(), "mission_planner"));
+        missilePad = register(event, named(new ItemMissilePad(), "missile_pad"));
+        missileTablet = register(event, named(new ItemMissileTablet(), "missile_control_tablet"));
         lightBattery = register(event, named(new ItemBattery(BatteryPack.LIGHT), BatteryPack.LIGHT.itemName()));
         standardBattery = register(event, named(new ItemBattery(BatteryPack.STANDARD), BatteryPack.STANDARD.itemName()));
         heavyBattery = register(event, named(new ItemBattery(BatteryPack.HEAVY), BatteryPack.HEAVY.itemName()));
@@ -154,6 +162,16 @@ public final class ModContent {
         for (RegistryEvent.MissingMappings.Mapping<Block> mapping : event.getAllMappings()) {
             if (mapping.key.equals(new ResourceLocation(CombatDrones.MOD_ID, "launch_ramp"))) {
                 mapping.ignore();
+            }
+        }
+    }
+
+    /** The Missile Control Tablet was briefly the Strike Laptop: those items carry over (link and all). */
+    @SubscribeEvent
+    public static void remapRenamedItems(RegistryEvent.MissingMappings<Item> event) {
+        for (RegistryEvent.MissingMappings.Mapping<Item> mapping : event.getAllMappings()) {
+            if (mapping.key.equals(new ResourceLocation(CombatDrones.MOD_ID, "strike_laptop"))) {
+                mapping.remap(missileTablet);
             }
         }
     }
@@ -198,6 +216,19 @@ public final class ModContent {
                 .id(new ResourceLocation(CombatDrones.MOD_ID, "rocket"), 5)
                 .name(CombatDrones.MOD_ID + ".rocket")
                 .tracker(160, 1, true)
+                .build());
+        event.getRegistry().register(EntityEntryBuilder.create()
+                .entity(EntityMissilePad.class)
+                .id(new ResourceLocation(CombatDrones.MOD_ID, "missile_pad"), 6)
+                .name(CombatDrones.MOD_ID + ".missile_pad")
+                .tracker(160, 20, false)
+                .build());
+        // Seen from far off while it climbs; every tick for the pilot's camera in the dive
+        event.getRegistry().register(EntityEntryBuilder.create()
+                .entity(EntityCruiseMissile.class)
+                .id(new ResourceLocation(CombatDrones.MOD_ID, "cruise_missile"), 7)
+                .name(CombatDrones.MOD_ID + ".cruise_missile")
+                .tracker(256, 1, false)
                 .build());
     }
 

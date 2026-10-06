@@ -1,6 +1,7 @@
 package io.github.duckysmacky.combatdrones.entity;
 
 import io.github.duckysmacky.combatdrones.ModSounds;
+import io.github.duckysmacky.combatdrones.physics.CruiseMissileFlight;
 import io.github.duckysmacky.combatdrones.type.DroneType;
 import net.minecraft.entity.Entity;
 import net.minecraft.util.EnumParticleTypes;
@@ -23,6 +24,10 @@ final class Exhaust {
      * thick smoke and flame, strung along the last tick's path so fast units leave a solid ribbon.
      */
     static void unitTrail(EntityRampUnit unit, DroneType type, boolean boosting) {
+        if (unit instanceof EntityCruiseMissile) {
+            missileTrail((EntityCruiseMissile) unit, boosting);
+            return;
+        }
         World world = unit.world;
         Random random = world.rand;
         Vec3d nose = Vec3d.fromPitchYaw(unit.rotationPitch, unit.rotationYaw);
@@ -44,6 +49,41 @@ final class Exhaust {
                 spawn(world, EnumParticleTypes.SMOKE_NORMAL, interpolate(previous, tail, 0.5), nose.scale(-0.03), random, 0.05);
             }
         }
+    }
+
+    /**
+     * Cruise missile: on the pad, exhaust billowing out sideways from under it; climbing, flame under the tail and a
+     * thick smoke column strung along its path (it should be seen from far away); diving, flame and smoke streaming
+     * up from the tail, heavier while boosting.
+     */
+    private static void missileTrail(EntityCruiseMissile missile, boolean boosting) {
+        World world = missile.world;
+        Random random = world.rand;
+        CruiseMissileFlight.Stage stage = missile.getStage();
+        boolean diving = stage == CruiseMissileFlight.Stage.DIVE;
+        // The tail is the bottom of the upright box while climbing, the top while diving nose-first
+        double tailHeight = diving ? missile.height : 0;
+        Vec3d tail = new Vec3d(missile.posX, missile.posY + tailHeight, missile.posZ);
+        Vec3d previous = new Vec3d(missile.prevPosX, missile.prevPosY + tailHeight, missile.prevPosZ);
+        Vec3d back = new Vec3d(0, diving ? 1 : -1, 0);
+        if (stage == CruiseMissileFlight.Stage.IGNITION) {
+            for (int index = 0; index < 3; index++) {
+                double angle = random.nextDouble() * Math.PI * 2;
+                double speed = 0.08 + random.nextDouble() * 0.15;
+                spawn(world, index == 0 ? EnumParticleTypes.CLOUD : EnumParticleTypes.SMOKE_LARGE, tail.add(0, 0.2, 0),
+                        new Vec3d(Math.cos(angle) * speed, 0.02, Math.sin(angle) * speed), random, 0.4);
+            }
+            spawn(world, EnumParticleTypes.FLAME, tail, back.scale(0.05), random, 0.3);
+            return;
+        }
+        int puffs = Math.max(2, (int) Math.ceil(tail.distanceTo(previous) * 2.5)) + (boosting ? 2 : 0);
+        for (int index = 0; index < puffs; index++) {
+            Vec3d at = interpolate(previous, tail, index / (double) puffs);
+            spawn(world, EnumParticleTypes.CLOUD, at, back.scale(0.02), random, 0.5);
+            spawn(world, EnumParticleTypes.SMOKE_LARGE, at, back.scale(0.04), random, 0.4);
+        }
+        spawn(world, EnumParticleTypes.FLAME, tail, back.scale(0.2), random, 0.2);
+        spawn(world, EnumParticleTypes.FLAME, interpolate(previous, tail, 0.5), back.scale(0.15), random, 0.2);
     }
 
     /** Booster lighting up: a roar and a burst of smoke at the tail. */

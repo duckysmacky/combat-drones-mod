@@ -28,6 +28,7 @@ public class TypeSyncPacket implements IMessage {
     private final double[] bombBlast = new double[BombType.values().length];
     private final double[] bombWeight = new double[BombType.values().length];
     private boolean worldBorderCollision;
+    private double steerConeDegrees;
 
     public TypeSyncPacket() {
     }
@@ -46,6 +47,7 @@ public class TypeSyncPacket implements IMessage {
             bombWeight[bomb.ordinal()] = bomb.getWeight();
         }
         worldBorderCollision = ModConfig.worldBorderCollision;
+        steerConeDegrees = ModConfig.steerConeDegrees;
     }
 
     /** Client side: adopt the server's battery pack and bomb values and synced settings. */
@@ -57,6 +59,7 @@ public class TypeSyncPacket implements IMessage {
             bomb.set(bombBayUnits[bomb.ordinal()], bombBlast[bomb.ordinal()], bombWeight[bomb.ordinal()]);
         }
         ModConfig.worldBorderCollision = worldBorderCollision;
+        ModConfig.steerConeDegrees = steerConeDegrees;
     }
 
     public Map<String, String> getTypesJson() {
@@ -80,6 +83,7 @@ public class TypeSyncPacket implements IMessage {
             bombWeight[index] = Math.max(0, Math.min(0.5, buf.readDouble()));
         }
         worldBorderCollision = buf.readBoolean();
+        steerConeDegrees = Math.max(0, Math.min(60, buf.readDouble()));
     }
 
     @Override
@@ -99,6 +103,7 @@ public class TypeSyncPacket implements IMessage {
             buf.writeDouble(bombWeight[index]);
         }
         buf.writeBoolean(worldBorderCollision);
+        buf.writeDouble(steerConeDegrees);
     }
 
     public static class Handler implements IMessageHandler<TypeSyncPacket, IMessage> {

@@ -38,7 +38,7 @@ import java.util.Map;
 public final class ModConfig {
     public static final String FILE_NAME = CombatDrones.MOD_ID + ".toml";
     /** Keys from older versions, removed from existing files so they don't look like live settings. */
-    private static final String[] RETIRED_KEYS = {"general.bombBlastPower"};
+    private static final String[] RETIRED_KEYS = {"general.bombBlastPower", "missiles.missilePreparingSeconds", "missiles.inboundDelaySeconds"};
 
     // [general]
     public static boolean blockDamageEnabled = true;
@@ -80,6 +80,25 @@ public final class ModConfig {
     public static double gunSpread = 1.5;
     public static double gunRange = 96.0;
     public static double gunHitMargin = 0.5;
+
+    // [missiles]
+    public static double missileIgnitionSeconds = 5.0;
+    public static double missileLiftoffSeconds = 4.0;
+    public static double missileSlowClimbSeconds = 5.0;
+    public static double missileFastClimbSeconds = 20.0;
+    public static double missileLiftoffSpeed = 0.1;
+    public static double missileSlowClimbSpeed = 0.4;
+    public static double missileFastClimbSpeed = 1.6;
+    public static double strikeRange = 1000.0;
+    public static double strikeHoldSeconds = 3.0;
+    public static double strikeAltitude = 250.0;
+    public static double steerConeDegrees = 30.0;
+    public static double missileSteerRateDegrees = 1.5;
+    public static double missileBoostMultiplier = 2.0;
+    public static double fuelBlastPower = 6.0;
+    public static double missileShrapnelDamage = 14.0;
+    public static double missileShrapnelRadius = 24.0;
+    public static double strikeAlertRadius = 128.0;
 
     // [client]
     public static boolean invertMousePitch = false;
@@ -256,6 +275,42 @@ public final class ModConfig {
             gunHitMargin = defaults.number("weapons.gunHitMargin", gunHitMargin, 0, 2,
                     "Blocks added around targets' hitboxes for gun rounds, so fast passes still connect.");
 
+            missileIgnitionSeconds = defaults.number("missiles.missileIgnitionSeconds", missileIgnitionSeconds, 0, 60,
+                    "Cruise missile launch: seconds the engine burns on the pad before it lifts off.");
+            missileLiftoffSeconds = defaults.number("missiles.missileLiftoffSeconds", missileLiftoffSeconds, 0.5, 60,
+                    "Seconds of the slow rise off the pad.");
+            missileSlowClimbSeconds = defaults.number("missiles.missileSlowClimbSeconds", missileSlowClimbSeconds, 0.5, 60,
+                    "Seconds of the slow climb (still easy to hit).");
+            missileFastClimbSeconds = defaults.number("missiles.missileFastClimbSeconds", missileFastClimbSeconds, 0.5, 60,
+                    "Seconds of the fast climb, after which the missile is out of sight and ready to strike.");
+            missileLiftoffSpeed = defaults.number("missiles.missileLiftoffSpeed", missileLiftoffSpeed, 0.01, 2,
+                    "Climb speed reached at the end of liftoff, in blocks/tick.");
+            missileSlowClimbSpeed = defaults.number("missiles.missileSlowClimbSpeed", missileSlowClimbSpeed, 0.01, 4,
+                    "Climb speed reached at the end of the slow climb, in blocks/tick.");
+            missileFastClimbSpeed = defaults.number("missiles.missileFastClimbSpeed", missileFastClimbSpeed, 0.01, 8,
+                    "Climb speed reached at the end of the fast climb, in blocks/tick.");
+            strikeRange = defaults.number("missiles.strikeRange", strikeRange, 16, 20000,
+                    "How far from its pad a cruise missile can strike, in blocks.");
+            strikeHoldSeconds = defaults.number("missiles.strikeHoldSeconds", strikeHoldSeconds, 0, 30,
+                    "Seconds the missile hangs over the strike point, armed and aimable, before it dives (the terrain loads meanwhile).");
+            strikeAltitude = defaults.number("missiles.strikeAltitude", strikeAltitude, 16, 400,
+                    "Blocks above the ground at the strike point where the dive starts.");
+            steerConeDegrees = defaults.number("missiles.steerConeDegrees", steerConeDegrees, 0, 60,
+                    "How far from straight down the pilot can steer the dive, in degrees.");
+            missileSteerRateDegrees = defaults.number("missiles.missileSteerRateDegrees", missileSteerRateDegrees, 0.1, 10,
+                    "Fastest the dive can be turned, in degrees per tick.");
+            missileBoostMultiplier = defaults.number("missiles.missileBoostMultiplier", missileBoostMultiplier, 1, 5,
+                    "Dive speed multiplier while the pilot holds boost (Space).");
+            fuelBlastPower = defaults.number("missiles.fuelBlastPower", fuelBlastPower, 0, 20,
+                    "Blast when a cruise missile is shot down or crashes before its dive (its fuel; the warhead only goes off on impact "
+                            + "in the dive). Vanilla TNT = 4.");
+            missileShrapnelDamage = defaults.number("missiles.missileShrapnelDamage", missileShrapnelDamage, 0, 60,
+                    "Shrapnel damage (half-hearts) at point blank from a warhead impact, falling off to 0 at missileShrapnelRadius.");
+            missileShrapnelRadius = defaults.number("missiles.missileShrapnelRadius", missileShrapnelRadius, 0, 64,
+                    "Reach of warhead shrapnel, in blocks.");
+            strikeAlertRadius = defaults.number("missiles.strikeAlertRadius", strikeAlertRadius, 0, 1024,
+                    "Players within this many blocks of the strike point get the INBOUND alarm when the dive starts (0 = nobody).");
+
             loadClient(defaults);
 
             for (BatteryPack pack : BatteryPack.values()) {
@@ -280,6 +335,8 @@ public final class ModConfig {
             // Table comments last: a comment can only attach to a table that exists
             defaults.comment("general", "Global balance settings. On a server these apply to everyone.");
             defaults.comment("weapons", "Gunship Plane weapons, fired only under manual control.");
+            defaults.comment("missiles", "Cruise Missile launch, standby and strike. Its speed, warhead, health and standby fuel are in "
+                    + "[drones.cruise_missile].");
             defaults.comment("client", CLIENT_COMMENT);
             defaults.comment("batteries", "Battery pack sizes for hand-flown drones. capacityMultiplier scales a drone's base capacity "
                     + "(defined for a Standard pack); performanceMultiplier scales its top speed and acceleration (pack weight).");

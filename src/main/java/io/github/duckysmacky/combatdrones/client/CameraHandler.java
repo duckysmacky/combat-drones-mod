@@ -4,7 +4,6 @@ import io.github.duckysmacky.combatdrones.CombatDrones;
 import io.github.duckysmacky.combatdrones.entity.EntityHandFlownDrone;
 import io.github.duckysmacky.combatdrones.entity.EntityRampUnit;
 import io.github.duckysmacky.combatdrones.physics.HandFlownFlight;
-import net.minecraft.util.math.MathHelper;
 import net.minecraftforge.client.event.EntityViewRenderEvent;
 import net.minecraftforge.client.event.RenderHandEvent;
 import net.minecraftforge.fml.common.Mod;
@@ -67,11 +66,12 @@ public final class CameraHandler {
     private static void remoteCamera(EntityViewRenderEvent.CameraSetup event, EntityRampUnit unit) {
         float partialTicks = (float) event.getRenderPartialTicks();
         RemoteController.updateLook(partialTicks);
-        float yaw = unit.prevRotationYaw + MathHelper.wrapDegrees(unit.rotationYaw - unit.prevRotationYaw) * partialTicks;
         if (RemoteController.isStickControl()) {
-            event.setYaw(yaw + 180.0F); // vanilla's camera yaw convention is offset by 180
-            event.setPitch(unit.prevRotationPitch + (unit.rotationPitch - unit.prevRotationPitch) * partialTicks);
-            event.setRoll(unit.prevBank + (unit.getBank() - unit.prevBank) * partialTicks);
+            // Through the airframe's orientation, so a missile's near-vertical dive (where yaw is meaningless) is smooth
+            double[] euler = HandFlownFlight.toEuler(unit.renderOrientation(partialTicks));
+            event.setYaw((float) euler[0] + 180.0F); // vanilla's camera yaw convention is offset by 180
+            event.setPitch((float) euler[1]);
+            event.setRoll((float) euler[2]);
         } else {
             event.setYaw(RemoteController.getCameraYaw() + 180.0F);
             event.setPitch(RemoteController.getCameraPitch());

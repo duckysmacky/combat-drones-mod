@@ -5,8 +5,11 @@ Run from anywhere: python3 tools/art/build_sounds.py
 Needs numpy and ffmpeg (libvorbis). Everything is written mono (1.12 only positions mono sounds in 3D), loops get a
 crossfaded seam so they repeat without a click. The UI beep and hit crack stay with tools/gen_sounds.py.
 Sources: "FPV To Minecraft" 1.20.1 (fpv:) and VIC's Modern Warfare 1.12.2 (mw:), used for this private server only.
+The cruise missile sounds come from CC0 / public-domain recordings in reference_mods/sounds/ (SOURCES.txt there);
+rebuild just those with --missile.
 """
 import subprocess
+import sys
 import tempfile
 import wave
 import zipfile
@@ -168,5 +171,35 @@ def main():
         write(f"explosion/far{index}", fade(peak(cut(load(source), 0, 3.5)), fade_out=0.6))
 
 
+def load_file(name):
+    """A downloaded original from reference_mods/sounds/ (see SOURCES.txt there) -> mono float samples at RATE."""
+    raw = subprocess.run(["ffmpeg", "-v", "error", "-i", str(ROOT / "reference_mods/sounds" / name), "-ac", "1", "-ar", str(RATE),
+                          "-f", "s16le", "-"], capture_output=True, check=True).stdout
+    return np.frombuffer(raw, dtype="<i2").astype(np.float32) / 32768
+
+
+def missile_sounds():
+    """Cruise missile, from real recordings (CC0 / public domain, listed in reference_mods/sounds/SOURCES.txt):
+    Artemis II launch audio for ignition, liftoff and the engine roar, an F-15 flyover's approach for the incoming
+    dive, a civil-defense siren for the INBOUND alarm."""
+    artemis = load_file("artemis_launch.mp3")
+    rumble = load_file("canaveral_rumble.mp3")
+    # Ignition: the build-up and the engines lighting (the recording's onset is at ~8 s)
+    write("missile/ignition", fade(peak(lowpass(cut(artemis, 6.5, 12.5), 7000)), 0.4, 0.5))
+    # Liftoff: the full-thrust blast, with the distant launch rumble under it for weight
+    liftoff = mix((lowpass(cut(artemis, 8.0, 16.0), 7000), 1.0), (cut(rumble, 12.0, 20.0) * 3.0, 0.6))
+    write("missile/liftoff", fade(peak(liftoff), 0.01, 1.5))
+    # Engine: the steady roar once it's climbing, looped
+    write("missile/engine", rms(loop(lowpass(cut(artemis, 20.0, 34.0), 6000), 1.5), 0.27))
+    # Dive, heard by everyone else: a jet's approach, rising as it closes in
+    write("missile/scream", fade(rms(cut(load_file("f15_flyover.mp3"), 1.5, 10.5), 0.25), 0.3, 0.3))
+    # INBOUND alarm: an air-raid siren's waver
+    write("missile/alarm", fade(peak(cut(load_file("siren_waver.ogg"), 17.0, 21.5), 0.8), 0.15, 0.6))
+
+
 if __name__ == "__main__":
-    main()
+    if "--missile" in sys.argv:
+        missile_sounds()
+    else:
+        main()
+        missile_sounds()

@@ -1,13 +1,11 @@
 package io.github.duckysmacky.combatdrones.client;
 
 import io.github.duckysmacky.combatdrones.entity.EntityRampUnit;
-import io.github.duckysmacky.combatdrones.physics.HandFlownFlight;
 import io.github.duckysmacky.combatdrones.type.DroneType;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.client.renderer.entity.Render;
 import net.minecraft.client.renderer.entity.RenderManager;
 import net.minecraft.util.ResourceLocation;
-import net.minecraft.util.math.MathHelper;
 
 import javax.annotation.Nullable;
 import javax.vecmath.AxisAngle4d;
@@ -30,11 +28,8 @@ public class RenderRampUnit extends Render<EntityRampUnit> {
         }
         GlStateManager.pushMatrix();
         GlStateManager.translate(x, y + unit.height / 2, z);
-        float yaw = unit.prevRotationYaw + MathHelper.wrapDegrees(unit.rotationYaw - unit.prevRotationYaw) * partialTicks;
-        float pitch = unit.prevRotationPitch + (unit.rotationPitch - unit.prevRotationPitch) * partialTicks;
-        float bank = unit.prevBank + MathHelper.wrapDegrees(unit.getBank() - unit.prevBank) * partialTicks;
         AxisAngle4d rotation = new AxisAngle4d();
-        rotation.set(HandFlownFlight.fromEuler(yaw, pitch, bank));
+        rotation.set(unit.renderOrientation(partialTicks));
         GlStateManager.rotate((float) Math.toDegrees(rotation.angle), (float) rotation.x, (float) rotation.y, (float) rotation.z);
         String model = GeoModels.nameFor(type);
         float propSpeed = UnitEngineSound.isRunning(unit) ? PROP_SPEED : 0;

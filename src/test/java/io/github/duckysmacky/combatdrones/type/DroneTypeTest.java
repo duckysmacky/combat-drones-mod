@@ -89,6 +89,16 @@ class DroneTypeTest {
     }
 
     @Test
+    void verticalStrikeTypeNeedsMissileScheme() {
+        String missile = RACER.replace("HAND_FLOWN", "VERTICAL_STRIKE");
+        assertThrows(IllegalArgumentException.class, () -> parse(missile));
+        assertEquals(DroneType.ControlScheme.MISSILE, parse(missile.replace("\"FPV\"", "\"MISSILE\"")).getControlScheme());
+        // MISSILE belongs to vertical strike types only, and they always carry a warhead
+        assertThrows(IllegalArgumentException.class, () -> parse(RACER.replace("\"FPV\"", "\"MISSILE\"")));
+        assertThrows(IllegalArgumentException.class, () -> parse(missile.replace("\"FPV\"", "\"MISSILE\"").replace("\"impactDetonates\": true", "\"impactDetonates\": false")));
+    }
+
+    @Test
     void unarmedTypeCantCarryBlast() {
         assertThrows(IllegalArgumentException.class, () -> parse(RACER.replace("{", "{ \"armed\": false,")));
     }

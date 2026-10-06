@@ -379,6 +379,57 @@ def frag_grenade():
     return model, None
 
 
+# ---- cruise missile -----------------------------------------------------------------------------------------------
+
+def cruise_missile():
+    """Tomahawk-style vertical-launch missile, nose -Z: ogive nose, long body, booster with nozzle and four tail fins.
+    7 blocks long, 0.65 wide, centred on the origin (the entity renders it about its mid-height)."""
+    skin = Mat("#c9ccc4", noise=0.03, edge=0.12, shine=0.08,
+               patterns=(panel_lines(9, "v", 0.1), zband(0.06, 0.09, "#b8302a"), zband(0.12, 0.14, "#d6b23a"), grime(0.1)))
+    booster = Mat("#3d4044", noise=0.05, edge=0.18, patterns=(zband(0.1, 0.18, "#d6b23a"), grime(0.25)))
+    fin = Mat("#b9bcb5", noise=0.03, edge=0.2, patterns=(grime(0.15),))
+    model = Model("cruise_missile", density=2)
+    body = model.bone("body")
+    # Ogive nose: tapering stack
+    for z, diameter in ((-54.0, 3.4), (-50.0, 6.0), (-46.0, 8.3), (-42.0, 9.9)):
+        body.cylinder_z((0, 0, z), diameter, 4.0, skin)
+    body.cylinder_z((0, 0, -56.2), 1.8, 0.8, Mat("#2a2c2e", noise=0.03, edge=0.1))  # seeker window
+    body.cylinder_z((0, 0, -2.0), 10.4, 76, skin)
+    body.box((0, 5.35, -10), (1.3, 0.8, 28), Mat("#9a9e98", noise=0.03, edge=0.1))  # wiring tunnel
+    # Booster section, its four fins (in line with the body axes, clear of the pad's corner clamps) and the nozzle
+    body.cylinder_z((0, 0, 44.0), 11.2, 16, booster)
+    body.box((0, 0, 46.5), (26, 0.65, 9), fin)
+    body.box((0, 0, 46.5), (0.65, 26, 9), fin)
+    body.cylinder_z((0, 0, 53.6), 7.3, 3.2, Mat("#24262a", noise=0.05, edge=0.25))
+    body.cylinder_z((0, 0, 55.4), 4.7, 0.8, Mat("#ff9a3a", noise=0.1, edge=0.0))  # hot throat
+    return model, (1.05, 7.0)
+
+
+def missile_pad():
+    """Vertical launch pad, 2.5 blocks square: steel deck on a skid frame, flame grate, four clamp posts round the
+    missile, hazard-striped edges, control box with an antenna. Deck top at 6 px (EntityMissilePad.DECK_HEIGHT)."""
+    deck = Mat("#6c7176", noise=0.06, edge=0.2, patterns=(rivets(4, 0.25), grime(0.3)))
+    hazard = Mat("#d9b02a", noise=0.04, edge=0.1, patterns=(panel_lines(2, "u", 0.85),))
+    olive = Mat("#4f5a2c", noise=0.06, edge=0.2, patterns=(grime(0.3),))
+    model = Model("missile_pad", density=2)
+    base = model.bone("base")
+    for side in (1, -1):
+        base.box((side * 16, 1.0, 0), (3, 2, 40), olive)  # skids
+    base.box((0, 4.0, 0), (36, 4, 36), deck)
+    for side in (1, -1):
+        base.box((side * 18.5, 4.0, 0), (1, 4, 38), hazard)
+        base.box((0, 4.0, side * 18.5), (36, 4, 1), hazard)
+    base.box((0, 6.05, 0), (12, 0.1, 12), Mat("#1d1f21", noise=0.04, edge=0.0, patterns=(vents("#0d0e0f", 2),)))  # flame grate
+    clamp = Mat("#3b3f43", noise=0.05, edge=0.2, patterns=(rivets(3),))
+    for x, z in ((1, 1), (1, -1), (-1, 1), (-1, -1)):
+        base.box((x * 8.5, 15.0, z * 8.5), (2, 18, 2), clamp)  # clamp posts, at the corners between the fins
+        base.box((x * 6.4, 22.0, z * 6.4), (4.4, 1.6, 1.6), RUBBER, rotation=[0, -45 * x * z, 0], pivot=[x * 6.4, 22.0, z * 6.4])  # clamp jaws, touching the body
+    base.box((13, 10, 13), (6, 8, 5), Mat("#4a542a", noise=0.05, edge=0.2, patterns=(vents("#2a2f18", 2),)))  # control box
+    base.box((13, 11, 10.4), (3, 2, 0.2), Mat("#55ff55", noise=0.02, edge=0.0))  # status light panel
+    base.box((15, 18, 14.5), (0.4, 8, 0.4), BLACK)  # antenna
+    return model, None
+
+
 MODELS = {
     "loitering_light": loitering_light,
     "loitering_heavy": loitering_heavy,
@@ -395,6 +446,8 @@ MODELS = {
     "bomb_heavy": bomb_heavy,
     "rocket": rocket,
     "frag_grenade": frag_grenade,
+    "cruise_missile": cruise_missile,
+    "missile_pad": missile_pad,
 }
 
 

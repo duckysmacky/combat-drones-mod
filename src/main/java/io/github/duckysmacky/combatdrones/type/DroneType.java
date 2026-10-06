@@ -16,14 +16,16 @@ import java.util.Map;
  * instance of this, not a subclass. Kept free of Minecraft classes so it can be unit-tested.
  */
 public final class DroneType {
-    public enum Category { HAND_FLOWN, RAMP_AUTOPILOT }
+    /** Hand-flown multirotors, ramp-launched fixed-wing units, or missiles launched straight up from a pad. */
+    public enum Category { HAND_FLOWN, RAMP_AUTOPILOT, VERTICAL_STRIKE }
 
     /**
      * How the drone is flown. Hand-flown: FPV (acro/angle/hover quad) or DJI (stabilized velocity control).
      * Ramp-launched (manual takeover from the Mission Planner): STICK, CLICK_DESIGNATE or GIMBAL_OBSERVE.
+     * Vertical strike: MISSILE (the dive is steered from the Missile Control Tablet within a cone around straight down).
      */
     public enum ControlScheme {
-        FPV, DJI, STICK, CLICK_DESIGNATE, GIMBAL_OBSERVE;
+        FPV, DJI, STICK, CLICK_DESIGNATE, GIMBAL_OBSERVE, MISSILE;
 
         public boolean isHandFlown() {
             return this == FPV || this == DJI;
@@ -157,15 +159,20 @@ public final class DroneType {
         require(motorSoundRange >= 0, "'motorSoundRange' must be >= 0");
         require(agility > 0, "'agility' must be > 0");
         require(hitboxWidth >= 0.1 && hitboxWidth <= 4, "'hitboxWidth' must be in 0.1..4");
-        require(hitboxHeight >= 0.1 && hitboxHeight <= 4, "'hitboxHeight' must be in 0.1..4");
+        require(hitboxHeight >= 0.1 && hitboxHeight <= 8, "'hitboxHeight' must be in 0.1..8");
         if (category == Category.HAND_FLOWN) {
             require(signalRange > 0, "hand-flown types need 'signalRange' > 0");
             require(defaultBattery != null, "hand-flown types need a valid 'defaultBattery' (LIGHT, STANDARD or HEAVY)");
             require(controlScheme != null && controlScheme.isHandFlown(), "hand-flown types need 'controlScheme' FPV or DJI");
             require(payloadCapacity == 0 || payload != null, "hand-flown types with payload slots need 'payload' GRENADE or BOMB");
-        } else {
-            require(controlScheme != null && !controlScheme.isHandFlown(), "ramp-launched types need 'controlScheme' STICK, CLICK_DESIGNATE or GIMBAL_OBSERVE");
+        } else if (category == Category.RAMP_AUTOPILOT) {
+            require(controlScheme != null && !controlScheme.isHandFlown() && controlScheme != ControlScheme.MISSILE,
+                    "ramp-launched types need 'controlScheme' STICK, CLICK_DESIGNATE or GIMBAL_OBSERVE");
             require(defaultCruiseAltitude > 0, "ramp-launched types need 'defaultCruiseAltitude' > 0");
+        } else {
+            require(controlScheme == ControlScheme.MISSILE, "vertical strike types need 'controlScheme' MISSILE");
+            require(armed && impactDetonates && weaponType == WeaponType.NONE && payloadCapacity == 0,
+                    "vertical strike types are armed, detonate on impact and carry no weapon or payload");
         }
         if (!armed) {
             // blastPower is allowed: it's the fuel going up in a crash, not a warhead

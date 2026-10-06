@@ -41,9 +41,17 @@ public final class ModSounds {
     public static final SoundEvent BULLET_IMPACT = create("bullet.impact");
     /** Supersonic crack of a round passing close by. */
     public static final SoundEvent BULLET_FLYBY = create("bullet.flyby");
+    /** Cruise missile engine lighting up on its pad. */
+    public static final SoundEvent MISSILE_IGNITION = create("missile.ignition");
+    /** Cruise missile leaving the pad: a blast heard far away. */
+    public static final SoundEvent MISSILE_LIFTOFF = create("missile.liftoff");
+    /** Rising whistle of a diving cruise missile (loop). */
+    public static final SoundEvent MISSILE_SCREAM = create("missile.scream");
+    /** INBOUND alarm for everyone near a strike point. */
+    public static final SoundEvent MISSILE_ALARM = create("missile.alarm");
     /** Per-type engine loops, picked by a drone type's {@code engineSound}. */
     private static final SoundEvent[] ENGINES = {create("unit.engine_electric"), create("unit.engine_twostroke"),
-            create("unit.engine_piston"), create("drone.motor_dji")};
+            create("unit.engine_piston"), create("drone.motor_dji"), create("missile.engine")};
 
     private ModSounds() {
     }
@@ -56,7 +64,7 @@ public final class ModSounds {
     @SubscribeEvent
     public static void registerSounds(RegistryEvent.Register<SoundEvent> event) {
         event.getRegistry().registerAll(DRONE_MOTOR, DRONE_MOTOR_FAR, DRONE_LINK, DRONE_BEEP, DRONE_BATTERY, DRONE_ATTACH, DRONE_CONNECT, DRONE_HIT, DRONE_PILOT_STATIC, UNIT_ENGINE, UNIT_LAUNCH,
-                GUNSHIP_ROCKET, GUNSHIP_GUN, UNIT_BOOST, BOMB_RELEASE, EXPLOSION_NEAR, EXPLOSION_FAR, BULLET_IMPACT, BULLET_FLYBY);
+                GUNSHIP_ROCKET, GUNSHIP_GUN, UNIT_BOOST, BOMB_RELEASE, EXPLOSION_NEAR, EXPLOSION_FAR, BULLET_IMPACT, BULLET_FLYBY, MISSILE_IGNITION, MISSILE_LIFTOFF, MISSILE_SCREAM, MISSILE_ALARM);
         event.getRegistry().registerAll(ENGINES);
     }
 

@@ -8,6 +8,7 @@ import io.github.duckysmacky.combatdrones.network.EffectPacket;
 import io.github.duckysmacky.combatdrones.network.EngineSoundPacket;
 import io.github.duckysmacky.combatdrones.network.GunFirePacket;
 import io.github.duckysmacky.combatdrones.network.IntelPacket;
+import io.github.duckysmacky.combatdrones.network.TabletStatusPacket;
 import io.github.duckysmacky.combatdrones.network.LockProgressPacket;
 import io.github.duckysmacky.combatdrones.network.MapTilePacket;
 import io.github.duckysmacky.combatdrones.network.PlannerOpenPacket;
@@ -55,8 +56,21 @@ public final class ClientPacketHandlers {
     }
 
     public static void onRemoteSession(RemoteSessionPacket packet) {
+        Minecraft minecraft = Minecraft.getMinecraft();
+        if (packet.getUnitId() >= 0 && minecraft.currentScreen instanceof GuiMissileTablet) {
+            minecraft.displayGuiScreen(null); // the strike began: into the missile's camera
+        }
         RemoteController.onSession(packet.getUnitId(), packet.isControl(), packet.isDrone(),
                 new Vec3d(packet.getHomeX(), packet.getHomeY(), packet.getHomeZ()));
+    }
+
+    public static void onTabletStatus(TabletStatusPacket packet) {
+        Minecraft minecraft = Minecraft.getMinecraft();
+        if (minecraft.currentScreen instanceof GuiMissileTablet) {
+            ((GuiMissileTablet) minecraft.currentScreen).update(packet);
+        } else if (packet.open) {
+            minecraft.displayGuiScreen(new GuiMissileTablet(packet));
+        }
     }
 
     public static void onGunFire(GunFirePacket packet) {

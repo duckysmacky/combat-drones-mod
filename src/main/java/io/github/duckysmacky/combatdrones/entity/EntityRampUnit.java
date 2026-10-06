@@ -10,6 +10,7 @@ import io.github.duckysmacky.combatdrones.network.ModNetwork;
 import io.github.duckysmacky.combatdrones.network.RouteCodec;
 import io.github.duckysmacky.combatdrones.physics.DroneSystems;
 import io.github.duckysmacky.combatdrones.physics.FixedWingFlight;
+import io.github.duckysmacky.combatdrones.physics.HandFlownFlight;
 import io.github.duckysmacky.combatdrones.physics.Route;
 import io.github.duckysmacky.combatdrones.physics.RouteAutopilot;
 import io.github.duckysmacky.combatdrones.type.DroneType;
@@ -44,6 +45,7 @@ import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.fml.relauncher.SideOnly;
 
 import javax.annotation.Nullable;
+import javax.vecmath.Quat4d;
 import java.util.UUID;
 
 /**
@@ -65,7 +67,7 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder {
     private static final double BELLY_LANDING_SPEED_FRACTION = 0.5;
     private static final double BELLY_LANDING_SINK_RATE = 0.2;
     /** Manual input older than this (ticks) is treated as a centred stick. */
-    private static final int STALE_INPUT_TICKS = 10;
+    protected static final int STALE_INPUT_TICKS = 10;
     private static final int DESIGNATE_COOLDOWN_TICKS = 10;
     // Client smoothing: share of the remaining rotation / position error taken out each tick, and the error beyond
     // which it just jumps (teleport, chunk reload)
@@ -87,7 +89,7 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder {
     private static final DataParameter<Integer> AMMO = EntityDataManager.createKey(EntityRampUnit.class, DataSerializers.VARINT);
     private static final DataParameter<Float> HEALTH_FRACTION = EntityDataManager.createKey(EntityRampUnit.class, DataSerializers.FLOAT);
 
-    private final FixedWingFlight.State flight = new FixedWingFlight.State();
+    protected final FixedWingFlight.State flight = new FixedWingFlight.State();
     @Nullable
     private UUID owner;
     private Route route = Route.empty(Route.TerminalAction.LOITER);
@@ -96,8 +98,8 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder {
     /** Where Return flies back to: the launch point. NaN for units summoned without one. */
     private double homeX = Double.NaN;
     private double homeZ = Double.NaN;
-    private double fuel;
-    private float health;
+    protected double fuel;
+    protected float health;
     // Manual control ("Take control"): the controller's latest input, and when it arrived
     private double manualPitch;
     private double manualRoll;
@@ -115,7 +117,7 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder {
     /** This tick the autopilot was flying Return's final landing approach. */
     private boolean landingApproach;
     /** Keeps the unit's chunk (and the next one ahead) loaded, so it keeps flying far from any player. */
-    private final ChunkAnchor anchor = new ChunkAnchor(this);
+    protected final ChunkAnchor anchor = new ChunkAnchor(this);
 
     // Client-side presentation
     public float prevBank;
@@ -221,7 +223,7 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder {
         dataManager.set(STRIKING, false);
     }
 
-    private void setHealth(float value) {
+    protected void setHealth(float value) {
         health = value;
         DroneType type = getDroneType();
         dataManager.set(HEALTH_FRACTION, type == null ? 1.0F : Math.max(0, Math.min(1, value / type.getMaxHP())));
@@ -267,6 +269,11 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder {
             setDead();
             return;
         }
+        serverUpdate(type);
+    }
+
+    /** Server tick of a unit with a known type: route autopilot or manual flight, fuel, movement and collisions. */
+    protected void serverUpdate(DroneType type) {
         boolean boosting = isBoosting(type);
         dataManager.set(BOOSTING, boosting);
         FixedWingFlight.Params params = boosting ? paramsOf(type).boosted(ModConfig.boostSpeedMultiplier) : paramsOf(type);
@@ -354,6 +361,21 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder {
 
     public boolean isBoosting() {
         return dataManager.get(BOOSTING);
+    }
+
+    protected void setBoosting(boolean boosting) {
+        dataManager.set(BOOSTING, boosting);
+    }
+
+    /**
+     * Airframe orientation for drawing it and for a camera fixed to its nose, interpolated for the frame. Planes go by
+     * heading, pitch and bank.
+     */
+    public Quat4d renderOrientation(float partialTicks) {
+        float yaw = prevRotationYaw + MathHelper.wrapDegrees(rotationYaw - prevRotationYaw) * partialTicks;
+        float pitch = prevRotationPitch + (rotationPitch - prevRotationPitch) * partialTicks;
+        float bank = prevBank + MathHelper.wrapDegrees(getBank() - prevBank) * partialTicks;
+        return HandFlownFlight.fromEuler(yaw, pitch, bank);
     }
 
     /** Client: the point it's diving on, if any. */
@@ -559,7 +581,7 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder {
         return world.isBlockLoaded(column) ? world.getHeight(column).getY() : Double.NaN;
     }
 
-    private boolean hitsEntity(AxisAlignedBB box) {
+    protected boolean hitsEntity(AxisAlignedBB box) {
         for (Entity entity : world.getEntitiesWithinAABBExcludingEntity(this, box)) {
             if (entity.canBeCollidedWith() && entity.isEntityAlive() && !isPassenger(entity)) {
                 return true;
@@ -568,7 +590,7 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder {
         return false;
     }
 
-    private void syncPresentation() {
+    protected void syncPresentation() {
         rotationYaw = (float) flight.heading;
         rotationPitch = (float) flight.pitch;
         dataManager.set(BANK, (float) flight.bank);
@@ -623,7 +645,7 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder {
     }
 
     @Nullable
-    private EntityLivingBase getBlameTarget() {
+    protected EntityLivingBase getBlameTarget() {
         return owner != null ? world.getPlayerEntityByUUID(owner) : null;
     }
 

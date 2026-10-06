@@ -49,6 +49,15 @@ public final class Effects {
             case LAUNCH:
                 launch(world, packet.getPosition(), packet.getDirection());
                 break;
+            case MISSILE_LIFTOFF:
+                missileLiftoff(world, player, packet.getPosition());
+                break;
+            case STRIKE_ALERT:
+                // Not positional: a siren in your head, wherever the missile is
+                play(new PositionedSoundRecord(ModSounds.MISSILE_ALARM.getSoundName(), SoundCategory.MASTER, 1.0F, 1.0F, false, 0,
+                        ISound.AttenuationType.NONE, 0, 0, 0), 0);
+                HudOverlay.showStrikeAlert();
+                break;
         }
     }
 
@@ -93,6 +102,36 @@ public final class Effects {
         }
         for (int index = 0; index < 3 + power; index++) {
             world.spawnParticle(EnumParticleTypes.LAVA, true, at.x, at.y, at.z, 0, 0, 0);
+        }
+    }
+
+    /**
+     * A cruise missile leaving its pad: a positional roar up close, a delayed rumble far out (like explosions), and a
+     * cloud of exhaust rolling out across the ground round the pad.
+     */
+    private static void missileLiftoff(World world, EntityPlayer player, Vec3d pad) {
+        double distance = player.getPositionEyes(1).distanceTo(pad);
+        if (distance < NEAR_DISTANCE * 2) {
+            play(new PositionedSoundRecord(ModSounds.MISSILE_LIFTOFF, SoundCategory.NEUTRAL, 16.0F, 1.0F,
+                    (float) pad.x, (float) pad.y, (float) pad.z), 0);
+        } else {
+            float volume = (float) Math.max(0.15, (1 - distance / EffectPacket.EXPLOSION_RANGE) * 0.9);
+            play(new PositionedSoundRecord(ModSounds.EXPLOSION_FAR.getSoundName(), SoundCategory.NEUTRAL, volume, 0.6F, false, 0,
+                    ISound.AttenuationType.NONE, 0, 0, 0), (int) (distance / SOUND_SPEED));
+        }
+        if (distance > PARTICLE_DISTANCE) {
+            return;
+        }
+        Random random = world.rand;
+        for (int index = 0; index < 80; index++) {
+            double angle = random.nextDouble() * Math.PI * 2;
+            double speed = 0.25 + random.nextDouble() * 0.35;
+            world.spawnParticle(index % 4 == 0 ? EnumParticleTypes.EXPLOSION_LARGE : EnumParticleTypes.CLOUD, true,
+                    pad.x, pad.y + 0.3, pad.z, Math.cos(angle) * speed, 0.02 + random.nextDouble() * 0.05, Math.sin(angle) * speed);
+        }
+        for (int index = 0; index < 20; index++) {
+            world.spawnParticle(EnumParticleTypes.FLAME, true, pad.x + (random.nextDouble() - 0.5), pad.y + 0.2, pad.z + (random.nextDouble() - 0.5),
+                    (random.nextDouble() - 0.5) * 0.3, 0.02, (random.nextDouble() - 0.5) * 0.3);
         }
     }
 

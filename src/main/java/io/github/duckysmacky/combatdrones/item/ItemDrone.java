@@ -82,7 +82,9 @@ public class ItemDrone extends Item {
         }
         // Order for every item: what it is, its current state, then stats, behaviour and how-to behind Shift
         boolean handFlown = type.getCategory() == DroneType.Category.HAND_FLOWN;
-        tooltip.add(TextFormatting.GRAY + I18n.format(handFlown ? "tooltip.combat_drones.drone.hand_flown" : "tooltip.combat_drones.drone.ramp_launched"));
+        boolean missile = type.getCategory() == DroneType.Category.VERTICAL_STRIKE;
+        tooltip.add(TextFormatting.GRAY + I18n.format(handFlown ? "tooltip.combat_drones.drone.hand_flown"
+                : missile ? "tooltip.combat_drones.drone.vertical_strike" : "tooltip.combat_drones.drone.ramp_launched"));
         if (!handFlown) {
             double fuel = getFuel(stack);
             tooltip.add(TextFormatting.YELLOW + I18n.format("tooltip.combat_drones.drone.fuel",
@@ -101,6 +103,12 @@ public class ItemDrone extends Item {
         tooltip.add(TextFormatting.YELLOW + I18n.format("tooltip.combat_drones.drone.health", formatNumber(type.getMaxHP())));
         if (type.getBlastPower() > 0) {
             tooltip.add(TextFormatting.YELLOW + I18n.format("tooltip.combat_drones.drone.blast", formatNumber(type.getBlastPower())));
+        }
+        if (missile) {
+            tooltip.add(TextFormatting.YELLOW + I18n.format("tooltip.combat_drones.drone.standby",
+                    Math.round(type.getBatteryOrFuelCapacity() / Math.max(1e-6, type.getDrainRatePerTick()) / 20)));
+            Tooltips.addDetails("tooltip.combat_drones.drone.setup_missile", tooltip, Tooltips.keyName(DroneKeys.TOGGLE_FPV));
+            return;
         }
         if (handFlown) {
             tooltip.add(TextFormatting.YELLOW + I18n.format("tooltip.combat_drones.drone.range", Math.round(type.getSignalRange())));

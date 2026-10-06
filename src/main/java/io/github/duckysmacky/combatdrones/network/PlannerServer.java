@@ -1,6 +1,7 @@
 package io.github.duckysmacky.combatdrones.network;
 
 import io.github.duckysmacky.combatdrones.config.ModConfig;
+import io.github.duckysmacky.combatdrones.entity.EntityCruiseMissile;
 import io.github.duckysmacky.combatdrones.entity.EntityLaunchRamp;
 import io.github.duckysmacky.combatdrones.entity.EntityRampUnit;
 import io.github.duckysmacky.combatdrones.entity.Raytrace;
@@ -84,7 +85,7 @@ public final class PlannerServer {
     public static void openAirborne(EntityPlayerMP player) {
         PlannerOpenPacket packet = new PlannerOpenPacket();
         for (Entity entity : player.world.loadedEntityList) {
-            if (!(entity instanceof EntityRampUnit) || entity.isDead || !player.getUniqueID().equals(((EntityRampUnit) entity).getOwner())) {
+            if (!(entity instanceof EntityRampUnit) || entity instanceof EntityCruiseMissile || entity.isDead || !player.getUniqueID().equals(((EntityRampUnit) entity).getOwner())) {
                 continue;
             }
             EntityRampUnit unit = (EntityRampUnit) entity;
@@ -156,7 +157,7 @@ public final class PlannerServer {
 
     private static void submitToUnit(EntityPlayerMP player, PlannerSubmitPacket packet) {
         Entity entity = player.world.getEntityByID(packet.unitId);
-        if (!(entity instanceof EntityRampUnit) || entity.isDead || !player.getUniqueID().equals(((EntityRampUnit) entity).getOwner())) {
+        if (!(entity instanceof EntityRampUnit) || entity instanceof EntityCruiseMissile || entity.isDead || !player.getUniqueID().equals(((EntityRampUnit) entity).getOwner())) {
             status(player, "message.combat_drones.planner.unit_gone");
             return;
         }
@@ -255,7 +256,7 @@ public final class PlannerServer {
 
     private static EntityRampUnit findOwnedUnit(EntityPlayer player, int unitId) {
         Entity entity = player.world.getEntityByID(unitId);
-        return entity instanceof EntityRampUnit && !entity.isDead && player.getUniqueID().equals(((EntityRampUnit) entity).getOwner())
+        return entity instanceof EntityRampUnit && !(entity instanceof EntityCruiseMissile) && !entity.isDead && player.getUniqueID().equals(((EntityRampUnit) entity).getOwner())
                 ? (EntityRampUnit) entity : null;
     }
 

@@ -1,0 +1,23 @@
+{
+  // Cruise Missile: launched straight up from a Missile Launch Pad, waits out of sight burning fuel, then dives on a
+  // point picked on the Missile Control Tablet map and is steered by hand. Stage timings and the strike live in [missiles].
+  "category": "VERTICAL_STRIKE",
+  // Dive speed (blocks/tick) and how fast it gets there; LMB boosts it by [missiles] missileBoostMultiplier.
+  // 1.5 from strikeAltitude 250: about 8.5 s down, about 4.5 s boosted
+  "maxSpeed": 1.5,
+  "acceleration": 0.08,
+  // Standby: capacity / drain = ticks it can wait for orders (6000 = 5 minutes)
+  "batteryOrFuelCapacity": 6000,
+  "drainRatePerTick": 1.0,
+  // The warhead, set off only by an impact in the dive; shot down, only its fuel goes up ([missiles] fuelBlastPower)
+  "blastPower": 24,
+  "payloadCapacity": 0,
+  "maxHP": 300,
+  // Upright missile: a tall, thin box (it stays near vertical the whole flight)
+  "hitboxWidth": 1.05,
+  "hitboxHeight": 7.0,
+  "controlScheme": "MISSILE",
+  "motorSoundRange": 250,
+  "engineSound": "missile.engine",
+  "impactDetonates": true
+}

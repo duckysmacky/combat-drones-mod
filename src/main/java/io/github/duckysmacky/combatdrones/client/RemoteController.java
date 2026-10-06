@@ -107,9 +107,14 @@ public final class RemoteController {
         return unitId >= 0;
     }
 
-    /** Flying the unit by hand (stick scheme): the camera is fixed to the nose. */
+    /** Flying the unit by hand (stick scheme, or steering a missile's dive): the camera is fixed to the nose. */
     public static boolean isStickControl() {
-        return control && scheme() == DroneType.ControlScheme.STICK;
+        return control && (scheme() == DroneType.ControlScheme.STICK || isMissile());
+    }
+
+    /** Steering a cruise missile's dive. */
+    public static boolean isMissile() {
+        return control && scheme() == DroneType.ControlScheme.MISSILE;
     }
 
     public static boolean isControl() {
@@ -202,6 +207,10 @@ public final class RemoteController {
             heldPitch = 0;
             cameraYaw = unit.rotationYaw;
             cameraPitch = 10;
+            if (isMissile()) {
+                player.sendStatusMessage(new TextComponentTranslation("message.combat_drones.remote.missile_started",
+                        Tooltips.keyName(DroneKeys.TOGGLE_FPV)), true);
+            }
         }
         if (unit != null && !control && unit.ticksExisted % 2 == 0) {
             DroneType type = unit.getDroneType();
@@ -210,7 +219,9 @@ public final class RemoteController {
                 ModNetwork.CHANNEL.sendToServer(new ReconLookPacket(unitId, Vec3d.fromPitchYaw(cameraPitch, cameraYaw)));
             }
         }
-        if (unit != null && isStickControl()) {
+        if (unit != null && isMissile()) {
+            sendMissileSteer(minecraft);
+        } else if (unit != null && isStickControl()) {
             sendStick(minecraft);
         } else if (unit != null && control) {
             // Click-designate flies itself; only boost goes up each tick
@@ -253,6 +264,26 @@ public final class RemoteController {
         }
         boolean trigger = minecraft.currentScreen == null && Mouse.isButtonDown(0);
         ModNetwork.CHANNEL.sendToServer(new PlaneInputPacket(unitId, pitch, roll, throttle, trigger, freeMode, isBoostKeyDown(minecraft)));
+    }
+
+    /**
+     * Missile dive: the mouse points the nose (up on screen is toward the missile's reference heading), like aiming
+     * a camera, but only as fast as the missile can turn. Arrows or W/A/S/D steer at full rate, LMB held boosts (the
+     * click itself is swallowed by {@link #onMouse}). Sent as pitch (forward) and roll (right) of the plane input.
+     */
+    private static void sendMissileSteer(Minecraft minecraft) {
+        double[] mouse = takeMouseMovement();
+        double right = mouse[0] * ModConfig.planeMouseSensitivity / FREE_MOUSE_FULL_STICK;
+        // Mouse forward (view pitch goes up, i.e. negative) points the nose up the screen
+        double forward = (ModConfig.invertMousePitch ? mouse[1] : -mouse[1]) * ModConfig.planeMouseSensitivity / FREE_MOUSE_FULL_STICK;
+        boolean keysRight = DroneKeys.ROLL_RIGHT.isKeyDown() || minecraft.gameSettings.keyBindRight.isKeyDown();
+        boolean keysLeft = DroneKeys.ROLL_LEFT.isKeyDown() || minecraft.gameSettings.keyBindLeft.isKeyDown();
+        boolean keysForward = DroneKeys.PITCH_FORWARD.isKeyDown() || minecraft.gameSettings.keyBindForward.isKeyDown();
+        boolean keysBack = DroneKeys.PITCH_BACK.isKeyDown() || minecraft.gameSettings.keyBindBack.isKeyDown();
+        right = clamp(right + axis(keysRight, keysLeft));
+        forward = clamp(forward + axis(keysForward, keysBack));
+        boolean boost = minecraft.currentScreen == null && Mouse.isButtonDown(0);
+        ModNetwork.CHANNEL.sendToServer(new PlaneInputPacket(unitId, forward, right, 0, false, false, boost));
     }
 
     /** Space (jump) boosts a munition: faster, at several times the fuel burn. */

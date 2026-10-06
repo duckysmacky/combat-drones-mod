@@ -45,6 +45,8 @@ public final class ModNetwork {
         CHANNEL.registerMessage(EngineSoundPacket.Handler.class, EngineSoundPacket.class, id++, Side.CLIENT);
         CHANNEL.registerMessage(EffectPacket.Handler.class, EffectPacket.class, id++, Side.CLIENT);
         CHANNEL.registerMessage(ClientConfigReloadPacket.Handler.class, ClientConfigReloadPacket.class, id++, Side.CLIENT);
+        CHANNEL.registerMessage(TabletActionPacket.Handler.class, TabletActionPacket.class, id++, Side.SERVER);
+        CHANNEL.registerMessage(TabletStatusPacket.Handler.class, TabletStatusPacket.class, id++, Side.CLIENT);
     }
 
     /** After a config reload: everyone gets the new stats right away. */

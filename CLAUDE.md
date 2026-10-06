@@ -80,7 +80,8 @@ behaviour, not this file.
    owns or is piloting the drone/munition in question before applying
    anything.
 4. **Physics is pure Java.** Flight/orientation math (racer and gunship
-   drone flight, loitering-munition routing, recon UAV autopilot) lives in
+   drone flight, loitering-munition routing, recon UAV autopilot, cruise
+   missile climb and dive steering) lives in
    classes with zero `net.minecraft.*` imports, so it's JUnit-testable
    outside a Minecraft environment. Minecraft-side code adapts that output to
    entities and packets.

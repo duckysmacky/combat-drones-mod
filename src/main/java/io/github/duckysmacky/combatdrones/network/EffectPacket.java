@@ -19,7 +19,11 @@ public class EffectPacket implements IMessage {
         /** Scale = blast power. Heard out to {@link #EXPLOSION_RANGE}. */
         EXPLOSION,
         /** A unit leaving the catapult; direction = launch heading. */
-        LAUNCH
+        LAUNCH,
+        /** A cruise missile lifting off its pad: a blast heard out to {@link #EXPLOSION_RANGE}. */
+        MISSILE_LIFTOFF,
+        /** A cruise missile starting its dive: alarm and HUD alert for everyone it's sent to. */
+        STRIKE_ALERT
     }
 
     public static final double EXPLOSION_RANGE = 400;
@@ -46,6 +50,17 @@ public class EffectPacket implements IMessage {
 
     public static void launch(World world, Vec3d position, Vec3d direction) {
         send(world, new EffectPacket(Kind.LAUNCH, position, direction, 1), LAUNCH_RANGE);
+    }
+
+    public static void missileLiftoff(World world, Vec3d position) {
+        send(world, new EffectPacket(Kind.MISSILE_LIFTOFF, position, new Vec3d(0, 1, 0), 1), EXPLOSION_RANGE);
+    }
+
+    /** To every player within {@code radius} of the strike point. */
+    public static void strikeAlert(World world, Vec3d target, double radius) {
+        if (radius > 0) {
+            send(world, new EffectPacket(Kind.STRIKE_ALERT, target, Vec3d.ZERO, 1), radius);
+        }
     }
 
     private static void send(World world, EffectPacket packet, double range) {
