@@ -299,6 +299,24 @@ SPRITES = {
         ".KllllllllllllK.",
         ".KKKKKKKKKKKKKK.",
     ], pal(c="#b87333", b="#a8862a", B="#d9b23a", l="#3d4524", L="#56632c", w="#e8e8e8")),
+    "cannon_shell": ([
+        "................",
+        "......KK........",
+        ".....KyyK.......",
+        ".....KGGK.......",
+        "....KGHGGK......",
+        "....KYYYYK......",
+        "....KGHGGK......",
+        "....KGHGGK......",
+        "....KbbbbK......",
+        "...KcCCCCcK.....",
+        "...KcCCCCcK.....",
+        "...KcCCCCcK.....",
+        "...KcCCCCcK.....",
+        "...KcCCCCcK.....",
+        "...KKKKKKKK.....",
+        "................",
+    ], pal(G="#4b5320", H="#66702c", Y="#d6b23a", y="#3d4248", b="#b08d3c", c="#8a6d2e", C="#c9a24a")),
 }
 
 BLOCKS = {

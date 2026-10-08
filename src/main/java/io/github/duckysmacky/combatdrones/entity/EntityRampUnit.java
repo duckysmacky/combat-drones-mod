@@ -92,6 +92,8 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder {
     private static final DataParameter<Integer> AMMO = EntityDataManager.createKey(EntityRampUnit.class, DataSerializers.VARINT);
     private static final DataParameter<Integer> AMMO_SECONDARY = EntityDataManager.createKey(EntityRampUnit.class, DataSerializers.VARINT);
     private static final DataParameter<Integer> ROCKET_KIND = EntityDataManager.createKey(EntityRampUnit.class, DataSerializers.VARINT);
+    /** Weapon station the gunner has selected (gunner scheme). */
+    private static final DataParameter<Integer> STATION = EntityDataManager.createKey(EntityRampUnit.class, DataSerializers.VARINT);
     private static final DataParameter<Float> HEALTH_FRACTION = EntityDataManager.createKey(EntityRampUnit.class, DataSerializers.FLOAT);
 
     protected final FixedWingFlight.State flight = new FixedWingFlight.State();
@@ -113,6 +115,10 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder {
     private boolean manualFree;
     private boolean manualBoost;
     private long manualInputTick = Long.MIN_VALUE;
+    // Gunner seat (gunner scheme): where the camera aims and whether the trigger is held, and when that arrived
+    private Vec3d gunnerAim = Vec3d.ZERO;
+    private boolean gunnerTrigger;
+    private long gunnerInputTick = Long.MIN_VALUE;
     /** A point picked from the camera (click-designate scheme): overrides the route with a strike. */
     @Nullable
     private Vec3d designatedTarget;
@@ -169,6 +175,7 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder {
         dataManager.register(AMMO, 0);
         dataManager.register(AMMO_SECONDARY, 0);
         dataManager.register(ROCKET_KIND, 0);
+        dataManager.register(STATION, 0);
         dataManager.register(STRIKING, false);
         dataManager.register(STRIKE_POINT, Optional.absent());
         dataManager.register(BOOSTING, false);
@@ -219,6 +226,11 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder {
         loadout.setAmmo(1, dataManager.get(AMMO_SECONDARY));
         loadout.setRocketKind(RocketType.byIndex(dataManager.get(ROCKET_KIND)));
         return loadout;
+    }
+
+    /** Weapon station the gunner has selected (synced for the HUD). */
+    public int getSelectedStation() {
+        return dataManager.get(STATION);
     }
 
     private void setLoadout(Loadout loadout) {
@@ -303,6 +315,7 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder {
         // The entity position is the truth (picks up /tp and positions set after NBT load)
         flight.position.set(posX, posY, posZ);
         FixedWingFlight.Controls controls = manualControls(type, params, boosting);
+        gunnerFire(type);
         landingApproach = false;
         Vec3d strikePoint = null;
         if (controls == null && designatedTarget != null) {
@@ -471,6 +484,14 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder {
                 : FixedWingFlight.fromStick(manualPitch, manualRoll, throttle, fuel > 0);
     }
 
+    /** Gunner seat: fires the selected station along the camera while the autopilot flies on. Fresh input only. */
+    private void gunnerFire(DroneType type) {
+        if (type.getControlScheme() == DroneType.ControlScheme.GUNNER && gunnerTrigger && RemoteSessions.controllerOf(this) != null
+                && world.getTotalWorldTime() - gunnerInputTick <= STALE_INPUT_TICKS) {
+            fireWeapon(type, getSelectedStation(), gunnerAim);
+        }
+    }
+
     /**
      * Fires one rocket or round from {@code station} along {@code aim} (a unit vector), if the weapon is ready and
      * there's ammo. Manual control only.
@@ -491,6 +512,12 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder {
             world.spawnEntity(new EntityRocket(world, this, owner, muzzle, velocity,
                     kind == RocketType.HEAVY ? EntityRocket.Kind.HEAVY_ROCKET : EntityRocket.Kind.ROCKET, (float) kind.getBlastPower(), 0));
             world.playSound(null, posX, posY, posZ, ModSounds.GUNSHIP_ROCKET, SoundCategory.NEUTRAL, 4.5F, kind == RocketType.HEAVY ? 0.8F : 1.0F);
+        } else if (weapon == DroneType.WeaponType.CANNON) {
+            weaponCooldown += ModConfig.cannonCooldownTicks;
+            Vec3d velocity = spread(aim, ModConfig.cannonSpread).scale(ModConfig.cannonSpeed).add(flight.velocity.x, flight.velocity.y, flight.velocity.z);
+            world.spawnEntity(new EntityRocket(world, this, owner, muzzle, velocity, EntityRocket.Kind.CANNON_SHELL,
+                    (float) ModConfig.cannonBlastPower, (float) ModConfig.cannonDamage));
+            world.playSound(null, posX, posY, posZ, ModSounds.GUNSHIP_CANNON, SoundCategory.NEUTRAL, 6.0F, 0.95F + rand.nextFloat() * 0.1F);
         } else {
             weaponCooldown += ModConfig.gunCooldownTicks;
             fireRound(muzzle, aim);
@@ -534,6 +561,24 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder {
         manualFree = free;
         manualBoost = boost;
         manualInputTick = world.getTotalWorldTime();
+    }
+
+    /**
+     * Server: latest gunner-seat input. Only the current controller of a gunner-scheme unit counts; the aim must be a
+     * real direction, and a station without a weapon falls back to the primary one.
+     */
+    public void acceptGunnerInput(EntityPlayerMP sender, Vec3d aim, boolean trigger, int station) {
+        DroneType type = getDroneType();
+        double length = aim.length();
+        if (RemoteSessions.controllerOf(this) != sender || type == null || type.getControlScheme() != DroneType.ControlScheme.GUNNER
+                || !(length > 1e-3) || !Double.isFinite(length)) {
+            return;
+        }
+        gunnerAim = aim.scale(1 / length);
+        gunnerTrigger = trigger;
+        gunnerInputTick = world.getTotalWorldTime();
+        boolean validStation = station >= 0 && station < Loadout.STATIONS && type.getWeapon(station) != DroneType.WeaponType.NONE;
+        dataManager.set(STATION, validStation ? station : 0);
     }
 
     /**

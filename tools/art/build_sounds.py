@@ -152,6 +152,9 @@ def main():
     write("gunship/rocket", fade(peak(load("fpv:basic_ocp_rocket")), fade_out=0.2))
     for index, source in enumerate(("mw:m249", "mw:m60")):
         write(f"gunship/gun{index}", fade(peak(cut(load(source), 0, 0.55)), fade_out=0.2))
+    # Gunship cannon: a 20 mm anti-materiel rifle pitched down into a heavier thump, over a low distant boom
+    write("gunship/cannon", fade(peak(mix((speed(cut(load("mw:ntw20"), 0, 0.9), 0.75), 1.0),
+                                          (lowpass(cut(load("fpv:bomblet_distant0"), 0, 1.2), 900), 0.45))), fade_out=0.3))
     for index, source in enumerate(("mw:bullet_1_rock", "mw:bullet_6_iron", "mw:bullet_5_grass")):
         write(f"bullet/impact{index}", fade(peak(cut(load(source), 0, 0.6), 0.8), fade_out=0.2))
     for index, source in enumerate(("mw:bullet_10_snap", "mw:bullet_13_snap")):

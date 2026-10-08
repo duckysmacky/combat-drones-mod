@@ -31,6 +31,7 @@ public final class ModSounds {
     public static final SoundEvent UNIT_LAUNCH = create("unit.launch");
     public static final SoundEvent GUNSHIP_ROCKET = create("gunship.rocket");
     public static final SoundEvent GUNSHIP_GUN = create("gunship.gun");
+    public static final SoundEvent GUNSHIP_CANNON = create("gunship.cannon");
     /** Booster lighting up on a munition. */
     public static final SoundEvent UNIT_BOOST = create("unit.boost");
     public static final SoundEvent BOMB_RELEASE = create("bomb.release");
@@ -64,7 +65,7 @@ public final class ModSounds {
     @SubscribeEvent
     public static void registerSounds(RegistryEvent.Register<SoundEvent> event) {
         event.getRegistry().registerAll(DRONE_MOTOR, DRONE_MOTOR_FAR, DRONE_LINK, DRONE_BEEP, DRONE_BATTERY, DRONE_ATTACH, DRONE_CONNECT, DRONE_HIT, DRONE_PILOT_STATIC, UNIT_ENGINE, UNIT_LAUNCH,
-                GUNSHIP_ROCKET, GUNSHIP_GUN, UNIT_BOOST, BOMB_RELEASE, EXPLOSION_NEAR, EXPLOSION_FAR, BULLET_IMPACT, BULLET_FLYBY, MISSILE_IGNITION, MISSILE_LIFTOFF, MISSILE_SCREAM, MISSILE_ALARM);
+                GUNSHIP_ROCKET, GUNSHIP_GUN, GUNSHIP_CANNON, UNIT_BOOST, BOMB_RELEASE, EXPLOSION_NEAR, EXPLOSION_FAR, BULLET_IMPACT, BULLET_FLYBY, MISSILE_IGNITION, MISSILE_LIFTOFF, MISSILE_SCREAM, MISSILE_ALARM);
         event.getRegistry().registerAll(ENGINES);
     }
 

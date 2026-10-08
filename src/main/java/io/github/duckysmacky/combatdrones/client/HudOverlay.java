@@ -200,8 +200,8 @@ public final class HudOverlay {
         drawCentered(font, I18n.format("hud.combat_drones.plane_status", Math.round(heading),
                 altitude < 0 ? "---" : String.valueOf(Math.round(altitude))), centerX, top - LINE - 4, TEXT);
 
-        String mode = !RemoteController.isControl() ? "view" : !RemoteController.isStickControl() ? "designate"
-                : RemoteController.isFreeMode() ? "free" : "assisted";
+        String mode = !RemoteController.isControl() ? "view" : RemoteController.isGunner() ? "gunner"
+                : !RemoteController.isStickControl() ? "designate" : RemoteController.isFreeMode() ? "free" : "assisted";
         drawText(font, I18n.format("hud.combat_drones.mode." + mode), left, top, TEXT);
         if (unit.isStrikingDesignated()) {
             drawText(font, I18n.format("hud.combat_drones.striking"), left, top + LINE, WARNING);
@@ -225,6 +225,9 @@ public final class HudOverlay {
             if (type.getWeapon(station) != DroneType.WeaponType.NONE) {
                 String ammo = I18n.format("hud.combat_drones.ammo." + ItemDrone.ammoKey(type, station, loadout), loadout.getAmmo(station),
                         loadout.capacity(type, station));
+                if (RemoteController.isGunner() && station == unit.getSelectedStation()) {
+                    ammo = "> " + ammo;
+                }
                 drawText(font, ammo, right - font.getStringWidth(ammo), top + LINE * ammoLine++, loadout.getAmmo(station) > 0 ? 0xFFAA00 : WARNING);
             }
         }

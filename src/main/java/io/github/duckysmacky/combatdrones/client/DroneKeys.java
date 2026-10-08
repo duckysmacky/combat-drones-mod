@@ -20,8 +20,10 @@ public final class DroneKeys {
     public static final KeyBinding PITCH_BACK = new KeyBinding("key.combat_drones.pitch_back", Keyboard.KEY_DOWN, CATEGORY);
     public static final KeyBinding ROLL_LEFT = new KeyBinding("key.combat_drones.roll_left", Keyboard.KEY_LEFT, CATEGORY);
     public static final KeyBinding ROLL_RIGHT = new KeyBinding("key.combat_drones.roll_right", Keyboard.KEY_RIGHT, CATEGORY);
+    /** Gunship gunner seat: cannon / rocket rack. */
+    public static final KeyBinding SWITCH_WEAPON = new KeyBinding("key.combat_drones.switch_weapon", Keyboard.KEY_R, CATEGORY);
 
-    static final KeyBinding[] ALL = {TOGGLE_FPV, FLIGHT_MODE, MOTORS, PITCH_FORWARD, PITCH_BACK, ROLL_LEFT, ROLL_RIGHT};
+    static final KeyBinding[] ALL = {TOGGLE_FPV, FLIGHT_MODE, MOTORS, PITCH_FORWARD, PITCH_BACK, ROLL_LEFT, ROLL_RIGHT, SWITCH_WEAPON};
 
     private DroneKeys() {
     }

@@ -113,12 +113,12 @@ def loitering_heavy():
     return model, (1.2, 0.5)
 
 
-def light_plane(name, weapon):
-    """Light armed fixed-wing: camera-nosed fuselage, straight high wing, twin tractor props, V-tail. ~3.6 x 2.6."""
+def strike_plane():
+    """Light rocket plane: camera-nosed fuselage, straight high wing, twin tractor props, V-tail, rocket pods. ~3.6 x 2.6."""
     skin = Mat("#b8bdc2", noise=0.035, edge=0.12, shine=0.1, patterns=(panel_lines(9, "v", 0.1),))
     wing = Mat("#bfc4c8", noise=0.03, edge=0.2, patterns=(panel_lines(8, "u", 0.08),))
     accent = Mat("#4b5056", noise=0.04, edge=0.15)
-    model = Model(name, density=2, scale=1.2)
+    model = Model("strike_plane", density=2, scale=1.2)
     body = model.bone("body")
     body.cylinder_z((0, 0, -1), 5.6, 22, skin)
     body.cylinder_z((0, 0.4, 13), 3.2, 10, skin)
@@ -136,21 +136,110 @@ def light_plane(name, weapon):
         two_blade_prop(model, "prop_" + ("right" if side > 0 else "left"), (side * 10, 1.9, -8.2), 11, chord=1.1)
         # V-tail
         body.box((side * 0.4, 4.7, 15.5), (0.6, 7, 4.5), wing, rotation=[0, 0, -side * 40], pivot=[side * 0.4, 1.2, 15.5])
-    if weapon == "rocket":
-        pod = Mat("#4b5320", noise=0.05, edge=0.18, patterns=(on_faces(("north",), dot(0.5, 0.5, "#111111", 0.28)),))
-        for side in (1, -1):
-            body.cylinder_z((side * 16, 0.0, -2.5), 3.2, 8, pod)
-            body.box((side * 16, 1.8, -2.5), (0.6, 1.6, 3), accent)
-            body.box((side * 16, 0.0, -6.6), (2.8, 2.8, 0.3), Mat("#111214", noise=0.02, edge=0.0,
-                                                                   patterns=(dot(0.3, 0.3, "#3a3a3a", 0.15),
-                                                                             dot(0.7, 0.7, "#3a3a3a", 0.15))))
-    else:
-        gun = Mat("#3c4045", noise=0.05, edge=0.18, patterns=(rivets(3),))
-        body.cylinder_z((0, -3.8, -3), 3.0, 11, gun)
-        body.box((0, -3.8, -11.5), (0.9, 0.9, 6), Mat("#1b1c1e", noise=0.04, edge=0.1))
-        body.box((0, -3.8, -14.6), (1.4, 1.4, 0.6), Mat("#1b1c1e", noise=0.04, edge=0.1))  # muzzle brake
-        body.box((0, -2.2, -3), (0.8, 1.2, 4), accent)
+    pod = Mat("#4b5320", noise=0.05, edge=0.18, patterns=(on_faces(("north",), dot(0.5, 0.5, "#111111", 0.28)),))
+    for side in (1, -1):
+        body.cylinder_z((side * 16, 0.0, -2.5), 3.2, 8, pod)
+        body.box((side * 16, 1.8, -2.5), (0.6, 1.6, 3), accent)
+        body.box((side * 16, 0.0, -6.6), (2.8, 2.8, 0.3), Mat("#111214", noise=0.02, edge=0.0,
+                                                               patterns=(dot(0.3, 0.3, "#3a3a3a", 0.15),
+                                                                         dot(0.7, 0.7, "#3a3a3a", 0.15))))
     return model, (1.6, 0.7)
+
+
+def attack_plane():
+    """Small, fast attack drone: slim fuselage, swept low wing, canted twin fins, rear pusher prop, chin gun. ~2.6 x 2.2."""
+    skin = Mat("#5d646b", noise=0.035, edge=0.12, shine=0.1, patterns=(panel_lines(7, "v", 0.12),))
+    wing = Mat("#646b72", noise=0.03, edge=0.18, patterns=(panel_lines(6, "u", 0.08),))
+    accent = Mat("#2f3338", noise=0.04, edge=0.15)
+    gun = Mat("#24272a", noise=0.05, edge=0.18, patterns=(rivets(3),))
+    model = Model("attack_plane", density=2)
+    body = model.bone("body")
+    body.cylinder_z((0, 0, 0), 4.6, 28, skin)
+    body.cylinder_z((0, -0.2, -16.5), 3.2, 5, skin)
+    body.cylinder_z((0, -0.4, -19.6), 1.6, 1.4, accent)
+    body.box((0, 2.3, -9), (2.6, 1.4, 6), faces_except(skin, GLASS, "north", "east", "west", "up"))  # canopy / sensor glass
+    body.box((0, 2.5, 4), (1.6, 1.2, 8), Mat("#565d64", noise=0.03, edge=0.15, patterns=(vents(),)))  # intake spine
+    for side in (1, -1):
+        # Swept wing in two panels: root and outer, the outer one further back
+        body.box((side * 5.5, -0.8, 1), (8, 0.8, 8), wing)
+        body.box((side * 13, -0.8, 4), (8, 0.7, 5.5), wing)
+        body.box((side * 17.2, -0.8, 4.8), (0.6, 0.9, 4.5), accent)  # wingtip
+        body.box((side * 2.4, 3.6, 12), (0.6, 5, 4), wing, rotation=[0, 0, -side * 25], pivot=[side * 1.6, 1.6, 12])  # canted fins
+        body.box((side * 4.5, 0.2, 13.5), (6, 0.6, 3), wing)  # tailplane
+    # Chin gun with its feed fairing
+    body.box((0, -2.6, -6), (2.2, 1.4, 7), accent)
+    body.cylinder_z((0, -2.8, -13), 1.2, 8, gun)
+    body.box((0, -2.8, -17.3), (1.6, 1.6, 0.6), gun)  # muzzle
+    body.cylinder_z((0, 0, 14.6), 2.4, 1.4, DARK_STEEL)
+    two_blade_prop(model, "prop", (0, 0, 15.6), 11, chord=1.3, mat=Mat("#1d1e1f", noise=0.03, edge=0.0))
+    return model, (1.2, 0.5)
+
+
+def four_blade_prop(model, name, pivot, span, chord=1.4, mat=PROP):
+    """Turboprop: four blades spinning about Z at `pivot`, spinner, and a blur disc sibling."""
+    x, y, z = pivot
+    group = model.bone("hub_" + name, pivot=pivot)
+    blades = model.bone(name, pivot=pivot, parent=group.name)
+    for angle in (0, 90):
+        blades.box((x, y, z), (span, chord, 0.4), mat, rotation=[0, 0, angle + 10], pivot=list(pivot))
+    blades.cylinder_z((x, y, z - 0.6), 2.0, 2.0, DARK_STEEL)
+    blur = model.bone(name + "_blur", pivot=pivot, parent=group.name)
+    blur.box((x, y, z), (span, span, 0), BLUR, faces=("north", "south"))
+    blur.cylinder_z((x, y, z - 0.6), 2.0, 2.0, DARK_STEEL)
+
+
+def gunship():
+    """C-130-style gunship: 4 blocks long, 6.5-block high wing with upturned tips, four turboprops, upswept tail with a
+    tall fin, guns poking out of the port side, rocket pods under the wings."""
+    skin = Mat("#7e858d", noise=0.035, edge=0.12, shine=0.08, patterns=(panel_lines(8, "v", 0.1), rivets(5, 0.12)))
+    wing = Mat("#868d95", noise=0.03, edge=0.18, patterns=(panel_lines(10, "u", 0.08),))
+    dark = Mat("#4a4f56", noise=0.04, edge=0.15)
+    tip = Mat("#868d95", noise=0.03, edge=0.15, patterns=(band(0.85, 1.0, "#c9a62a", "v"),))
+    gun = Mat("#2c2f33", noise=0.05, edge=0.18, patterns=(rivets(3),))
+    pod = Mat("#4b5320", noise=0.05, edge=0.18, patterns=(on_faces(("north",), dot(0.5, 0.5, "#111111", 0.28)),))
+    model = Model("gunship", density=2)
+    body = model.bone("body")
+    # Fuselage: barrel body, rounded nose, rear sweeping up into the tail
+    body.cylinder_z((0, 0, -4), 13, 40, skin)
+    body.cylinder_z((0, -0.6, -27), 11, 6, skin)
+    body.cylinder_z((0, -1.4, -31), 7, 2.4, dark)  # radome
+    body.box((0, 3.4, -27.6), (8, 2.2, 3.4), faces_except(skin, GLASS, "north", "east", "west"))  # cockpit glazing
+    body.cylinder_z((0, 1.2, 20), 10.5, 8, skin)
+    body.cylinder_z((0, 2.6, 27), 7.5, 6, skin)
+    body.cylinder_z((0, 3.6, 31), 4.5, 2, dark)
+    for side in (1, -1):
+        body.box((side * 6.2, -4.6, -3), (3.4, 4.4, 15), skin)  # landing gear sponsons
+    # High wing, upturned tips
+    body.box((0, 6.6, -6), (104, 1.6, 12), wing)
+    body.box((0, 7.0, -6), (14, 1.6, 14), skin)  # wing root fairing
+    for side in (1, -1):
+        body.box((side * 52.4, 9.6, -4), (1.2, 6.5, 6), tip, rotation=[0, 0, -side * 15], pivot=[side * 52.4, 7.0, -4])
+    # Four turboprops under the wing
+    for x in (18, 34):
+        for side in (1, -1):
+            nacelle_x = side * x
+            body.cylinder_z((nacelle_x, 4.4, -12), 4.6, 13, skin)
+            body.cylinder_z((nacelle_x, 4.4, -18.8), 3.2, 1.2, dark)  # intake ring
+            body.box((nacelle_x, 5.6, -5), (2.0, 1.2, 4), dark)  # exhaust
+            four_blade_prop(model, "prop_" + ("r" if side > 0 else "l") + str(x), (nacelle_x, 4.4, -19.6), 13)
+    # Rocket pods under the outer wing
+    for side in (1, -1):
+        body.box((side * 26, 4.6, -6), (0.6, 2.0, 3), dark)
+        body.cylinder_z((side * 26, 2.8, -6), 3.2, 9, pod)
+    # Tail: tall swept fin and the tailplane
+    body.box((0, 12.5, 29), (1.6, 17, 8), wing, rotation=[-18, 0, 0], pivot=[0, 4, 29])
+    body.box((0, 21.6, 32.2), (1.8, 1.0, 4), tip, rotation=[-18, 0, 0], pivot=[0, 4, 29])
+    body.box((0, 4.2, 29), (38, 1.0, 7), wing)
+    # Port-side guns (-X is port): a big cannon and a gatling ahead of the wing, and sensor ball under the nose
+    body.box((-6.6, -2.2, -19), (2.4, 3.4, 4.4), dark)
+    body.cylinder_x((-10.4, -2.4, -19), 1.6, 6, gun)
+    body.box((-13.6, -2.4, -19), (0.6, 2.2, 2.2), gun)  # muzzle brake
+    body.box((-6.6, -2.2, -9), (2.4, 3.0, 3.6), dark)
+    for offset in (-0.45, 0.45):
+        body.cylinder_x((-10.0, -2.2 + offset, -9 + offset), 0.6, 5, gun)
+    body.cylinder_y((0, -6.4, -24), 3.4, 2.6, dark)  # sensor ball
+    body.box((0, -6.4, -25.75), (1.8, 1.8, 0.2), GLASS)
+    return model, (3.0, 1.2)
 
 
 def recon_uav():
@@ -371,6 +460,31 @@ def rocket():
     return model, None
 
 
+def rocket_heavy():
+    """Heavy rocket: fatter, longer, dark grey with a red warhead band; bigger fins."""
+    skin = Mat("#4a4f55", noise=0.04, edge=0.1, patterns=(zband(0.06, 0.13, "#b8302a"),))
+    model = Model("rocket_heavy", density=6)
+    bone = model.bone("body")
+    bone.cylinder_z((0, 0, -7.2), 2.0, 3.0, Mat("#5a5f66", noise=0.04, edge=0.1))
+    bone.cylinder_z((0, 0, -8.9), 1.0, 0.6, BRASS)
+    bone.cylinder_z((0, 0, 0), 2.6, 11.5, skin)
+    bone.cylinder_z((0, 0, 6.2), 1.9, 1.0, Mat("#2a2a2a", noise=0.04, edge=0.1))
+    fin = Mat("#33373b", noise=0.04, edge=0.1)
+    bone.box((0, 0, 4.6), (4.4, 0.2, 2.0), fin)
+    bone.box((0, 0, 4.6), (0.2, 4.4, 2.0), fin)
+    return model, None
+
+
+def cannon_shell():
+    """Cannon round in flight: brass case gone, just the projectile with a yellow HE band."""
+    model = Model("cannon_shell", density=8)
+    bone = model.bone("body")
+    bone.cylinder_z((0, 0, -1.6), 0.9, 1.2, Mat("#3d4248", noise=0.03, edge=0.1))
+    bone.cylinder_z((0, 0, 0.4), 1.4, 3.0, Mat("#4b5320", noise=0.04, edge=0.1, patterns=(zband(0.1, 0.25, "#d6b23a"),)))
+    bone.cylinder_z((0, 0, 2.1), 1.5, 0.4, BRASS)  # driving band
+    return model, None
+
+
 def frag_grenade():
     """RGD-5-style grenade on a drop clip, as it hangs under a racer (nose -Z)."""
     model = Model("frag_grenade", density=8)
@@ -438,8 +552,9 @@ def missile_pad():
 MODELS = {
     "loitering_light": loitering_light,
     "loitering_heavy": loitering_heavy,
-    "strike_plane": lambda: light_plane("strike_plane", "rocket"),
-    "attack_plane": lambda: light_plane("attack_plane", "gun"),
+    "strike_plane": strike_plane,
+    "attack_plane": attack_plane,
+    "gunship": gunship,
     "recon_uav": recon_uav,
     "racer_micro": racer_micro,
     "racer_standard": racer_standard,
@@ -451,6 +566,8 @@ MODELS = {
     "bomb": bomb,
     "bomb_heavy": bomb_heavy,
     "rocket": rocket,
+    "rocket_heavy": rocket_heavy,
+    "cannon_shell": cannon_shell,
     "frag_grenade": frag_grenade,
     "cruise_missile": cruise_missile,
     "missile_pad": missile_pad,

@@ -7,11 +7,13 @@ import io.github.duckysmacky.combatdrones.entity.EntityRampUnit;
 import io.github.duckysmacky.combatdrones.entity.Raytrace;
 import io.github.duckysmacky.combatdrones.config.ModConfig;
 import io.github.duckysmacky.combatdrones.network.DesignatePacket;
+import io.github.duckysmacky.combatdrones.network.GunnerInputPacket;
 import io.github.duckysmacky.combatdrones.network.ModNetwork;
 import io.github.duckysmacky.combatdrones.network.PlaneInputPacket;
 import io.github.duckysmacky.combatdrones.network.ReconLookPacket;
 import io.github.duckysmacky.combatdrones.network.TogglePilotPacket;
 import io.github.duckysmacky.combatdrones.type.DroneType;
+import io.github.duckysmacky.combatdrones.type.Loadout;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.audio.PositionedSoundRecord;
 import net.minecraft.client.entity.EntityPlayerSP;
@@ -38,7 +40,8 @@ import javax.annotation.Nullable;
 
 /**
  * Client side of a remote session with a ramp unit: the camera rides the unit, the body stays put. In view mode (and
- * the click-designate scheme) the mouse looks around a stabilized camera; under stick control it flies the plane.
+ * the click-designate and gunner schemes) the mouse looks around a stabilized camera; under stick control it flies the
+ * plane.
  * Like {@link PilotController}, mouse movement still goes through vanilla's player turning and is read back and
  * undone, so the (invisible) body never rotates.
  */
@@ -52,6 +55,8 @@ public final class RemoteController {
     /** How far the camera holds on to an estimated ground point when the line finds nothing (unloaded terrain). */
     private static final double GROUND_FALLBACK_RANGE = 2048.0;
     private static final int MAX_ZOOM = 8;
+    /** Gunner seat: the camera starts looking this far down (degrees) along the nose. */
+    private static final float GUNNER_START_PITCH = 30.0F;
     /** Mouse pushes a virtual stick (degrees -> stick units) that springs back to centre, like FPV angle mode. */
     private static final double MOUSE_STICK_GAIN = 1.0 / 15.0;
     private static final double STICK_SPRING = 0.1;
@@ -88,6 +93,8 @@ public final class RemoteController {
     private static double throttle;
     /** Free (rate) stick instead of the self-levelling assisted one; kept between sessions. */
     private static boolean freeMode;
+    /** Gunner seat: the selected weapon station. */
+    private static int gunnerStation;
 
     private RemoteController() {
     }
@@ -119,6 +126,11 @@ public final class RemoteController {
 
     public static boolean isControl() {
         return control;
+    }
+
+    /** In a gunship's gunner seat: the autopilot flies, the camera aims the weapons. */
+    public static boolean isGunner() {
+        return control && scheme() == DroneType.ControlScheme.GUNNER;
     }
 
     public static boolean isFreeMode() {
@@ -167,6 +179,7 @@ public final class RemoteController {
         anchorEntity = null;
         anchorPoint = null;
         zoom = 1;
+        gunnerStation = 0;
         stickPitch = 0;
         stickRoll = 0;
         throttle = START_THROTTLE;
@@ -206,7 +219,7 @@ public final class RemoteController {
             heldYaw = player.rotationYaw;
             heldPitch = 0;
             cameraYaw = unit.rotationYaw;
-            cameraPitch = 10;
+            cameraPitch = isGunner() ? GUNNER_START_PITCH : 10;
             if (isMissile()) {
                 player.sendStatusMessage(new TextComponentTranslation("message.combat_drones.remote.missile_started",
                         Tooltips.keyName(DroneKeys.TOGGLE_FPV)), true);
@@ -223,6 +236,8 @@ public final class RemoteController {
             sendMissileSteer(minecraft);
         } else if (unit != null && isStickControl()) {
             sendStick(minecraft);
+        } else if (unit != null && isGunner()) {
+            sendGunner(minecraft);
         } else if (unit != null && control) {
             // Click-designate flies itself; only boost goes up each tick
             ModNetwork.CHANNEL.sendToServer(new PlaneInputPacket(unitId, 0, 0, 0, false, false, isBoostKeyDown(minecraft)));
@@ -286,6 +301,31 @@ public final class RemoteController {
         ModNetwork.CHANNEL.sendToServer(new PlaneInputPacket(unitId, forward, right, 0, false, false, boost));
     }
 
+    /**
+     * Gunner seat: the camera direction is the aim, LMB held fires (the click itself is swallowed by {@link #onMouse}),
+     * the switch-weapon key cycles through the stations that carry a weapon.
+     */
+    private static void sendGunner(Minecraft minecraft) {
+        DroneType type = unit.getDroneType();
+        if (type == null) {
+            return;
+        }
+        if (DroneKeys.SWITCH_WEAPON.isPressed()) {
+            for (int step = 1; step <= Loadout.STATIONS; step++) {
+                int next = (gunnerStation + step) % Loadout.STATIONS;
+                if (type.getWeapon(next) != DroneType.WeaponType.NONE) {
+                    if (next != gunnerStation) {
+                        gunnerStation = next;
+                        minecraft.getSoundHandler().playSound(PositionedSoundRecord.getMasterRecord(ModSounds.DRONE_BEEP, 1.3F));
+                    }
+                    break;
+                }
+            }
+        }
+        boolean trigger = minecraft.currentScreen == null && Mouse.isButtonDown(0);
+        ModNetwork.CHANNEL.sendToServer(new GunnerInputPacket(unitId, Vec3d.fromPitchYaw(cameraPitch, cameraYaw), trigger, gunnerStation));
+    }
+
     /** Space (jump) boosts a munition: faster, at several times the fuel burn. */
     private static boolean isBoostKeyDown(Minecraft minecraft) {
         return minecraft.currentScreen == null && minecraft.gameSettings.keyBindJump.isKeyDown();
@@ -328,7 +368,13 @@ public final class RemoteController {
             // Finer aim when zoomed in
             cameraYaw = MathHelper.wrapDegrees(cameraYaw + mouseX / zoom);
             cameraPitch = Math.max(LOOK_UP_LIMIT, Math.min(LOOK_DOWN_LIMIT, cameraPitch + mouseY / zoom));
-            reanchor(eye);
+            // The gunner's camera holds a direction, not a target: keeping the aim on a point while orbiting is the skill
+            if (!isGunner()) {
+                reanchor(eye);
+            }
+            return;
+        }
+        if (isGunner()) {
             return;
         }
         if (anchorEntity != null && (anchorEntity.isDead || anchorEntity.world != unit.world)) {

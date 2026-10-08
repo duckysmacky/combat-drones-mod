@@ -21,11 +21,12 @@ public final class DroneType {
 
     /**
      * How the drone is flown. Hand-flown: FPV (acro/angle/hover quad) or DJI (stabilized velocity control).
-     * Ramp-launched (manual takeover from the Mission Planner): STICK, CLICK_DESIGNATE or GIMBAL_OBSERVE.
+     * Ramp-launched (manual takeover from the Mission Planner): STICK, CLICK_DESIGNATE, GUNNER (the autopilot flies, the
+     * player aims and fires the weapons from a gimbal camera) or GIMBAL_OBSERVE.
      * Vertical strike: MISSILE (the dive is steered from the Missile Control Tablet within a cone around straight down).
      */
     public enum ControlScheme {
-        FPV, DJI, STICK, CLICK_DESIGNATE, GIMBAL_OBSERVE, MISSILE;
+        FPV, DJI, STICK, CLICK_DESIGNATE, GUNNER, GIMBAL_OBSERVE, MISSILE;
 
         public boolean isHandFlown() {
             return this == FPV || this == DJI;
@@ -33,11 +34,11 @@ public final class DroneType {
 
         /** Ramp-launched schemes that allow "Take control" (the recon gimbal is view-only). */
         public boolean isFlyable() {
-            return this == STICK || this == CLICK_DESIGNATE;
+            return this == STICK || this == CLICK_DESIGNATE || this == GUNNER;
         }
     }
 
-    public enum WeaponType { NONE, ROCKET_POD, GUN_MOUNT }
+    public enum WeaponType { NONE, ROCKET_POD, GUN_MOUNT, CANNON }
 
     /** What a hand-flown drone's payload slots hold: grenades boost a racer's impact blast, bombs are dropped. */
     public enum PayloadKind { GRENADE, BOMB }
@@ -85,6 +86,10 @@ public final class DroneType {
     /** Input mapping: FPV/DJI for hand-flown types, the Mission Planner takeover scheme for ramp-launched ones. */
     private ControlScheme controlScheme;
     private WeaponType weaponType = WeaponType.NONE;
+    /** Optional second weapon station (the gunship's rocket rack), switched to in flight; its own magazine. */
+    private WeaponType secondaryWeapon = WeaponType.NONE;
+    /** Rounds (or rocket bay units) the secondary station holds. */
+    private int secondaryCapacity;
     /** Detonates on any collision (racer family). */
     private boolean impactDetonates;
     /** False for the recon UAV: no warhead or weapon, never dives or strikes (a crash can still set off its fuel). */
@@ -122,7 +127,8 @@ public final class DroneType {
             String name = entry.getKey();
             if ((name.equals("signalRange") && category != Category.HAND_FLOWN)
                     || ((name.equals("defaultCruiseAltitude") || name.equals("agility") || name.equals("pitchAgility"))
-                            && category != Category.RAMP_AUTOPILOT)) {
+                            && category != Category.RAMP_AUTOPILOT)
+                    || (name.equals("secondaryCapacity") && secondaryWeapon == WeaponType.NONE)) {
                 continue;
             }
             stats.put(name, value.getAsNumber());
@@ -152,6 +158,9 @@ public final class DroneType {
         // Unknown enum names deserialize to null, so these also catch typos
         require(category != null, "missing or unknown 'category'");
         require(weaponType != null, "unknown 'weaponType'");
+        require(secondaryWeapon != null, "unknown 'secondaryWeapon'");
+        require(secondaryWeapon == WeaponType.NONE || (secondaryCapacity > 0 && secondaryWeapon != weaponType && weaponType != WeaponType.NONE),
+                "a 'secondaryWeapon' needs 'secondaryCapacity' > 0, a primary weapon, and must differ from it");
         require(maxSpeed > 0, "'maxSpeed' must be > 0");
         require(acceleration > 0, "'acceleration' must be > 0");
         require(batteryOrFuelCapacity > 0, "'batteryOrFuelCapacity' must be > 0");
@@ -171,7 +180,7 @@ public final class DroneType {
             require(payloadCapacity == 0 || payload != null, "hand-flown types with payload slots need 'payload' GRENADE or BOMB");
         } else if (category == Category.RAMP_AUTOPILOT) {
             require(controlScheme != null && !controlScheme.isHandFlown() && controlScheme != ControlScheme.MISSILE,
-                    "ramp-launched types need 'controlScheme' STICK, CLICK_DESIGNATE or GIMBAL_OBSERVE");
+                    "ramp-launched types need 'controlScheme' STICK, CLICK_DESIGNATE, GUNNER or GIMBAL_OBSERVE");
             require(defaultCruiseAltitude > 0, "ramp-launched types need 'defaultCruiseAltitude' > 0");
         } else {
             require(controlScheme == ControlScheme.MISSILE, "vertical strike types need 'controlScheme' MISSILE");
@@ -180,7 +189,7 @@ public final class DroneType {
         }
         if (!armed) {
             // blastPower is allowed: it's the fuel going up in a crash, not a warhead
-            require(!impactDetonates && weaponType == WeaponType.NONE && payloadCapacity == 0, "unarmed types can't detonate on impact or carry a weapon or payload");
+            require(!impactDetonates && weaponType == WeaponType.NONE && secondaryWeapon == WeaponType.NONE && payloadCapacity == 0, "unarmed types can't detonate on impact or carry a weapon or payload");
             require(controlScheme == null || controlScheme == ControlScheme.GIMBAL_OBSERVE, "unarmed types can only use GIMBAL_OBSERVE");
         }
     }
@@ -278,12 +287,12 @@ public final class DroneType {
 
     /** The weapon on {@code station} (0 = primary, 1 = secondary), or NONE. */
     public WeaponType getWeapon(int station) {
-        return station == 0 ? weaponType : WeaponType.NONE;
+        return station == 0 ? weaponType : station == 1 ? secondaryWeapon : WeaponType.NONE;
     }
 
     /** Rounds (or rocket bay units, for a rocket pod) {@code station} holds. */
     public int getStationCapacity(int station) {
-        return station == 0 ? payloadCapacity : 0;
+        return station == 0 ? payloadCapacity : station == 1 ? secondaryCapacity : 0;
     }
 
     /** The station with {@code weapon}, or -1 if the airframe doesn't carry it. */

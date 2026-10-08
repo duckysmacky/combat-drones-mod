@@ -79,8 +79,8 @@ behaviour, not this file.
    packets, clamp values to config bounds, and confirm the sender actually
    owns or is piloting the drone/munition in question before applying
    anything.
-4. **Physics is pure Java.** Flight/orientation math (racer and gunship
-   drone flight, loitering-munition routing, recon UAV autopilot, cruise
+4. **Physics is pure Java.** Flight/orientation math (racer and armed-plane
+   flight, loitering-munition routing, recon UAV autopilot, cruise
    missile climb and dive steering) lives in
    classes with zero `net.minecraft.*` imports, so it's JUnit-testable
    outside a Minecraft environment. Minecraft-side code adapts that output to
@@ -93,7 +93,7 @@ behaviour, not this file.
    never be hand-flown or steered into anything by its own pilot: it only
    takes routes and camera input, never a strike command. It carries no
    warhead, but a hard crash or being shot down sets off its fuel (a small
-   `blastPower`, like a gunship's); a gentle touchdown lands it intact.
+   `blastPower`, like an armed plane's); a gentle touchdown lands it intact.
 
 ## Working method
 

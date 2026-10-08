@@ -77,6 +77,11 @@ public final class ModConfig {
     public static int roundsPerRifleItem = 16;
     public static double rocketSpeed = 3.0;
     public static int rocketCooldownTicks = 15;
+    public static double cannonDamage = 8.0;
+    public static double cannonBlastPower = 1.0;
+    public static double cannonSpeed = 5.0;
+    public static double cannonCooldownTicks = 10.0;
+    public static double cannonSpread = 0.3;
     public static double gunDamagePerRound = 8.0;
     public static double gunCooldownTicks = 1.0;
     public static double gunSpread = 1.5;
@@ -275,6 +280,13 @@ public final class ModConfig {
                     "Gun rounds one Rifle Rounds item loads into an Attack Plane's belt.");
             rocketSpeed = defaults.number("weapons.rocketSpeed", rocketSpeed, 0.5, 10, "Rocket speed on top of the plane's own, in blocks/tick.");
             rocketCooldownTicks = (int) defaults.number("weapons.rocketCooldownTicks", rocketCooldownTicks, 1, 200, "Ticks between rockets while the trigger is held.");
+            cannonDamage = defaults.number("weapons.cannonDamage", cannonDamage, 0, 40,
+                    "Gunship cannon: damage (half-hearts) to whatever a shell hits directly, on top of its blast.");
+            cannonBlastPower = defaults.number("weapons.cannonBlastPower", cannonBlastPower, 0, 10, "Gunship cannon shell blast (vanilla TNT = 4).");
+            cannonSpeed = defaults.number("weapons.cannonSpeed", cannonSpeed, 0.5, 20, "Gunship cannon shell speed on top of the plane's own, in blocks/tick.");
+            cannonCooldownTicks = defaults.number("weapons.cannonCooldownTicks", cannonCooldownTicks, 1, 200,
+                    "Ticks between cannon shells while the trigger is held; fractions work.");
+            cannonSpread = defaults.number("weapons.cannonSpread", cannonSpread, 0, 10, "Gunship cannon spread: random aim error per shell, in degrees.");
             gunDamagePerRound = defaults.number("weapons.gunDamagePerRound", gunDamagePerRound, 0, 40, "Damage per gun round (half-hearts).");
             gunCooldownTicks = defaults.number("weapons.gunCooldownTicks", gunCooldownTicks, 1, 40,
                     "Ticks between gun rounds while the trigger is held; fractions work (1 = 20 rounds/s, 1.25 = 16 rounds/s).");

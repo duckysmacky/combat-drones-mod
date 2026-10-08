@@ -47,6 +47,7 @@ public final class ModNetwork {
         CHANNEL.registerMessage(ClientConfigReloadPacket.Handler.class, ClientConfigReloadPacket.class, id++, Side.CLIENT);
         CHANNEL.registerMessage(TabletActionPacket.Handler.class, TabletActionPacket.class, id++, Side.SERVER);
         CHANNEL.registerMessage(TabletStatusPacket.Handler.class, TabletStatusPacket.class, id++, Side.CLIENT);
+        CHANNEL.registerMessage(GunnerInputPacket.Handler.class, GunnerInputPacket.class, id++, Side.SERVER);
     }
 
     /** After a config reload: everyone gets the new stats right away. */

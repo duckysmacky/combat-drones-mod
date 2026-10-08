@@ -248,6 +248,9 @@ public class EntityLaunchRamp extends Entity {
         if (rocketKindOf(stack) != null) {
             return DroneType.WeaponType.ROCKET_POD;
         }
+        if (stack.getItem() == ModContent.cannonShell) {
+            return DroneType.WeaponType.CANNON;
+        }
         return stack.getItem() == ModContent.rifleRounds ? DroneType.WeaponType.GUN_MOUNT : null;
     }
 
@@ -263,7 +266,7 @@ public class EntityLaunchRamp extends Entity {
 
     /**
      * Loads as much of the held ammo as fits into the station that takes it: rockets into a rocket pod, rifle rounds
-     * onto a gun mount's belt. A pod holds one rocket size at a time, so loading the other size hands the rockets
+     * onto a gun mount's belt, shells into a cannon. A pod holds one rocket size at a time, so loading the other size hands the rockets
      * already in it back.
      */
     private void loadAmmo(EntityPlayer player, ItemStack stack) {
@@ -283,7 +286,7 @@ public class EntityLaunchRamp extends Entity {
             loadout.setAmmo(station, 0);
             loadout.setRocketKind(kind);
         }
-        int perItem = kind != null ? 1 : ModConfig.roundsPerRifleItem;
+        int perItem = stack.getItem() == ModContent.rifleRounds ? ModConfig.roundsPerRifleItem : 1;
         int capacity = loadout.capacity(type, station);
         int space = capacity - loadout.getAmmo(station);
         if (space <= 0) {

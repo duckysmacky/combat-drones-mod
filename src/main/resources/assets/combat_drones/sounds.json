@@ -126,6 +126,13 @@
       "combat_drones:gunship/gun1"
     ]
   },
+  "gunship.cannon": {
+    "category": "neutral",
+    "subtitle": "subtitles.combat_drones.gunship.cannon",
+    "sounds": [
+      "combat_drones:gunship/cannon"
+    ]
+  },
   "bullet.impact": {
     "category": "neutral",
     "subtitle": "subtitles.combat_drones.bullet.impact",

@@ -173,12 +173,13 @@ public class ItemDrone extends Item {
         } else {
             Tooltips.addDetails("tooltip.combat_drones.drone.setup_ramp", tooltip);
             // How "Take control" / View works for this unit
-            String control = type.isSensor() ? "sensor"
+            boolean gunner = type.getControlScheme() == DroneType.ControlScheme.GUNNER;
+            String control = type.isSensor() ? "sensor" : gunner ? "gunner"
                     : type.getWeaponType() != DroneType.WeaponType.NONE ? "armed_plane"
                     : type.getControlScheme() == null ? null : type.getControlScheme().name().toLowerCase(Locale.ROOT);
             if (control != null) {
                 Tooltips.addDetails("tooltip.combat_drones.drone.control." + control, tooltip,
-                        Tooltips.keyName(DroneKeys.FLIGHT_MODE), Tooltips.keyName(DroneKeys.TOGGLE_FPV));
+                        Tooltips.keyName(gunner ? DroneKeys.SWITCH_WEAPON : DroneKeys.FLIGHT_MODE), Tooltips.keyName(DroneKeys.TOGGLE_FPV));
             }
         }
     }

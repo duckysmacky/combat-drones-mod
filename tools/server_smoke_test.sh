@@ -1,9 +1,9 @@
 #!/bin/bash
-# Scripted dedicated-server regression run for ramp units: Dive, Destroy, low-fuel loiter dive, gunship Return,
+# Scripted dedicated-server regression run for ramp units: Dive, Destroy, low-fuel loiter dive, plane and gunship Return,
 # recon Loop and a low-fuel recon return. Summons units around the dev world's spawn, probes their positions with
 # /tp every 4 s, then prints a summary. Meant for a flat dev world (run/world); run from the repo root:
 #   tools/server_smoke_test.sh
-# Expect: dive/destroy/lowfuel disappear (craters near their targets), "ret" and "lowloop" drop as items near spawn,
+# Expect: dive/destroy/lowfuel disappear (craters near their targets), "ret", "retgs" and "lowloop" drop as items near spawn,
 # "loop" keeps flying its two waypoints, "crashg" and "crashu" (Medium speed into a stone wall) explode without
 # dropping an item. Server log: build/smoke/server.log
 set -u
@@ -46,6 +46,7 @@ summon lowfuel "$SX" $((SZ + 20)) loitering_light 300 0 "{Terminal:\"LOITER\",Lo
 summon destroy $((SX - 20)) "$SZ" loitering_light 3600 90 "{Terminal:\"DESTROY\",LoiterRadius:24d,Target:{X:$((SX - 120))d,Y:${GROUND}d,Z:$((SZ - 60))d},Waypoints:[$(wp $((SX - 100)) "$SZ")]}"
 summon loop    $((SX + 20)) $((SZ - 40)) recon_uav 24000 180 "{Terminal:\"LOOP\",LoiterRadius:24d,Waypoints:[$(wp "$SX" $((SZ - 100))),$(wp $((SX + 80)) $((SZ - 100)))]}"
 summon lowloop $((SX + 20)) $((SZ + 40)) recon_uav 2000 0 "{Terminal:\"LOOP\",LoiterRadius:24d,Waypoints:[$(wp "$SX" $((SZ + 100))),$(wp $((SX + 80)) $((SZ + 100)))]}"
+summon retgs   $((SX + 20)) $((SZ - 70)) gunship 7200 -90 "{Terminal:\"RETURN\",LoiterRadius:24d,Waypoints:[$(wp $((SX + 150)) $((SZ - 70)))]}"
 summon crashg  $((SX - 30)) $((SZ + 60)) attack_plane 6000 -90 "{Terminal:\"LOITER\",LoiterRadius:24d,Waypoints:[$(wp $((SX + 160)) $((SZ + 60)) MEDIUM)]}"
 summon crashu  $((SX - 30)) $((SZ + 90)) recon_uav 24000 -90 "{Terminal:\"LOITER\",LoiterRadius:24d,Waypoints:[$(wp $((SX + 160)) $((SZ + 90)) MEDIUM)]}"
 for _ in $(seq 1 25); do sleep 4; say "tp @e[type=$UNIT] ~ ~ ~"; done
@@ -55,7 +56,7 @@ say "save-all"
 say "stop"
 sleep 10
 exec 3>&-
-for name in dive destroy lowfuel ret loop lowloop crashg crashu; do
+for name in dive destroy lowfuel ret retgs loop lowloop crashg crashu; do
     printf '%-8s %2s probes, last: %s\n' "$name" "$(grep -c "Teleported $name " "$LOG")" \
         "$(grep "Teleported $name " "$LOG" | tail -1 | sed -E 's/.*to //' | cut -c1-48)"
 done
