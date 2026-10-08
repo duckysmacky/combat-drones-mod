@@ -33,7 +33,7 @@ public class RenderProjectile<T extends Entity> extends Render<T> {
     }
 
     public static RenderProjectile<EntityRocket> rocket(RenderManager renderManager) {
-        return new RenderProjectile<>(renderManager, rocket -> "rocket", true);
+        return new RenderProjectile<>(renderManager, rocket -> rocket.getKind().modelName(), true);
     }
 
     @Override

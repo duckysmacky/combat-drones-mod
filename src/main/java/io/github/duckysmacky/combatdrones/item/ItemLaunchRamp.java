@@ -9,9 +9,12 @@ import net.minecraft.util.EnumHand;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
 
-/** Places a Launch Ramp on top of a block, aimed exactly where the player is looking. */
+/** Places a Munition or Plane Ramp on top of a block, aimed exactly where the player is looking. */
 public class ItemLaunchRamp extends ItemWithTooltip {
-    public ItemLaunchRamp() {
+    private final EntityLaunchRamp.Kind kind;
+
+    public ItemLaunchRamp(EntityLaunchRamp.Kind kind) {
+        this.kind = kind;
         setMaxStackSize(4);
     }
 
@@ -21,7 +24,7 @@ public class ItemLaunchRamp extends ItemWithTooltip {
             return EnumActionResult.FAIL;
         }
         if (!world.isRemote) {
-            world.spawnEntity(new EntityLaunchRamp(world, pos.getX() + hitX, pos.getY() + 1, pos.getZ() + hitZ, player.rotationYaw));
+            world.spawnEntity(new EntityLaunchRamp(world, kind, pos.getX() + hitX, pos.getY() + 1, pos.getZ() + hitZ, player.rotationYaw));
             if (!player.capabilities.isCreativeMode) {
                 player.getHeldItem(hand).shrink(1);
             }

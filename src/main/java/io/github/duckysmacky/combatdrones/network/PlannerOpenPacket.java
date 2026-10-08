@@ -1,5 +1,7 @@
 package io.github.duckysmacky.combatdrones.network;
 
+import io.github.duckysmacky.combatdrones.type.Loadout;
+import io.github.duckysmacky.combatdrones.type.RocketType;
 import io.github.duckysmacky.combatdrones.client.ClientPacketHandlers;
 import io.github.duckysmacky.combatdrones.config.ModConfig;
 import io.github.duckysmacky.combatdrones.physics.Route;
@@ -29,7 +31,7 @@ public class PlannerOpenPacket implements IMessage {
         public double z;
         public float heading;
         public float fuelFraction;
-        public int ammo;
+        public Loadout loadout = new Loadout();
         public int waypointIndex;
         /** Altitudes in the route are relative to this. */
         public double originY;
@@ -44,7 +46,10 @@ public class PlannerOpenPacket implements IMessage {
             buf.writeDouble(z);
             buf.writeFloat(heading);
             buf.writeFloat(fuelFraction);
-            buf.writeShort(ammo);
+            for (int station = 0; station < Loadout.STATIONS; station++) {
+                buf.writeShort(loadout.getAmmo(station));
+            }
+            buf.writeByte(loadout.getRocketKind().ordinal());
             buf.writeInt(waypointIndex);
             buf.writeDouble(originY);
             RouteCodec.write(buf, route);
@@ -64,7 +69,10 @@ public class PlannerOpenPacket implements IMessage {
             view.z = buf.readDouble();
             view.heading = buf.readFloat();
             view.fuelFraction = buf.readFloat();
-            view.ammo = buf.readUnsignedShort();
+            for (int station = 0; station < Loadout.STATIONS; station++) {
+                view.loadout.setAmmo(station, buf.readUnsignedShort());
+            }
+            view.loadout.setRocketKind(RocketType.byIndex(buf.readUnsignedByte()));
             view.waypointIndex = buf.readInt();
             view.originY = buf.readDouble();
             view.route = RouteCodec.read(buf);

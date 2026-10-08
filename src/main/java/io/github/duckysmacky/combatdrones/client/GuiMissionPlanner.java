@@ -1,5 +1,7 @@
 package io.github.duckysmacky.combatdrones.client;
 
+import io.github.duckysmacky.combatdrones.item.ItemDrone;
+import io.github.duckysmacky.combatdrones.type.Loadout;
 import io.github.duckysmacky.combatdrones.entity.EntityRampUnit;
 import io.github.duckysmacky.combatdrones.network.IntelPacket;
 import io.github.duckysmacky.combatdrones.network.ModNetwork;
@@ -319,10 +321,13 @@ public class GuiMissionPlanner extends GuiScreen {
             fontRenderer.drawString(I18n.format("gui.combat_drones.planner.fuel", percent(unit.fuelFraction)), MARGIN, y,
                     unit.fuelFraction < view.minLaunchFuel ? WARNING : 0xFFFFFF);
             DroneType unitType = DroneTypes.get(unit.typeId);
-            if (unitType != null && unitType.getWeaponType() != DroneType.WeaponType.NONE) {
-                y += ROW;
-                fontRenderer.drawString(I18n.format("gui.combat_drones.planner.ammo", unit.ammo, unitType.getPayloadCapacity()), MARGIN, y,
-                        unit.ammo == 0 ? WARNING : 0xFFFFFF);
+            for (int station = 0; unitType != null && station < Loadout.STATIONS; station++) {
+                if (unitType.getWeapon(station) != DroneType.WeaponType.NONE) {
+                    int ammo = unit.loadout.getAmmo(station);
+                    y += ROW;
+                    fontRenderer.drawString(I18n.format("hud.combat_drones.ammo." + ItemDrone.ammoKey(unitType, station, unit.loadout), ammo,
+                            unit.loadout.capacity(unitType, station)), MARGIN, y, ammo == 0 ? WARNING : 0xFFFFFF);
+                }
             }
             y += ROW + 4;
         }

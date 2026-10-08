@@ -283,36 +283,41 @@ def dji_drone():
 
 # ---- launch ramp --------------------------------------------------------------------------------------------------
 
-def launch_ramp():
-    """Pneumatic catapult rail, 4 blocks long, 15 degrees: skid base, A-frame legs, twin beam rail, carriage."""
-    olive = Mat("#4f5a2c", noise=0.06, edge=0.2, patterns=(grime(0.3), rivets(4, 0.2)))
+def launch_ramp(name, blocks, frame_color):
+    """Pneumatic catapult rail at 15 degrees: skid base, A-frame legs, twin beam rail, carriage. Laid out for 4 blocks
+    and stretched along the rail to `blocks` (3 for the Munition Ramp, 5 for the Plane Ramp)."""
+    f = blocks / 4.0
+    frame = Mat(frame_color, noise=0.06, edge=0.2, patterns=(grime(0.3), rivets(4, 0.2)))
     rail_steel = Mat("#7a7f84", noise=0.05, edge=0.2, shine=0.2, patterns=(grime(0.15),))
     hazard = Mat("#d9b02a", noise=0.04, edge=0.1, patterns=(panel_lines(2, "u", 0.85),))
-    model = Model("launch_ramp", density=2)
+    model = Model(name, density=2)
     base = model.bone("base")
     for side in (1, -1):
-        base.box((side * 6, 0.75, 10), (1.5, 1.5, 44), olive)  # ground skids
-        base.box((side * 5.2, 9.5, -20), (1.2, 19, 1.2), olive, rotation=[-10, 0, side * 10], pivot=[side * 5.2, 0, -20])
-        base.box((side * 5.0, 6.0, -10), (1.0, 12, 1.0), olive, rotation=[-40, 0, 0], pivot=[side * 5.0, 1.5, -6])
-        base.box((side * 6, 0.25, -21.5), (3, 0.5, 3), DARK_STEEL)  # leg feet
+        base.box((side * 6, 0.75, 10 * f), (1.5, 1.5, 44 * f), frame)  # ground skids
+        # Front legs and braces reach up to the rail, which is higher the longer it is
+        base.box((side * 5.2, 9.5 * f, -20 * f), (1.2, 19 * f, 1.2), frame, rotation=[-10, 0, side * 10], pivot=[side * 5.2, 0, -20 * f])
+        base.box((side * 5.0, 6.0 * f, -10 * f), (1.0, 12 * f, 1.0), frame, rotation=[-40, 0, 0], pivot=[side * 5.0, 1.5, -6 * f])
+        base.box((side * 6, 0.25, -21.5 * f), (3, 0.5, 3), DARK_STEEL)  # leg feet
     for z in (28, 12, -4):
-        base.box((0, 0.75, z), (13.5, 1.0, 1.4), olive)
+        base.box((0, 0.75, z * f), (13.5, 1.0, 1.4), frame)
     for side in (1, -1):
-        base.box((side * 3.4, 3.0, 27), (1.2, 4.5, 1.2), olive)  # rear rail posts
-    base.box((9.5, 2.5, 20), (5, 5, 7), Mat("#4a542a", noise=0.05, edge=0.2, patterns=(vents("#2a2f18", 2),)))  # compressor
-    base.cylinder_z((9.5, 2.0, 11), 3, 8, Mat("#59652f", noise=0.05, edge=0.15))  # air tank
-    rail = model.bone("rail", pivot=(0, 7, 30), rotation=[-15, 0, 0])
+        base.box((side * 3.4, 3.0, 27 * f), (1.2, 4.5, 1.2), frame)  # rear rail posts
+    base.box((9.5, 2.5, 20 * f), (5, 5, 7), Mat("#4a542a", noise=0.05, edge=0.2, patterns=(vents("#2a2f18", 2),)))  # compressor
+    base.cylinder_z((9.5, 2.0, 11 * f), 3, 8, Mat("#59652f", noise=0.05, edge=0.15))  # air tank
+    rail = model.bone("rail", pivot=(0, 7, 30 * f), rotation=[-15, 0, 0])
     for side in (1, -1):
-        rail.box((side * 2.4, 6.0, -2), (1.2, 2.0, 64), rail_steel)
-        rail.box((side * 3.2, 5.3, -2), (0.6, 0.6, 64), Mat("#62676c", noise=0.04, edge=0.1))
-    for z in range(26, -34, -8):
-        rail.box((0, 5.4, z), (6.0, 0.8, 0.8), olive)
-    rail.cylinder_z((0, 3.6, 6), 2.2, 44, Mat("#3e4446", noise=0.04, edge=0.15, patterns=(zband(0.9, 0.97, "#c9a62a"),)))
-    rail.box((0, 6.0, -33.6), (6.4, 2.6, 0.8), hazard)  # end stop
-    carriage = model.bone("carriage", pivot=(0, 7, -4), parent="rail")
-    carriage.box((0, 8.0, -4), (5.4, 2.0, 9), Mat("#3b3f43", noise=0.05, edge=0.2, patterns=(rivets(3),)))
-    carriage.box((0, 9.3, 0.0), (3.0, 0.8, 0.8), RUBBER)
-    carriage.box((0, 9.3, -8.0), (3.0, 0.8, 0.8), RUBBER)
+        rail.box((side * 2.4, 6.0, -2 * f), (1.2, 2.0, 64 * f), rail_steel)
+        rail.box((side * 3.2, 5.3, -2 * f), (0.6, 0.6, 64 * f), Mat("#62676c", noise=0.04, edge=0.1))
+    z = 26 * f
+    while z > -34 * f:
+        rail.box((0, 5.4, z), (6.0, 0.8, 0.8), frame)
+        z -= 8
+    rail.cylinder_z((0, 3.6, 6 * f), 2.2, 44 * f, Mat("#3e4446", noise=0.04, edge=0.15, patterns=(zband(0.9, 0.97, "#c9a62a"),)))
+    rail.box((0, 6.0, -33.6 * f), (6.4, 2.6, 0.8), hazard)  # end stop
+    carriage = model.bone("carriage", pivot=(0, 7, -4 * f), parent="rail")
+    carriage.box((0, 8.0, -4 * f), (5.4, 2.0, 9), Mat("#3b3f43", noise=0.05, edge=0.2, patterns=(rivets(3),)))
+    carriage.box((0, 9.3, -4 * f + 4), (3.0, 0.8, 0.8), RUBBER)
+    carriage.box((0, 9.3, -4 * f - 4), (3.0, 0.8, 0.8), RUBBER)
     return model, None
 
 
@@ -440,7 +445,8 @@ MODELS = {
     "racer_standard": racer_standard,
     "racer_longrange": racer_longrange,
     "dji_drone": dji_drone,
-    "launch_ramp": launch_ramp,
+    "launch_ramp": lambda: launch_ramp("launch_ramp", 3, "#4f5a2c"),
+    "plane_ramp": lambda: launch_ramp("plane_ramp", 5, "#4c5560"),
     "bomb_light": bomb_light,
     "bomb": bomb,
     "bomb_heavy": bomb_heavy,

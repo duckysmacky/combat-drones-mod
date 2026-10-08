@@ -276,6 +276,26 @@ public final class DroneType {
         return weaponType;
     }
 
+    /** The weapon on {@code station} (0 = primary, 1 = secondary), or NONE. */
+    public WeaponType getWeapon(int station) {
+        return station == 0 ? weaponType : WeaponType.NONE;
+    }
+
+    /** Rounds (or rocket bay units, for a rocket pod) {@code station} holds. */
+    public int getStationCapacity(int station) {
+        return station == 0 ? payloadCapacity : 0;
+    }
+
+    /** The station with {@code weapon}, or -1 if the airframe doesn't carry it. */
+    public int stationOf(WeaponType weapon) {
+        for (int station = 0; station < Loadout.STATIONS; station++) {
+            if (weapon != WeaponType.NONE && getWeapon(station) == weapon) {
+                return station;
+            }
+        }
+        return -1;
+    }
+
     public boolean isImpactDetonates() {
         return impactDetonates;
     }

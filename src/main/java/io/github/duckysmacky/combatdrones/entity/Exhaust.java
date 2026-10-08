@@ -117,6 +117,16 @@ final class Exhaust {
         spawn(world, EnumParticleTypes.FLAME, here.add(back.scale(0.3)), back.scale(0.1), random, 0.03);
     }
 
+    /** Cannon shell: a thin glowing tracer line, no smoke. */
+    static void shellTracer(Entity shell) {
+        World world = shell.world;
+        Vec3d velocity = new Vec3d(shell.motionX, shell.motionY, shell.motionZ);
+        Vec3d here = shell.getPositionVector();
+        for (int index = 0; index < 3; index++) {
+            spawn(world, EnumParticleTypes.FIREWORKS_SPARK, here.subtract(velocity.scale(index / 3.0)), Vec3d.ZERO, world.rand, 0.02);
+        }
+    }
+
     private static Vec3d interpolate(Vec3d from, Vec3d to, double fraction) {
         return from.add(to.subtract(from).scale(fraction));
     }

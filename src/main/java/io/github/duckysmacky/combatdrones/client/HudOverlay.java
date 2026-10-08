@@ -1,5 +1,7 @@
 package io.github.duckysmacky.combatdrones.client;
 
+import io.github.duckysmacky.combatdrones.item.ItemDrone;
+import io.github.duckysmacky.combatdrones.type.Loadout;
 import io.github.duckysmacky.combatdrones.CombatDrones;
 import io.github.duckysmacky.combatdrones.config.ModConfig;
 import io.github.duckysmacky.combatdrones.entity.EntityCruiseMissile;
@@ -212,15 +214,19 @@ public final class HudOverlay {
         }
         if (!ClientIntel.getMarks().isEmpty()) {
             String targets = I18n.format("hud.combat_drones.targets", ClientIntel.getMarks().size());
-            drawText(font, targets, right - font.getStringWidth(targets), top + LINE * 2, WARNING);
+            drawText(font, targets, right - font.getStringWidth(targets), top + LINE * 3, WARNING);
         }
 
         String fuelText = I18n.format("hud.combat_drones.fuel", percent(fuel));
         drawText(font, fuelText, right - font.getStringWidth(fuelText), top, fuel < LOW_BATTERY ? WARNING : TEXT);
-        if (type.getWeaponType() != DroneType.WeaponType.NONE) {
-            String ammo = I18n.format("hud.combat_drones.ammo." + type.getWeaponType().name().toLowerCase(Locale.ROOT), unit.getAmmo(),
-                    type.getPayloadCapacity());
-            drawText(font, ammo, right - font.getStringWidth(ammo), top + LINE, unit.getAmmo() > 0 ? 0xFFAA00 : WARNING);
+        Loadout loadout = unit.getLoadout();
+        int ammoLine = 1;
+        for (int station = 0; station < Loadout.STATIONS; station++) {
+            if (type.getWeapon(station) != DroneType.WeaponType.NONE) {
+                String ammo = I18n.format("hud.combat_drones.ammo." + ItemDrone.ammoKey(type, station, loadout), loadout.getAmmo(station),
+                        loadout.capacity(type, station));
+                drawText(font, ammo, right - font.getStringWidth(ammo), top + LINE * ammoLine++, loadout.getAmmo(station) > 0 ? 0xFFAA00 : WARNING);
+            }
         }
 
         drawLadder(font, left, centerY, speedKmh, SPEED_PIXELS_PER_KMH, SPEED_TICK, true);

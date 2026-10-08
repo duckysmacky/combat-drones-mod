@@ -15,6 +15,8 @@ import io.github.duckysmacky.combatdrones.physics.Route;
 import io.github.duckysmacky.combatdrones.physics.RouteAutopilot;
 import io.github.duckysmacky.combatdrones.type.DroneType;
 import io.github.duckysmacky.combatdrones.type.DroneTypes;
+import io.github.duckysmacky.combatdrones.type.Loadout;
+import io.github.duckysmacky.combatdrones.type.RocketType;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.player.EntityPlayerMP;
@@ -86,7 +88,10 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder {
     private static final DataParameter<Optional<BlockPos>> STRIKE_POINT = EntityDataManager.createKey(EntityRampUnit.class, DataSerializers.OPTIONAL_BLOCK_POS);
     private static final DataParameter<Boolean> BOOSTING = EntityDataManager.createKey(EntityRampUnit.class, DataSerializers.BOOLEAN);
     private static final DataParameter<Boolean> STRIKING = EntityDataManager.createKey(EntityRampUnit.class, DataSerializers.BOOLEAN);
+    // Loadout, synced for the HUD: rounds or rockets left per weapon station, and the rocket size in the pod
     private static final DataParameter<Integer> AMMO = EntityDataManager.createKey(EntityRampUnit.class, DataSerializers.VARINT);
+    private static final DataParameter<Integer> AMMO_SECONDARY = EntityDataManager.createKey(EntityRampUnit.class, DataSerializers.VARINT);
+    private static final DataParameter<Integer> ROCKET_KIND = EntityDataManager.createKey(EntityRampUnit.class, DataSerializers.VARINT);
     private static final DataParameter<Float> HEALTH_FRACTION = EntityDataManager.createKey(EntityRampUnit.class, DataSerializers.FLOAT);
 
     protected final FixedWingFlight.State flight = new FixedWingFlight.State();
@@ -135,9 +140,9 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder {
     }
 
     /** A unit leaving its ramp: launched along {@code heading} at cruise speed with a slight climb. */
-    public EntityRampUnit(World world, DroneType type, @Nullable UUID owner, Route route, double fuel, int ammo, double x, double y, double z, float heading) {
+    public EntityRampUnit(World world, DroneType type, @Nullable UUID owner, Route route, double fuel, Loadout loadout, double x, double y, double z, float heading) {
         this(world);
-        dataManager.set(AMMO, ammo);
+        setLoadout(loadout);
         dataManager.set(TYPE_ID, type.getId());
         this.owner = owner;
         this.route = route;
@@ -162,6 +167,8 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder {
         dataManager.register(FUEL_FRACTION, 1.0F);
         dataManager.register(HEALTH_FRACTION, 1.0F);
         dataManager.register(AMMO, 0);
+        dataManager.register(AMMO_SECONDARY, 0);
+        dataManager.register(ROCKET_KIND, 0);
         dataManager.register(STRIKING, false);
         dataManager.register(STRIKE_POINT, Optional.absent());
         dataManager.register(BOOSTING, false);
@@ -205,9 +212,19 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder {
         return dataManager.get(STRIKING);
     }
 
-    /** Rockets or rounds left (synced for the HUD). */
-    public int getAmmo() {
-        return dataManager.get(AMMO);
+    /** Rockets and rounds left (synced for the HUD). A copy: change it through {@link #setLoadout}. */
+    public Loadout getLoadout() {
+        Loadout loadout = new Loadout();
+        loadout.setAmmo(0, dataManager.get(AMMO));
+        loadout.setAmmo(1, dataManager.get(AMMO_SECONDARY));
+        loadout.setRocketKind(RocketType.byIndex(dataManager.get(ROCKET_KIND)));
+        return loadout;
+    }
+
+    private void setLoadout(Loadout loadout) {
+        dataManager.set(AMMO, loadout.getAmmo(0));
+        dataManager.set(AMMO_SECONDARY, loadout.getAmmo(1));
+        dataManager.set(ROCKET_KIND, loadout.getRocketKind().ordinal());
     }
 
     public float getHealthFraction() {
@@ -447,39 +464,42 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder {
             manualTrigger = false;
         }
         if (manualTrigger) {
-            fireWeapon(type);
+            fireWeapon(type, 0, Vec3d.fromPitchYaw(rotationPitch, rotationYaw));
         }
         double throttle = boosting ? 1 : manualThrottle;
         return manualFree ? FixedWingFlight.fromRates(flight, params, manualPitch, manualRoll, throttle, fuel > 0)
                 : FixedWingFlight.fromStick(manualPitch, manualRoll, throttle, fuel > 0);
     }
 
-    /** Fires one rocket or round along the nose, if the weapon is ready and there's ammo. Manual control only. */
-    private void fireWeapon(DroneType type) {
-        int ammo = getAmmo();
-        if (type.getWeaponType() == DroneType.WeaponType.NONE || weaponCooldown > 0 || ammo <= 0) {
+    /**
+     * Fires one rocket or round from {@code station} along {@code aim} (a unit vector), if the weapon is ready and
+     * there's ammo. Manual control only.
+     */
+    private void fireWeapon(DroneType type, int station, Vec3d aim) {
+        Loadout loadout = getLoadout();
+        DroneType.WeaponType weapon = type.getWeapon(station);
+        if (weapon == DroneType.WeaponType.NONE || weaponCooldown > 0 || loadout.getAmmo(station) <= 0) {
             return;
         }
-        dataManager.set(AMMO, ammo - 1);
-        Vec3d nose = Vec3d.fromPitchYaw(rotationPitch, rotationYaw);
-        Vec3d muzzle = new Vec3d(posX, posY + height / 2, posZ).add(nose.scale(1.2));
-        if (type.getWeaponType() == DroneType.WeaponType.ROCKET_POD) {
+        loadout.setAmmo(station, loadout.getAmmo(station) - 1);
+        setLoadout(loadout);
+        Vec3d muzzle = new Vec3d(posX, posY + height / 2, posZ).add(aim.scale(Math.max(1.2, width)));
+        if (weapon == DroneType.WeaponType.ROCKET_POD) {
             weaponCooldown += ModConfig.rocketCooldownTicks;
-            Vec3d velocity = nose.scale(ModConfig.rocketSpeed).add(flight.velocity.x, flight.velocity.y, flight.velocity.z);
-            world.spawnEntity(new EntityRocket(world, this, owner, muzzle, velocity));
-            world.playSound(null, posX, posY, posZ, ModSounds.GUNSHIP_ROCKET, SoundCategory.NEUTRAL, 4.5F, 1.0F);
+            RocketType kind = loadout.getRocketKind();
+            Vec3d velocity = aim.scale(ModConfig.rocketSpeed).add(flight.velocity.x, flight.velocity.y, flight.velocity.z);
+            world.spawnEntity(new EntityRocket(world, this, owner, muzzle, velocity,
+                    kind == RocketType.HEAVY ? EntityRocket.Kind.HEAVY_ROCKET : EntityRocket.Kind.ROCKET, (float) kind.getBlastPower(), 0));
+            world.playSound(null, posX, posY, posZ, ModSounds.GUNSHIP_ROCKET, SoundCategory.NEUTRAL, 4.5F, kind == RocketType.HEAVY ? 0.8F : 1.0F);
         } else {
             weaponCooldown += ModConfig.gunCooldownTicks;
-            fireRound(muzzle);
+            fireRound(muzzle, aim);
         }
     }
 
-    /** Gun mount: hitscan along the nose with a little spread; nearby players see a tracer. */
-    private void fireRound(Vec3d muzzle) {
-        float spread = (float) ModConfig.gunSpread;
-        Vec3d direction = Vec3d.fromPitchYaw(rotationPitch + (float) rand.nextGaussian() * spread / 2,
-                rotationYaw + (float) rand.nextGaussian() * spread / 2);
-        Vec3d end = muzzle.add(direction.scale(ModConfig.gunRange));
+    /** Gun mount: hitscan along {@code aim} with a little spread; nearby players see a tracer. */
+    private void fireRound(Vec3d muzzle, Vec3d aim) {
+        Vec3d end = muzzle.add(spread(aim, ModConfig.gunSpread).scale(ModConfig.gunRange));
         RayTraceResult hit = Raytrace.firstResult(world, muzzle, end, this, ModConfig.gunHitMargin);
         if (hit != null && hit.entityHit != null) {
             if (hit.entityHit instanceof EntityLivingBase) {
@@ -493,6 +513,13 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder {
         ModNetwork.CHANNEL.sendToAllAround(new GunFirePacket(muzzle, impact, hit != null, getEntityId()),
                 new NetworkRegistry.TargetPoint(world.provider.getDimension(), posX, posY, posZ, 160));
         world.playSound(null, posX, posY, posZ, ModSounds.GUNSHIP_GUN, SoundCategory.NEUTRAL, 4.5F, 0.9F + rand.nextFloat() * 0.2F);
+    }
+
+    /** {@code aim} turned by a random aim error with a standard deviation of half {@code degrees}. */
+    private Vec3d spread(Vec3d aim, double degrees) {
+        float pitch = (float) Math.toDegrees(-Math.asin(MathHelper.clamp(aim.y, -1, 1)));
+        float yaw = (float) Math.toDegrees(Math.atan2(-aim.x, aim.z));
+        return Vec3d.fromPitchYaw(pitch + (float) (rand.nextGaussian() * degrees / 2), yaw + (float) (rand.nextGaussian() * degrees / 2));
     }
 
     /** Server: latest manual input from the network. Only the current controller's input counts; values arrive clamped. */
@@ -640,7 +667,7 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder {
         world.playSound(null, posX, posY, posZ, ModSounds.DRONE_HIT, SoundCategory.NEUTRAL, 1.0F, 0.5F);
         Item item = ForgeRegistries.ITEMS.getValue(new ResourceLocation(CombatDrones.MOD_ID, type.getId()));
         if (item != null) {
-            entityDropItem(ItemDrone.withAmmo(ItemDrone.withFuel(new ItemStack(item), fuel), getAmmo()), 0.2F);
+            entityDropItem(ItemDrone.withLoadout(ItemDrone.withFuel(new ItemStack(item), fuel), getLoadout()), 0.2F);
         }
     }
 
@@ -713,7 +740,7 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder {
         compound.setDouble("HomeZ", homeZ);
         compound.setDouble("Fuel", fuel);
         compound.setFloat("Health", health);
-        compound.setInteger("Ammo", getAmmo());
+        ItemDrone.writeLoadout(compound, getLoadout());
         if (designatedTarget != null) {
             compound.setDouble("DesignatedX", designatedTarget.x);
             compound.setDouble("DesignatedY", designatedTarget.y);
@@ -736,7 +763,7 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder {
         homeZ = compound.hasKey("HomeZ") ? compound.getDouble("HomeZ") : Double.NaN;
         fuel = compound.getDouble("Fuel");
         setHealth(compound.getFloat("Health"));
-        dataManager.set(AMMO, compound.getInteger("Ammo"));
+        setLoadout(ItemDrone.readLoadout(compound));
         designatedTarget = compound.hasKey("DesignatedX")
                 ? new Vec3d(compound.getDouble("DesignatedX"), compound.getDouble("DesignatedY"), compound.getDouble("DesignatedZ")) : null;
         dataManager.set(STRIKING, designatedTarget != null);

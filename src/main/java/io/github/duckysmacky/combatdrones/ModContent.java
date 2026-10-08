@@ -23,6 +23,7 @@ import io.github.duckysmacky.combatdrones.type.BatteryPack;
 import io.github.duckysmacky.combatdrones.type.BombType;
 import io.github.duckysmacky.combatdrones.type.DroneType;
 import io.github.duckysmacky.combatdrones.type.DroneTypes;
+import io.github.duckysmacky.combatdrones.type.RocketType;
 import net.minecraft.block.Block;
 import net.minecraft.block.material.Material;
 import net.minecraft.creativetab.CreativeTabs;
@@ -85,8 +86,8 @@ public final class ModContent {
         List<List<Item>> groups = Arrays.asList(
                 Arrays.asList(fpvRemote, fpvGoggles),
                 Arrays.asList(lightBattery, standardBattery, heavyBattery, fragGrenade, bombLight, bomb, bombHeavy),
-                Arrays.asList(launchRamp, missionPlanner, fuelCan, missilePad, missileTablet),
-                Arrays.asList(rocket, rifleRounds));
+                Arrays.asList(launchRamp, planeRamp, missionPlanner, fuelCan, missilePad, missileTablet),
+                Arrays.asList(rocket, rocketHeavy, rifleRounds));
         for (int group = 0; group < groups.size(); group++) {
             int index = groups.get(group).indexOf(item);
             if (index >= 0) {
@@ -104,6 +105,7 @@ public final class ModContent {
     public static final List<Item> ITEMS = new ArrayList<>();
 
     public static Item launchRamp;
+    public static Item planeRamp;
     public static Item missilePad;
     public static Item missileTablet;
     public static Block rearmStation;
@@ -120,6 +122,7 @@ public final class ModContent {
     public static Item bomb;
     public static Item bombHeavy;
     public static Item rocket;
+    public static Item rocketHeavy;
     public static Item rifleRounds;
 
     private ModContent() {
@@ -134,7 +137,8 @@ public final class ModContent {
     // Forge fires the block registry event before the item one, so the blocks exist here
     @SubscribeEvent
     public static void registerItems(RegistryEvent.Register<Item> event) {
-        launchRamp = register(event, named(new ItemLaunchRamp(), "launch_ramp"));
+        launchRamp = register(event, named(new ItemLaunchRamp(EntityLaunchRamp.Kind.MUNITION), EntityLaunchRamp.Kind.MUNITION.getName()));
+        planeRamp = register(event, named(new ItemLaunchRamp(EntityLaunchRamp.Kind.PLANE), EntityLaunchRamp.Kind.PLANE.getName()));
         register(event, new ItemBlockWithTooltip(rearmStation));
         fpvRemote = register(event, named(new ItemRemote(), "fpv_remote"));
         fpvGoggles = register(event, named(new ItemGoggles(GOGGLES_MATERIAL), "fpv_goggles"));
@@ -149,7 +153,8 @@ public final class ModContent {
         bombLight = register(event, named(new ItemBomb(BombType.LIGHT, 64), BombType.LIGHT.itemName()));
         bomb = register(event, named(new ItemBomb(BombType.MEDIUM, 32), BombType.MEDIUM.itemName()));
         bombHeavy = register(event, named(new ItemBomb(BombType.HEAVY, 16), BombType.HEAVY.itemName()));
-        rocket = register(event, simpleItem("rocket"));
+        rocket = register(event, simpleItem(RocketType.LIGHT.itemName()));
+        rocketHeavy = register(event, simpleItem(RocketType.HEAVY.itemName()).setMaxStackSize(16));
         rifleRounds = register(event, simpleItem("rifle_rounds"));
         // One placeable item per data-defined type; the registry name is the type ID
         for (DroneType type : DroneTypes.all()) {
@@ -253,6 +258,14 @@ public final class ModContent {
             default:
                 return bomb;
         }
+    }
+
+    public static Item rampItem(EntityLaunchRamp.Kind kind) {
+        return kind == EntityLaunchRamp.Kind.PLANE ? planeRamp : launchRamp;
+    }
+
+    public static Item rocketItem(RocketType kind) {
+        return kind == RocketType.HEAVY ? rocketHeavy : rocket;
     }
 
     public static Item batteryItem(BatteryPack pack) {

@@ -7,6 +7,7 @@ import io.github.duckysmacky.combatdrones.physics.CruiseMissileFlight;
 import io.github.duckysmacky.combatdrones.physics.HandFlownFlight;
 import io.github.duckysmacky.combatdrones.physics.Route;
 import io.github.duckysmacky.combatdrones.type.DroneType;
+import io.github.duckysmacky.combatdrones.type.Loadout;
 import net.minecraft.entity.MoverType;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.nbt.NBTTagCompound;
@@ -76,7 +77,7 @@ public class EntityCruiseMissile extends EntityRampUnit {
 
     /** A missile lighting up on its pad: upright, still, on the pad's heading. */
     public EntityCruiseMissile(World world, DroneType type, @Nullable UUID owner, UUID padId, double fuel, double x, double y, double z, float heading) {
-        super(world, type, owner, Route.empty(Route.TerminalAction.LOITER), fuel, 0, x, y, z, heading);
+        super(world, type, owner, Route.empty(Route.TerminalAction.LOITER), fuel, new Loadout(), x, y, z, heading);
         this.padId = padId;
         flight.pitch = -90;
         flight.speed = 0;

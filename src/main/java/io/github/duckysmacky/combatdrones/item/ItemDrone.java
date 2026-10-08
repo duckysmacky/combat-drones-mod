@@ -6,6 +6,8 @@ import io.github.duckysmacky.combatdrones.entity.EntityHandFlownDrone;
 import io.github.duckysmacky.combatdrones.type.BombType;
 import io.github.duckysmacky.combatdrones.type.DroneType;
 import io.github.duckysmacky.combatdrones.type.DroneTypes;
+import io.github.duckysmacky.combatdrones.type.Loadout;
+import io.github.duckysmacky.combatdrones.type.RocketType;
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.resources.I18n;
 import net.minecraft.client.util.ITooltipFlag;
@@ -37,6 +39,8 @@ public class ItemDrone extends Item {
 
     private static final String TAG_FUEL = "Fuel";
     private static final String TAG_AMMO = "Ammo";
+    private static final String TAG_AMMO_SECONDARY = "Ammo2";
+    private static final String TAG_ROCKET_KIND = "RocketKind";
 
     /** Fuel stored in a ramp-launched unit's item (kept when it's taken off a ramp or lands). */
     public static double getFuel(ItemStack stack) {
@@ -53,19 +57,42 @@ public class ItemDrone extends Item {
         return stack;
     }
 
-    /** Rockets or rounds loaded in a gunship's item (kept when it's taken off a ramp or lands). */
-    public static int getAmmo(ItemStack stack) {
+    /** Rockets and rounds loaded in an armed plane's item (kept when it's taken off a ramp or lands). */
+    public static Loadout getLoadout(ItemStack stack) {
         NBTTagCompound tag = stack.getTagCompound();
-        return tag != null ? Math.max(0, tag.getInteger(TAG_AMMO)) : 0;
+        return tag != null ? readLoadout(tag) : new Loadout();
     }
 
-    public static ItemStack withAmmo(ItemStack stack, int ammo) {
-        if (ammo > 0) {
+    public static ItemStack withLoadout(ItemStack stack, Loadout loadout) {
+        if (!loadout.isEmpty()) {
             NBTTagCompound tag = stack.hasTagCompound() ? stack.getTagCompound() : new NBTTagCompound();
-            tag.setInteger(TAG_AMMO, ammo);
+            writeLoadout(tag, loadout);
             stack.setTagCompound(tag);
         }
         return stack;
+    }
+
+    /** The loadout under the shared keys an item, a ramp and a flying unit all save it with. */
+    public static Loadout readLoadout(NBTTagCompound tag) {
+        Loadout loadout = new Loadout();
+        loadout.setAmmo(0, tag.getInteger(TAG_AMMO));
+        loadout.setAmmo(1, tag.getInteger(TAG_AMMO_SECONDARY));
+        // Missing (older saves, from before rocket sizes) reads as 0: light rockets
+        loadout.setRocketKind(RocketType.byIndex(tag.getInteger(TAG_ROCKET_KIND)));
+        return loadout;
+    }
+
+    public static void writeLoadout(NBTTagCompound tag, Loadout loadout) {
+        tag.setInteger(TAG_AMMO, loadout.getAmmo(0));
+        tag.setInteger(TAG_AMMO_SECONDARY, loadout.getAmmo(1));
+        tag.setInteger(TAG_ROCKET_KIND, loadout.getRocketKind().ordinal());
+    }
+
+    /** Translation key naming the ammo {@code station} takes, by weapon (and rocket size for a pod). */
+    public static String ammoKey(DroneType type, int station, Loadout loadout) {
+        DroneType.WeaponType weapon = type.getWeapon(station);
+        String key = weapon.name().toLowerCase(Locale.ROOT);
+        return weapon == DroneType.WeaponType.ROCKET_POD ? key + "." + loadout.getRocketKind().key() : key;
     }
 
     /** Looked up on use rather than cached, so server-synced type stats are always the ones applied. */
@@ -89,9 +116,12 @@ public class ItemDrone extends Item {
             double fuel = getFuel(stack);
             tooltip.add(TextFormatting.YELLOW + I18n.format("tooltip.combat_drones.drone.fuel",
                     Math.round(Math.min(1, fuel / type.getBatteryOrFuelCapacity()) * 100)));
-            if (type.getWeaponType() != DroneType.WeaponType.NONE) {
-                tooltip.add(TextFormatting.YELLOW + I18n.format("tooltip.combat_drones.drone.ammo." + type.getWeaponType().name().toLowerCase(Locale.ROOT),
-                        getAmmo(stack), type.getPayloadCapacity()));
+            Loadout loadout = getLoadout(stack);
+            for (int station = 0; station < Loadout.STATIONS; station++) {
+                if (type.getWeapon(station) != DroneType.WeaponType.NONE) {
+                    tooltip.add(TextFormatting.YELLOW + I18n.format("tooltip.combat_drones.drone.ammo." + ammoKey(type, station, loadout),
+                            loadout.getAmmo(station), loadout.capacity(type, station)));
+                }
             }
         }
         if (!GuiScreen.isShiftKeyDown()) {

@@ -9,6 +9,7 @@ import io.github.duckysmacky.combatdrones.type.BatteryPack;
 import io.github.duckysmacky.combatdrones.type.BombType;
 import io.github.duckysmacky.combatdrones.type.DroneType;
 import io.github.duckysmacky.combatdrones.type.DroneTypes;
+import io.github.duckysmacky.combatdrones.type.RocketType;
 
 import javax.annotation.Nullable;
 import java.io.File;
@@ -31,6 +32,7 @@ import java.util.Map;
  *       {@link #reloadClient}.</li>
  *   <li>{@code [batteries.<size>]}: battery pack capacity and weight multipliers, synced to clients.</li>
  *   <li>{@code [bombs.<size>]}: bomb bay size, blast power and weight, synced to clients.</li>
+ *   <li>{@code [rockets.<size>]}: rocket pod bay size and blast power, synced to clients.</li>
  *   <li>{@code [drones.<id>]}: per-type balance stats, defaulting to the bundled drone type data. The server's
  *       values are synced to clients on login.</li>
  * </ul>
@@ -39,7 +41,7 @@ public final class ModConfig {
     public static final String FILE_NAME = CombatDrones.MOD_ID + ".toml";
     /** Keys from older versions, removed from existing files so they don't look like live settings. */
     private static final String[] RETIRED_KEYS = {"general.bombBlastPower", "missiles.missilePreparingSeconds", "missiles.inboundDelaySeconds",
-            "drones.gunship_rocket", "drones.gunship_gun"};
+            "drones.gunship_rocket", "drones.gunship_gun", "weapons.rocketBlastPower"};
 
     // [general]
     public static boolean blockDamageEnabled = true;
@@ -73,7 +75,6 @@ public final class ModConfig {
 
     // [weapons]
     public static int roundsPerRifleItem = 16;
-    public static double rocketBlastPower = 3.0;
     public static double rocketSpeed = 3.0;
     public static int rocketCooldownTicks = 15;
     public static double gunDamagePerRound = 8.0;
@@ -272,7 +273,6 @@ public final class ModConfig {
 
             roundsPerRifleItem = (int) defaults.number("weapons.roundsPerRifleItem", roundsPerRifleItem, 1, 256,
                     "Gun rounds one Rifle Rounds item loads into an Attack Plane's belt.");
-            rocketBlastPower = defaults.number("weapons.rocketBlastPower", rocketBlastPower, 0, 20, "Rocket explosion power (vanilla TNT = 4).");
             rocketSpeed = defaults.number("weapons.rocketSpeed", rocketSpeed, 0.5, 10, "Rocket speed on top of the plane's own, in blocks/tick.");
             rocketCooldownTicks = (int) defaults.number("weapons.rocketCooldownTicks", rocketCooldownTicks, 1, 200, "Ticks between rockets while the trigger is held.");
             gunDamagePerRound = defaults.number("weapons.gunDamagePerRound", gunDamagePerRound, 0, 40, "Damage per gun round (half-hearts).");
@@ -335,6 +335,12 @@ public final class ModConfig {
                         defaults.number(table + ".weightPerBomb", bomb.getDefaultWeight(), 0, 0.5, null));
             }
 
+            for (RocketType rocket : RocketType.values()) {
+                String table = "rockets." + rocket.key();
+                rocket.set((int) defaults.number(table + ".bayUnits", rocket.getDefaultBayUnits(), 1, 16, null),
+                        defaults.number(table + ".blastPower", rocket.getDefaultBlastPower(), 0, 20, null));
+            }
+
             for (DroneType type : DroneTypes.all()) {
                 applyDroneTable(defaults, type);
             }
@@ -350,6 +356,8 @@ public final class ModConfig {
                     + "(defined for a Standard pack); performanceMultiplier scales its top speed and acceleration (pack weight).");
             defaults.comment("bombs", "Bombs for DJI-style drones. bayUnits: space taken in a drone's bomb bay (its payloadCapacity); "
                     + "blastPower: vanilla scale (TNT = 4); weightPerBomb: share of top speed and acceleration lost per bomb carried.");
+            defaults.comment("rockets", "Rockets for rocket pods, one size loaded at a time. bayUnits: space taken in the pod (the plane's "
+                    + "payloadCapacity); blastPower: vanilla scale (TNT = 4).");
             defaults.comment("drones", "Per-drone-type stats. Units: speed in blocks/tick (1 = 72 km/h), acceleration in blocks/tick², "
                     + "capacity (with a Standard pack) and drain in charge units (full-throttle flight time = capacity / drain ticks), blastPower on the vanilla "
                     + "scale (TNT = 4), maxHP like mob health, signalRange and motorSoundRange in blocks.");
