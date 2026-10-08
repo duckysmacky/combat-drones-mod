@@ -299,7 +299,7 @@ public class EntityLaunchRamp extends Entity {
 
     @Override
     protected void readEntityFromNBT(NBTTagCompound compound) {
-        dataManager.set(UNIT_TYPE, compound.getString("Unit"));
+        dataManager.set(UNIT_TYPE, DroneTypes.migrateId(compound.getString("Unit")));
         owner = compound.hasUniqueId("Owner") ? compound.getUniqueId("Owner") : null;
         setFuel(compound.getDouble("Fuel"));
         ammo = compound.getInteger("Ammo");

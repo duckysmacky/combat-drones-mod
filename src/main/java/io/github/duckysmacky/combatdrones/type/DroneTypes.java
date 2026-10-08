@@ -11,6 +11,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.regex.Pattern;
@@ -23,6 +24,13 @@ import java.util.regex.Pattern;
 public final class DroneTypes {
     private static final String BUNDLED_DIR = "assets/" + CombatDrones.MOD_ID + "/drone_types";
     private static final Pattern VALID_ID = Pattern.compile("[a-z0-9_]+");
+    /** Type IDs that were renamed, old to new, so saved units and items carry over. */
+    private static final Map<String, String> RENAMED = new HashMap<>();
+
+    static {
+        RENAMED.put("gunship_rocket", "strike_plane");
+        RENAMED.put("gunship_gun", "attack_plane");
+    }
 
     // Sorted so item registration and creative-tab order don't depend on filesystem iteration order
     private static final Map<String, DroneType> TYPES = new TreeMap<>();
@@ -38,6 +46,11 @@ public final class DroneTypes {
 
     public static DroneType get(String id) {
         return TYPES.get(id);
+    }
+
+    /** The current ID for a type ID read from an older save: renamed types map to their new ID, the rest stay. */
+    public static String migrateId(String id) {
+        return RENAMED.getOrDefault(id, id);
     }
 
     /** Must run in preInit: registry events fire right after it and register one item per type. */

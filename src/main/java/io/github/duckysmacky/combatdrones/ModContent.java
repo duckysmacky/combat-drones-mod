@@ -38,6 +38,7 @@ import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.registry.EntityEntry;
 import net.minecraftforge.fml.common.registry.EntityEntryBuilder;
+import net.minecraftforge.fml.common.registry.ForgeRegistries;
 import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.fml.relauncher.SideOnly;
 
@@ -66,7 +67,7 @@ public final class ModContent {
 
     /** Hand-flown, then ramp-launched drones in this order; types not listed go last in their group. */
     private static final List<String> DRONE_TAB_ORDER = Arrays.asList("racer_micro", "racer_standard", "racer_longrange", "dji_drone",
-            "loitering_light", "loitering_heavy", "gunship_rocket", "gunship_gun", "recon_uav", "cruise_missile");
+            "loitering_light", "loitering_heavy", "strike_plane", "attack_plane", "gunship", "recon_uav", "cruise_missile");
 
     /**
      * Creative tab position: FPV gear (0+), hand-flown drones (100+), batteries and payloads (200+), ramp gear (400+),
@@ -166,12 +167,23 @@ public final class ModContent {
         }
     }
 
-    /** The Missile Control Tablet was briefly the Strike Laptop: those items carry over (link and all). */
+    /**
+     * Renamed items carry over: the Missile Control Tablet was briefly the Strike Laptop (link and all), and the
+     * Strike and Attack Planes were the two Gunship Planes (fuel and ammo kept).
+     */
     @SubscribeEvent
     public static void remapRenamedItems(RegistryEvent.MissingMappings<Item> event) {
         for (RegistryEvent.MissingMappings.Mapping<Item> mapping : event.getAllMappings()) {
             if (mapping.key.equals(new ResourceLocation(CombatDrones.MOD_ID, "strike_laptop"))) {
                 mapping.remap(missileTablet);
+                continue;
+            }
+            String renamed = DroneTypes.migrateId(mapping.key.getPath());
+            if (mapping.key.getNamespace().equals(CombatDrones.MOD_ID) && !renamed.equals(mapping.key.getPath())) {
+                Item item = ForgeRegistries.ITEMS.getValue(new ResourceLocation(CombatDrones.MOD_ID, renamed));
+                if (item != null) {
+                    mapping.remap(item);
+                }
             }
         }
     }

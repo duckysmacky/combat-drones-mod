@@ -144,7 +144,7 @@ public class ItemDrone extends Item {
             Tooltips.addDetails("tooltip.combat_drones.drone.setup_ramp", tooltip);
             // How "Take control" / View works for this unit
             String control = type.isSensor() ? "sensor"
-                    : type.getWeaponType() != DroneType.WeaponType.NONE ? "gunship"
+                    : type.getWeaponType() != DroneType.WeaponType.NONE ? "armed_plane"
                     : type.getControlScheme() == null ? null : type.getControlScheme().name().toLowerCase(Locale.ROOT);
             if (control != null) {
                 Tooltips.addDetails("tooltip.combat_drones.drone.control." + control, tooltip,

@@ -113,12 +113,12 @@ def loitering_heavy():
     return model, (1.2, 0.5)
 
 
-def gunship(weapon):
+def light_plane(name, weapon):
     """Light armed fixed-wing: camera-nosed fuselage, straight high wing, twin tractor props, V-tail. ~3.6 x 2.6."""
     skin = Mat("#b8bdc2", noise=0.035, edge=0.12, shine=0.1, patterns=(panel_lines(9, "v", 0.1),))
     wing = Mat("#bfc4c8", noise=0.03, edge=0.2, patterns=(panel_lines(8, "u", 0.08),))
     accent = Mat("#4b5056", noise=0.04, edge=0.15)
-    model = Model("gunship_" + weapon, density=2, scale=1.2)
+    model = Model(name, density=2, scale=1.2)
     body = model.bone("body")
     body.cylinder_z((0, 0, -1), 5.6, 22, skin)
     body.cylinder_z((0, 0.4, 13), 3.2, 10, skin)
@@ -433,8 +433,8 @@ def missile_pad():
 MODELS = {
     "loitering_light": loitering_light,
     "loitering_heavy": loitering_heavy,
-    "gunship_rocket": lambda: gunship("rocket"),
-    "gunship_gun": lambda: gunship("gun"),
+    "strike_plane": lambda: light_plane("strike_plane", "rocket"),
+    "attack_plane": lambda: light_plane("attack_plane", "gun"),
     "recon_uav": recon_uav,
     "racer_micro": racer_micro,
     "racer_standard": racer_standard,

@@ -121,6 +121,17 @@ class FixedWingFlightTest {
     }
 
     @Test
+    void pitchAgilityOnlySpeedsUpPitch() {
+        Params snappy = new Params(1.0, 0.1, 1.0, 2.0);
+        State plane = cruising();
+        State pitchy = cruising();
+        FixedWingFlight.step(plane, new Controls(45, -30, 0.8, true), PLANE);
+        FixedWingFlight.step(pitchy, new Controls(45, -30, 0.8, true), snappy);
+        assertEquals(plane.pitch * 2, pitchy.pitch, 1e-6);
+        assertEquals(plane.bank, pitchy.bank, 1e-6);
+    }
+
+    @Test
     void boostRaisesTopSpeed() {
         State state = cruising();
         run(state, new Controls(0, 0, 1, true), 300);

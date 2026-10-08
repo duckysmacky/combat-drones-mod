@@ -41,12 +41,12 @@ say "kill @e[type=$UNIT]"; say "kill @e[type=item]"; sleep 1
 # A tall stone wall across the crash cases' path (east of spawn, south side), removed again at the end
 say "fill $WALL_X $SY $((SZ + 50)) $((WALL_X + 1)) $((SY + 80)) $((SZ + 100)) stone"
 summon dive    "$SX" $((SZ - 20)) loitering_light 3600 180 "{Terminal:\"DIVE\",LoiterRadius:24d,Waypoints:[$(wp "$SX" $((SZ - 150)))]}"
-summon ret     $((SX + 20)) "$SZ" gunship_rocket 6000 -90 "{Terminal:\"RETURN\",LoiterRadius:24d,Waypoints:[$(wp $((SX + 200)) "$SZ")]}"
+summon ret     $((SX + 20)) "$SZ" strike_plane 6000 -90 "{Terminal:\"RETURN\",LoiterRadius:24d,Waypoints:[$(wp $((SX + 200)) "$SZ")]}"
 summon lowfuel "$SX" $((SZ + 20)) loitering_light 300 0 "{Terminal:\"LOITER\",LoiterRadius:24d,Waypoints:[$(wp "$SX" $((SZ + 100)))]}"
 summon destroy $((SX - 20)) "$SZ" loitering_light 3600 90 "{Terminal:\"DESTROY\",LoiterRadius:24d,Target:{X:$((SX - 120))d,Y:${GROUND}d,Z:$((SZ - 60))d},Waypoints:[$(wp $((SX - 100)) "$SZ")]}"
 summon loop    $((SX + 20)) $((SZ - 40)) recon_uav 24000 180 "{Terminal:\"LOOP\",LoiterRadius:24d,Waypoints:[$(wp "$SX" $((SZ - 100))),$(wp $((SX + 80)) $((SZ - 100)))]}"
 summon lowloop $((SX + 20)) $((SZ + 40)) recon_uav 2000 0 "{Terminal:\"LOOP\",LoiterRadius:24d,Waypoints:[$(wp "$SX" $((SZ + 100))),$(wp $((SX + 80)) $((SZ + 100)))]}"
-summon crashg  $((SX - 30)) $((SZ + 60)) gunship_gun 6000 -90 "{Terminal:\"LOITER\",LoiterRadius:24d,Waypoints:[$(wp $((SX + 160)) $((SZ + 60)) MEDIUM)]}"
+summon crashg  $((SX - 30)) $((SZ + 60)) attack_plane 6000 -90 "{Terminal:\"LOITER\",LoiterRadius:24d,Waypoints:[$(wp $((SX + 160)) $((SZ + 60)) MEDIUM)]}"
 summon crashu  $((SX - 30)) $((SZ + 90)) recon_uav 24000 -90 "{Terminal:\"LOITER\",LoiterRadius:24d,Waypoints:[$(wp $((SX + 160)) $((SZ + 90)) MEDIUM)]}"
 for _ in $(seq 1 25); do sleep 4; say "tp @e[type=$UNIT] ~ ~ ~"; done
 say "fill $WALL_X $SY $((SZ + 50)) $((WALL_X + 1)) $((SY + 80)) $((SZ + 100)) air"

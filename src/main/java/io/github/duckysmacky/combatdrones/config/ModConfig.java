@@ -38,7 +38,8 @@ import java.util.Map;
 public final class ModConfig {
     public static final String FILE_NAME = CombatDrones.MOD_ID + ".toml";
     /** Keys from older versions, removed from existing files so they don't look like live settings. */
-    private static final String[] RETIRED_KEYS = {"general.bombBlastPower", "missiles.missilePreparingSeconds", "missiles.inboundDelaySeconds"};
+    private static final String[] RETIRED_KEYS = {"general.bombBlastPower", "missiles.missilePreparingSeconds", "missiles.inboundDelaySeconds",
+            "drones.gunship_rocket", "drones.gunship_gun"};
 
     // [general]
     public static boolean blockDamageEnabled = true;
@@ -75,8 +76,8 @@ public final class ModConfig {
     public static double rocketBlastPower = 3.0;
     public static double rocketSpeed = 3.0;
     public static int rocketCooldownTicks = 15;
-    public static double gunDamagePerRound = 4.5;
-    public static double gunCooldownTicks = 1.25;
+    public static double gunDamagePerRound = 8.0;
+    public static double gunCooldownTicks = 1.0;
     public static double gunSpread = 1.5;
     public static double gunRange = 96.0;
     public static double gunHitMargin = 0.5;
@@ -202,6 +203,13 @@ public final class ModConfig {
         try (CommentedFileConfig config = open(file)) {
             config.load();
             Defaults defaults = new Defaults(config);
+            // First, so retired drone tables aren't reported as unknown types
+            for (String retired : RETIRED_KEYS) {
+                if (config.contains(retired)) {
+                    config.remove(retired);
+                    defaults.changed = true;
+                }
+            }
 
             blockDamageEnabled = defaults.get("general.blockDamageEnabled", blockDamageEnabled, "Whether drone and munition explosions break blocks.");
             grenadeBlastBonus = defaults.number("general.grenadeBlastBonus", grenadeBlastBonus, 0, 20,
@@ -263,13 +271,13 @@ public final class ModConfig {
                     "How far away a pilot's radio static can be heard, in blocks (quieter further out).");
 
             roundsPerRifleItem = (int) defaults.number("weapons.roundsPerRifleItem", roundsPerRifleItem, 1, 256,
-                    "Gun rounds one Rifle Rounds item loads into a Gunship Plane's belt.");
+                    "Gun rounds one Rifle Rounds item loads into an Attack Plane's belt.");
             rocketBlastPower = defaults.number("weapons.rocketBlastPower", rocketBlastPower, 0, 20, "Rocket explosion power (vanilla TNT = 4).");
             rocketSpeed = defaults.number("weapons.rocketSpeed", rocketSpeed, 0.5, 10, "Rocket speed on top of the plane's own, in blocks/tick.");
             rocketCooldownTicks = (int) defaults.number("weapons.rocketCooldownTicks", rocketCooldownTicks, 1, 200, "Ticks between rockets while the trigger is held.");
             gunDamagePerRound = defaults.number("weapons.gunDamagePerRound", gunDamagePerRound, 0, 40, "Damage per gun round (half-hearts).");
             gunCooldownTicks = defaults.number("weapons.gunCooldownTicks", gunCooldownTicks, 1, 40,
-                    "Ticks between gun rounds while the trigger is held; fractions work (1.25 = 16 rounds/s).");
+                    "Ticks between gun rounds while the trigger is held; fractions work (1 = 20 rounds/s, 1.25 = 16 rounds/s).");
             gunSpread = defaults.number("weapons.gunSpread", gunSpread, 0, 10, "Gun spread: random aim error per round, in degrees.");
             gunRange = defaults.number("weapons.gunRange", gunRange, 8, 256, "Gun range in blocks.");
             gunHitMargin = defaults.number("weapons.gunHitMargin", gunHitMargin, 0, 2,
@@ -334,7 +342,7 @@ public final class ModConfig {
 
             // Table comments last: a comment can only attach to a table that exists
             defaults.comment("general", "Global balance settings. On a server these apply to everyone.");
-            defaults.comment("weapons", "Gunship Plane weapons, fired only under manual control.");
+            defaults.comment("weapons", "Armed plane weapons, fired only under manual control.");
             defaults.comment("missiles", "Cruise Missile launch, standby and strike. Its speed, warhead, health and standby fuel are in "
                     + "[drones.cruise_missile].");
             defaults.comment("client", CLIENT_COMMENT);
@@ -346,12 +354,6 @@ public final class ModConfig {
                     + "capacity (with a Standard pack) and drain in charge units (full-throttle flight time = capacity / drain ticks), blastPower on the vanilla "
                     + "scale (TNT = 4), maxHP like mob health, signalRange and motorSoundRange in blocks.");
 
-            for (String retired : RETIRED_KEYS) {
-                if (config.contains(retired)) {
-                    config.remove(retired);
-                    defaults.changed = true;
-                }
-            }
             if (defaults.changed) {
                 config.save();
             }

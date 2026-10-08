@@ -36,20 +36,28 @@ public final class FixedWingFlight {
         final double drag;
         /** Multiplies roll, pitch and turn rates: rocket-like munitions turn far tighter than planes. */
         final double agility;
+        /** Extra multiplier on the pitch rate only, on top of agility: climbs and dives without rolling faster. */
+        final double pitchAgility;
 
         public Params(double maxSpeed, double acceleration) {
             this(maxSpeed, acceleration, 1.0);
+        }
+
+        public Params(double maxSpeed, double acceleration, double agility) {
+            this(maxSpeed, acceleration, agility, 1.0);
         }
 
         /**
          * @param maxSpeed     level-flight top speed at full throttle, blocks/tick
          * @param acceleration blocks/tick² of thrust at full throttle
          * @param agility      1 = plane-like; higher rolls, pitches and turns faster
+         * @param pitchAgility multiplies the pitch rate on top of {@code agility}
          */
-        public Params(double maxSpeed, double acceleration, double agility) {
+        public Params(double maxSpeed, double acceleration, double agility, double pitchAgility) {
             this.maxSpeed = maxSpeed;
             this.acceleration = acceleration;
             this.agility = agility;
+            this.pitchAgility = pitchAgility;
             // Quadratic drag sized so full throttle in level flight settles exactly at maxSpeed; low at low speed, so
             // an unpowered glide keeps flying instead of stalling out
             this.drag = acceleration / (maxSpeed * maxSpeed);
@@ -57,7 +65,7 @@ public final class FixedWingFlight {
 
         /** Boosted engine: top speed times {@code multiplier} (thrust scaled to match, so drag balances there). */
         public Params boosted(double multiplier) {
-            return new Params(maxSpeed * multiplier, acceleration * multiplier * multiplier, agility);
+            return new Params(maxSpeed * multiplier, acceleration * multiplier * multiplier, agility, pitchAgility);
         }
 
         public double maxSpeed() {
@@ -66,6 +74,10 @@ public final class FixedWingFlight {
 
         public double stallSpeed() {
             return maxSpeed * STALL_FRACTION;
+        }
+
+        double pitchRate() {
+            return PITCH_RATE_DEG * agility * pitchAgility;
         }
     }
 
@@ -116,7 +128,7 @@ public final class FixedWingFlight {
      */
     public static Controls fromRates(State state, Params params, double pitchStick, double rollStick, double throttle, boolean hasFuel) {
         return new Controls(state.bank + clamp(rollStick, 1) * ROLL_RATE_DEG * params.agility,
-                state.pitch + clamp(pitchStick, 1) * PITCH_RATE_DEG * params.agility,
+                state.pitch + clamp(pitchStick, 1) * params.pitchRate(),
                 hasFuel ? Math.max(0, Math.min(1, throttle)) : 0, hasFuel);
     }
 
@@ -129,7 +141,7 @@ public final class FixedWingFlight {
         if (stalled) {
             targetPitch = Math.max(targetPitch, 15.0); // a stalled wing drops the nose to regain speed
         }
-        state.pitch = Math.max(-MAX_PITCH_DEG, Math.min(MAX_DIVE_PITCH_DEG, approach(state.pitch, targetPitch, PITCH_RATE_DEG * params.agility)));
+        state.pitch = Math.max(-MAX_PITCH_DEG, Math.min(MAX_DIVE_PITCH_DEG, approach(state.pitch, targetPitch, params.pitchRate())));
 
         double turnRate = Math.toDegrees(TURN_GRAVITY * params.agility * Math.tan(Math.toRadians(state.bank)) / Math.max(state.speed, 0.1));
         state.heading = wrap(state.heading + clamp(turnRate, MAX_TURN_RATE_DEG * params.agility));

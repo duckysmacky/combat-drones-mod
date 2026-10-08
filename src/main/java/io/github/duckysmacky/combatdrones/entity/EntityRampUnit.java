@@ -230,7 +230,7 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder {
     }
 
     private static FixedWingFlight.Params paramsOf(DroneType type) {
-        return new FixedWingFlight.Params(type.getMaxSpeed(), type.getAcceleration(), type.getAgility());
+        return new FixedWingFlight.Params(type.getMaxSpeed(), type.getAcceleration(), type.getAgility(), type.getPitchAgility());
     }
 
     /** Takes the type's hitbox size, also after a config reload; setSize keeps the min corner, so re-centre. */
@@ -727,7 +727,7 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder {
 
     @Override
     protected void readEntityFromNBT(NBTTagCompound compound) {
-        dataManager.set(TYPE_ID, compound.getString("Type"));
+        dataManager.set(TYPE_ID, DroneTypes.migrateId(compound.getString("Type")));
         owner = compound.hasUniqueId("Owner") ? compound.getUniqueId("Owner") : null;
         route = RouteCodec.fromNbt(compound.getCompoundTag("Route"), Route.TerminalAction.LOITER);
         waypointIndex = compound.getInteger("WaypointIndex");
