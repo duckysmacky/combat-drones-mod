@@ -7,7 +7,7 @@ import net.minecraftforge.fml.common.network.simpleimpl.IMessage;
 import net.minecraftforge.fml.common.network.simpleimpl.IMessageHandler;
 import net.minecraftforge.fml.common.network.simpleimpl.MessageContext;
 
-/** Client to server: refresh the airborne-units view of an open Mission Planner. */
+/** Client to server: refresh the units shown in an open Mission Planner. */
 public class PlannerRequestPacket implements IMessage {
     @Override
     public void fromBytes(ByteBuf buf) {
@@ -21,7 +21,7 @@ public class PlannerRequestPacket implements IMessage {
         @Override
         public IMessage onMessage(PlannerRequestPacket message, MessageContext context) {
             EntityPlayerMP player = context.getServerHandler().player;
-            FMLCommonHandler.instance().getWorldThread(context.netHandler).addScheduledTask(() -> PlannerServer.openAirborne(player));
+            FMLCommonHandler.instance().getWorldThread(context.netHandler).addScheduledTask(() -> PlannerServer.openAll(player, -1));
             return null;
         }
     }

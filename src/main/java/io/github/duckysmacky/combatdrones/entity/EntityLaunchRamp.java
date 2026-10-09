@@ -28,6 +28,7 @@ import net.minecraft.util.SoundCategory;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.util.text.TextComponentTranslation;
 import net.minecraft.world.World;
+import net.minecraftforge.common.ForgeChunkManager;
 import net.minecraftforge.fml.common.registry.ForgeRegistries;
 import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.fml.relauncher.SideOnly;
@@ -41,8 +42,10 @@ import java.util.UUID;
  * short Munition Ramp for loitering munitions and a long Plane Ramp for planes and the recon UAV.
  * Holds at most one ramp-launched unit (type, owner, fuel) plus the route planned for it; the unit only becomes an
  * {@link EntityRampUnit} when it launches. Left-click (attack) knocks the ramp down, dropping it and its unit.
+ * Once its owner links it with a Mission Planner, the unit shows in their planner from anywhere and the ramp keeps
+ * its own chunk loaded until the unit leaves, so it can be launched remotely.
  */
-public class EntityLaunchRamp extends Entity {
+public class EntityLaunchRamp extends Entity implements ChunkAnchor.Holder {
     /** Which ramp it is. The rail geometry scales with the length (the 4-block original is scale 1). */
     public enum Kind {
         // Ramps placed before the split default to MUNITION (ordinal 0)
@@ -95,6 +98,9 @@ public class EntityLaunchRamp extends Entity {
     private double fuel;
     private Loadout loadout = new Loadout();
     private Route route = Route.empty(Route.TerminalAction.LOITER);
+    /** Linked to its owner's Mission Planner; cleared whenever the unit leaves the ramp. */
+    private boolean linked;
+    private final ChunkAnchor anchor = new ChunkAnchor(this);
 
     public EntityLaunchRamp(World world) {
         super(world);
@@ -132,6 +138,27 @@ public class EntityLaunchRamp extends Entity {
     public void onUpdate() {
         // Static: no gravity or motion; only vanilla bookkeeping (prev positions etc.)
         super.onUpdate();
+        if (!world.isRemote && ticksExisted % 20 == 0) {
+            if (isLinked()) {
+                anchor.hold(posX, posZ);
+            } else {
+                anchor.release();
+            }
+        }
+    }
+
+    /** Server: after a restart Forge hands back the ticket this ramp held (see CombatDrones' loading callback). */
+    @Override
+    public void adoptChunkTicket(ForgeChunkManager.Ticket ticket) {
+        anchor.adopt(ticket);
+    }
+
+    @Override
+    public void setDead() {
+        super.setDead();
+        if (!world.isRemote) {
+            anchor.release();
+        }
     }
 
     @Nullable
@@ -146,6 +173,30 @@ public class EntityLaunchRamp extends Entity {
 
     public boolean isOwnedBy(EntityPlayer player) {
         return player.getUniqueID().equals(owner);
+    }
+
+    /** Linked to its owner's Mission Planner, with a unit on it. */
+    public boolean isLinked() {
+        return linked && isLoaded();
+    }
+
+    /** Server: links the ramp to {@code player}'s Mission Planner. Returns false (with a message) if they can't. */
+    public boolean link(EntityPlayer player) {
+        if (!isLoaded()) {
+            status(player, "message.combat_drones.ramp.empty");
+            return false;
+        }
+        if (!isOwnedBy(player)) {
+            status(player, "message.combat_drones.ramp.not_owner");
+            return false;
+        }
+        if (!linked) {
+            linked = true;
+            anchor.hold(posX, posZ);
+            world.playSound(null, posX, posY, posZ, ModSounds.DRONE_LINK, SoundCategory.BLOCKS, 1.0F, 1.0F);
+            status(player, "message.combat_drones.ramp.linked");
+        }
+        return true;
     }
 
     public float getFuelFraction() {
@@ -184,7 +235,7 @@ public class EntityLaunchRamp extends Entity {
         } else if (ammoWeapon(stack) != null) {
             loadAmmo(player, stack);
         } else if (stack.getItem() == ModContent.missionPlanner) {
-            PlannerServer.openRamp(player, this);
+            PlannerServer.linkAndOpen(player, this);
         } else if (stack.isEmpty() && player.isSneaking() && isLoaded()) {
             if (!isOwnedBy(player)) {
                 status(player, "message.combat_drones.ramp.not_owner");
@@ -328,26 +379,30 @@ public class EntityLaunchRamp extends Entity {
         return stack;
     }
 
-    /** Server: launches the unit from the end of the rail along the ramp's heading. */
-    public void launch() {
+    /** Server: launches the unit from the end of the rail along the ramp's heading; returns it, or null if empty. */
+    @Nullable
+    public EntityRampUnit launch() {
         DroneType type = getUnitType();
         if (type == null) {
-            return;
+            return null;
         }
         double radians = Math.toRadians(rotationYaw);
         double scale = getKind().railScale();
         double x = posX - Math.sin(radians) * RAIL_END * scale;
         double z = posZ + Math.cos(radians) * RAIL_END * scale;
         double y = posY + LAUNCH_HEIGHT * scale + LAUNCH_CLEARANCE;
-        world.spawnEntity(new EntityRampUnit(world, type, owner, route, fuel, loadout, x, y, z, rotationYaw));
+        EntityRampUnit unit = new EntityRampUnit(world, type, owner, route, fuel, loadout, x, y, z, rotationYaw);
+        world.spawnEntity(unit);
         world.playSound(null, posX, posY, posZ, ModSounds.UNIT_LAUNCH, SoundCategory.NEUTRAL, 3.0F, 1.0F);
         EffectPacket.launch(world, new Vec3d(posX, posY, posZ), Vec3d.fromPitchYaw(0, rotationYaw));
         clearUnit();
+        return unit;
     }
 
     private void clearUnit() {
         dataManager.set(UNIT_TYPE, "");
         owner = null;
+        linked = false;
         setFuel(0);
         loadout = new Loadout();
         route = Route.empty(Route.TerminalAction.LOITER);
@@ -400,6 +455,7 @@ public class EntityLaunchRamp extends Entity {
         compound.setDouble("Fuel", fuel);
         ItemDrone.writeLoadout(compound, loadout);
         compound.setTag("Route", RouteCodec.toNbt(route));
+        compound.setBoolean("Linked", linked);
     }
 
     @Override
@@ -410,5 +466,6 @@ public class EntityLaunchRamp extends Entity {
         setFuel(compound.getDouble("Fuel"));
         loadout = ItemDrone.readLoadout(compound);
         route = RouteCodec.fromNbt(compound.getCompoundTag("Route"), Route.TerminalAction.LOITER);
+        linked = compound.getBoolean("Linked");
     }
 }

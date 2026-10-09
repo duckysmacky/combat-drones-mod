@@ -48,7 +48,7 @@ public final class ClientPacketHandlers {
 
     public static void onPlannerOpen(PlannerOpenPacket packet) {
         Minecraft minecraft = Minecraft.getMinecraft();
-        if (minecraft.currentScreen instanceof GuiMissionPlanner && ((GuiMissionPlanner) minecraft.currentScreen).accepts(packet)) {
+        if (minecraft.currentScreen instanceof GuiMissionPlanner) {
             ((GuiMissionPlanner) minecraft.currentScreen).update(packet);
         } else {
             minecraft.displayGuiScreen(new GuiMissionPlanner(packet));

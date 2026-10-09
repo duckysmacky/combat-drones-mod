@@ -18,13 +18,14 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * Server to client: what the Mission Planner should show. Either one Launch Ramp (plan + launch) or the player's
- * airborne units (live positions, in-flight route edits). Also carries the server's route limits for the UI.
+ * Server to client: what the Mission Planner should show: the player's units on linked Launch Ramps (plan + launch)
+ * and in the air (live positions, in-flight route edits). Also carries the server's route limits for the UI.
  */
 public class PlannerOpenPacket implements IMessage {
-    /** One plannable unit: on a ramp ({@code entityId} = -1) or in the air. */
+    /** One plannable unit: on a linked ramp ({@code rampId} set, {@code entityId} = -1) or in the air. */
     public static final class UnitView {
         public int entityId = -1;
+        public int rampId = -1;
         public String typeId = "";
         public double x;
         public double y;
@@ -40,6 +41,7 @@ public class PlannerOpenPacket implements IMessage {
 
         void write(ByteBuf buf) {
             buf.writeInt(entityId);
+            buf.writeInt(rampId);
             ByteBufUtils.writeUTF8String(buf, typeId);
             buf.writeDouble(x);
             buf.writeDouble(y);
@@ -60,9 +62,19 @@ public class PlannerOpenPacket implements IMessage {
             buf.writeByte(mask);
         }
 
+        public boolean isGrounded() {
+            return rampId >= 0;
+        }
+
+        /** Same unit as {@code other} (refreshes keep the selection by this). */
+        public boolean sameUnit(UnitView other) {
+            return other != null && entityId == other.entityId && rampId == other.rampId;
+        }
+
         static UnitView read(ByteBuf buf) {
             UnitView view = new UnitView();
             view.entityId = buf.readInt();
+            view.rampId = buf.readInt();
             view.typeId = ByteBufUtils.readUTF8String(buf);
             view.x = buf.readDouble();
             view.y = buf.readDouble();
@@ -86,21 +98,17 @@ public class PlannerOpenPacket implements IMessage {
         }
     }
 
-    /** Launch Ramp entity ID in ramp mode, or -1 in airborne mode. */
-    public int rampId = -1;
+    /** Entity ID (a unit in flight, or the ramp of a grounded one) the screen should select, or -1 to keep its selection. */
+    public int selectId = -1;
     public final List<UnitView> units = new ArrayList<>();
     public int maxWaypoints = ModConfig.maxWaypointsPerRoute;
     public double maxAltitude = ModConfig.maxRouteAltitude;
     public double maxLength = ModConfig.maxRouteLength;
     public double minLaunchFuel = ModConfig.minLaunchFuel;
 
-    public boolean isRampMode() {
-        return rampId >= 0;
-    }
-
     @Override
     public void toBytes(ByteBuf buf) {
-        buf.writeInt(rampId);
+        buf.writeInt(selectId);
         buf.writeInt(maxWaypoints);
         buf.writeDouble(maxAltitude);
         buf.writeDouble(maxLength);
@@ -113,7 +121,7 @@ public class PlannerOpenPacket implements IMessage {
 
     @Override
     public void fromBytes(ByteBuf buf) {
-        rampId = buf.readInt();
+        selectId = buf.readInt();
         maxWaypoints = buf.readInt();
         maxAltitude = buf.readDouble();
         maxLength = buf.readDouble();

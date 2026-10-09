@@ -34,9 +34,9 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * Mission Planner: an abstract grid map (north up, one grid square per chunk) for planning a ramp unit's route and
- * launching it, or (airborne mode) watching owned units fly and re-routing them. The client only proposes; the server
- * validates every route.
+ * Mission Planner: an abstract grid map (north up, one grid square per chunk) of the player's units: grounded on
+ * linked ramps (plan, save with Apply, Launch or Launch &amp; Fly) and in flight (watch, re-route, View or Take control).
+ * The client only proposes; the server validates every route.
  *
  * <p>Map controls (like the reference mod): left-drag pans, or moves a waypoint when grabbed on one; right-click opens
  * a context menu (add a waypoint, or set a waypoint's height, speed, final action, loiter radius, or remove it); the
@@ -71,12 +71,13 @@ public class GuiMissionPlanner extends GuiScreen {
     private static final int BUTTON_VIEW = 10;
     private static final int BUTTON_CONTROL = 11;
     private static final int BUTTON_MARK = 12;
+    private static final int BUTTON_LAUNCH_FLY = 13;
     private static final int TARGET_COLOR = 0xFFFF4040;
     private static final int LOCKED_COLOR = 0xFFFF2020;
     private static final int BORDER_COLOR = 0xC0FF5050;
 
     private PlannerOpenPacket view;
-    /** Index into view.units of the unit being edited (always 0 in ramp mode). */
+    /** Index into view.units of the unit being edited. */
     private int selectedUnit;
     private final List<Route.Waypoint> waypoints = new ArrayList<>();
     private Route.TerminalAction terminal = Route.TerminalAction.LOITER;
@@ -109,31 +110,39 @@ public class GuiMissionPlanner extends GuiScreen {
 
     private GuiButton terminalButton;
     private GuiButton launchButton;
+    private GuiButton launchFlyButton;
     private GuiButton viewButton;
     private GuiButton controlButton;
     private GuiButton markButton;
 
     public GuiMissionPlanner(PlannerOpenPacket view) {
         this.view = view;
-        selectUnit(0);
+        selectUnit(Math.max(0, indexOf(view.selectId)));
     }
 
-    /** Whether an incoming planner packet belongs to this screen (same ramp, or both airborne). */
-    public boolean accepts(PlannerOpenPacket packet) {
-        return view.isRampMode() ? view.rampId == packet.rampId : !packet.isRampMode();
+    /** Index of the unit in flight with entity ID {@code id}, or on the ramp with that ID; -1 if none. */
+    private int indexOf(int id) {
+        for (int index = 0; id >= 0 && index < view.units.size(); index++) {
+            PlannerOpenPacket.UnitView unit = view.units.get(index);
+            if (unit.entityId == id || unit.rampId == id) {
+                return index;
+            }
+        }
+        return -1;
     }
 
     /** New data from the server: keep the player's unsent edits, refresh everything else. */
     public void update(PlannerOpenPacket packet) {
-        int previousId = currentUnit() == null ? -1 : currentUnit().entityId;
+        PlannerOpenPacket.UnitView previous = currentUnit();
         view = packet;
-        int index = 0;
-        for (int candidate = 0; candidate < view.units.size(); candidate++) {
-            if (view.units.get(candidate).entityId == previousId) {
+        int index = indexOf(packet.selectId);
+        for (int candidate = 0; index < 0 && candidate < view.units.size(); candidate++) {
+            if (view.units.get(candidate).sameUnit(previous)) {
                 index = candidate;
             }
         }
-        boolean sameUnit = index == selectedUnit && currentUnit() != null && currentUnit().entityId == previousId;
+        index = Math.max(0, index);
+        boolean sameUnit = index == selectedUnit && view.units.size() > index && view.units.get(index).sameUnit(previous);
         if (!sameUnit) {
             selectUnit(index);
         } else if (!dirty) {
@@ -196,17 +205,14 @@ public class GuiMissionPlanner extends GuiScreen {
         x += 124;
         addButton(new GuiButton(BUTTON_CLEAR, x, y, 50, 20, I18n.format("gui.combat_drones.planner.clear")));
         x += 54;
-        addButton(new GuiButton(BUTTON_SEND, x, y, 60, 20, I18n.format(view.isRampMode() ? "gui.combat_drones.planner.send" : "gui.combat_drones.planner.apply")));
+        addButton(new GuiButton(BUTTON_SEND, x, y, 60, 20, I18n.format("gui.combat_drones.planner.apply")));
         x += 64;
-        if (view.isRampMode()) {
-            launchButton = addButton(new GuiButton(BUTTON_LAUNCH, x, y, 60, 20, I18n.format("gui.combat_drones.planner.launch")));
-            x += 64;
-        } else {
-            viewButton = addButton(new GuiButton(BUTTON_VIEW, x, y, 50, 20, I18n.format("gui.combat_drones.planner.view")));
-            x += 54;
-            controlButton = addButton(new GuiButton(BUTTON_CONTROL, x, y, 80, 20, I18n.format("gui.combat_drones.planner.take_control")));
-            x += 84;
-        }
+        // Same slot, swapped by refreshButtons: Launch / Launch & Fly for a grounded unit, View / Take control in flight
+        launchButton = addButton(new GuiButton(BUTTON_LAUNCH, x, y, 60, 20, I18n.format("gui.combat_drones.planner.launch")));
+        launchFlyButton = addButton(new GuiButton(BUTTON_LAUNCH_FLY, x + 64, y, 80, 20, I18n.format("gui.combat_drones.planner.launch_fly")));
+        viewButton = addButton(new GuiButton(BUTTON_VIEW, x, y, 50, 20, I18n.format("gui.combat_drones.planner.view")));
+        controlButton = addButton(new GuiButton(BUTTON_CONTROL, x + 54, y, 80, 20, I18n.format("gui.combat_drones.planner.take_control")));
+        x += 148;
         addButton(new GuiButton(BUTTON_CLOSE, Math.max(x, width - MARGIN - 50), y, 50, 20, I18n.format("gui.done")));
 
         int panelY = height - 50;
@@ -233,20 +239,24 @@ public class GuiMissionPlanner extends GuiScreen {
             }
         }
         markButton.visible = unit != null && unit.allowedTerminals.contains(Route.TerminalAction.DESTROY);
-        if (viewButton != null) {
-            DroneType type = unit == null ? null : DroneTypes.get(unit.typeId);
-            viewButton.enabled = unit != null && unit.entityId >= 0;
-            controlButton.enabled = viewButton.enabled && type != null && type.getControlScheme() != null && type.getControlScheme().isFlyable();
-        }
-        if (launchButton != null) {
-            launchButton.enabled = unit != null && !waypoints.isEmpty() && unit.fuelFraction >= view.minLaunchFuel;
-        }
+        DroneType type = unit == null ? null : DroneTypes.get(unit.typeId);
+        boolean grounded = unit != null && unit.isGrounded();
+        viewButton.visible = !grounded;
+        controlButton.visible = !grounded;
+        viewButton.enabled = unit != null && unit.entityId >= 0;
+        controlButton.enabled = viewButton.enabled && type != null && type.getControlScheme() != null && type.getControlScheme().isFlyable();
+        boolean fueled = grounded && unit.fuelFraction >= view.minLaunchFuel;
+        launchButton.visible = grounded;
+        launchButton.enabled = fueled && !waypoints.isEmpty();
+        // Hand-flown straight off the ramp: only stick types, which need no route (without one they fly straight on)
+        launchFlyButton.visible = grounded && type != null && type.getControlScheme() == DroneType.ControlScheme.STICK;
+        launchFlyButton.enabled = fueled;
     }
 
     @Override
     public void updateScreen() {
-        // Airborne units move: keep their positions, fuel and progress fresh while the map is open
-        if (!view.isRampMode() && ++ticks % REFRESH_TICKS == 0) {
+        // Units move (and ramps get loaded or launched): keep positions, fuel and progress fresh while the map is open
+        if (++ticks % REFRESH_TICKS == 0) {
             ModNetwork.CHANNEL.sendToServer(new PlannerRequestPacket());
         }
     }
@@ -287,11 +297,7 @@ public class GuiMissionPlanner extends GuiScreen {
     }
 
     private String title() {
-        PlannerOpenPacket.UnitView unit = currentUnit();
-        if (view.isRampMode() && unit != null) {
-            return I18n.format("gui.combat_drones.planner.title_ramp", unitName(unit));
-        }
-        return I18n.format("gui.combat_drones.planner.title_airborne");
+        return I18n.format("gui.combat_drones.planner.title");
     }
 
     private static String unitName(PlannerOpenPacket.UnitView unit) {
@@ -301,35 +307,32 @@ public class GuiMissionPlanner extends GuiScreen {
     private void drawPanel(int mouseX, int mouseY) {
         Gui.drawRect(MARGIN - 2, mapTop - 2, MARGIN + PANEL_WIDTH + 2, height - 54, 0x80000000);
         int y = mapTop;
-        if (!view.isRampMode()) {
-            fontRenderer.drawString(I18n.format("gui.combat_drones.planner.units"), MARGIN, y, 0xAAAAAA);
+        fontRenderer.drawString(I18n.format("gui.combat_drones.planner.units"), MARGIN, y, 0xAAAAAA);
+        y += ROW;
+        if (view.units.isEmpty()) {
+            fontRenderer.drawString(I18n.format("gui.combat_drones.planner.no_units"), MARGIN, y, 0x777777);
             y += ROW;
-            if (view.units.isEmpty()) {
-                fontRenderer.drawString(I18n.format("gui.combat_drones.planner.no_units"), MARGIN, y, 0x777777);
+        }
+        for (int index = 0; index < view.units.size(); index++) {
+            PlannerOpenPacket.UnitView unit = view.units.get(index);
+            String tag = unit.isGrounded() ? I18n.format("gui.combat_drones.planner.on_ramp") + " " : "";
+            String line = tag + fontRenderer.trimStringToWidth(unitName(unit), PANEL_WIDTH - 34 - fontRenderer.getStringWidth(tag)) + " "
+                    + percent(unit.fuelFraction) + "%";
+            int color = index == selectedUnit ? 0xFFFF55 : unit.isGrounded() ? 0x88CCFF : 0xFFFFFF;
+            fontRenderer.drawString(line, MARGIN, y, color);
+            y += ROW;
+        }
+        y += 4;
+        // A grounded unit's ammo, checked before launch (in flight the HUD shows it)
+        PlannerOpenPacket.UnitView selected = currentUnit();
+        DroneType selectedType = selected == null || !selected.isGrounded() ? null : DroneTypes.get(selected.typeId);
+        for (int station = 0; selectedType != null && station < Loadout.STATIONS; station++) {
+            if (selectedType.getWeapon(station) != DroneType.WeaponType.NONE) {
+                int ammo = selected.loadout.getAmmo(station);
+                fontRenderer.drawString(I18n.format("hud.combat_drones.ammo." + ItemDrone.ammoKey(selectedType, station, selected.loadout), ammo,
+                        selected.loadout.capacity(selectedType, station)), MARGIN, y, ammo == 0 ? WARNING : 0xFFFFFF);
                 y += ROW;
             }
-            for (int index = 0; index < view.units.size(); index++) {
-                PlannerOpenPacket.UnitView unit = view.units.get(index);
-                String line = fontRenderer.trimStringToWidth(unitName(unit), PANEL_WIDTH - 34) + " " + percent(unit.fuelFraction) + "%";
-                int color = index == selectedUnit ? 0xFFFF55 : 0xFFFFFF;
-                fontRenderer.drawString(line, MARGIN, y, color);
-                y += ROW;
-            }
-            y += 4;
-        } else if (currentUnit() != null) {
-            PlannerOpenPacket.UnitView unit = currentUnit();
-            fontRenderer.drawString(I18n.format("gui.combat_drones.planner.fuel", percent(unit.fuelFraction)), MARGIN, y,
-                    unit.fuelFraction < view.minLaunchFuel ? WARNING : 0xFFFFFF);
-            DroneType unitType = DroneTypes.get(unit.typeId);
-            for (int station = 0; unitType != null && station < Loadout.STATIONS; station++) {
-                if (unitType.getWeapon(station) != DroneType.WeaponType.NONE) {
-                    int ammo = unit.loadout.getAmmo(station);
-                    y += ROW;
-                    fontRenderer.drawString(I18n.format("hud.combat_drones.ammo." + ItemDrone.ammoKey(unitType, station, unit.loadout), ammo,
-                            unit.loadout.capacity(unitType, station)), MARGIN, y, ammo == 0 ? WARNING : 0xFFFFFF);
-                }
-            }
-            y += ROW + 4;
         }
         fontRenderer.drawString(I18n.format("gui.combat_drones.planner.waypoints", waypoints.size(), view.maxWaypoints), MARGIN, y, 0xAAAAAA);
         y += ROW;
@@ -367,7 +370,7 @@ public class GuiMissionPlanner extends GuiScreen {
             drawTarget(buffer);
         }
         for (PlannerOpenPacket.UnitView other : view.units) {
-            if (other.entityId >= 0) {
+            if (!other.isGrounded()) {
                 drawUnitMarker(buffer, other);
             }
         }
@@ -376,8 +379,10 @@ public class GuiMissionPlanner extends GuiScreen {
         drawUnitIcons();
 
         // Markers and labels
-        if (view.isRampMode() && unit != null) {
-            drawMarker(unit.x, unit.z, 0xFF55AAFF, 3);
+        for (PlannerOpenPacket.UnitView other : view.units) {
+            if (other.isGrounded()) {
+                drawMarker(other.x, other.z, other == unit ? 0xFFFFFF55 : 0xFF55AAFF, 3);
+            }
         }
         for (int index = 0; index < waypoints.size(); index++) {
             Route.Waypoint waypoint = waypoints.get(index);
@@ -466,7 +471,7 @@ public class GuiMissionPlanner extends GuiScreen {
         double fromX = unit.x;
         double fromZ = unit.z;
         // Airborne: the path starts at the waypoint the unit is heading for
-        int start = dirty || view.isRampMode() ? 0 : Math.min(unit.waypointIndex, waypoints.size());
+        int start = dirty || unit.isGrounded() ? 0 : Math.min(unit.waypointIndex, waypoints.size());
         if (terminal == Route.TerminalAction.LOOP && waypoints.size() > 1) {
             // A loop is a closed circuit: the leg to where it's heading, then every leg including last -> first
             Route.Waypoint next = waypoints.get(Math.min(start, waypoints.size() - 1));
@@ -514,10 +519,10 @@ public class GuiMissionPlanner extends GuiScreen {
         }
     }
 
-    /** Each airborne unit seen from above, turned to its heading, so different unit types can be told apart. */
+    /** Each unit seen from above, turned to its heading, so different unit types can be told apart. */
     private void drawUnitIcons() {
         for (PlannerOpenPacket.UnitView unit : view.units) {
-            DroneType type = unit.entityId < 0 ? null : DroneTypes.get(unit.typeId);
+            DroneType type = DroneTypes.get(unit.typeId);
             int screenX = toScreenX(unit.x);
             int screenY = toScreenY(unit.z);
             if (type != null && insideMap(screenX, screenY)) {
@@ -663,7 +668,7 @@ public class GuiMissionPlanner extends GuiScreen {
         super.mouseClicked(mouseX, mouseY, button);
         if (mouseX >= MARGIN && mouseX <= MARGIN + PANEL_WIDTH) {
             int unitRow = (mouseY - mapTop - ROW) / ROW;
-            if (!view.isRampMode() && mouseY >= mapTop + ROW && unitRow < view.units.size()) {
+            if (mouseY >= mapTop + ROW && unitRow < view.units.size()) {
                 clickUnitList(unitRow);
             } else {
                 clickWaypointList(mouseY);
@@ -796,8 +801,21 @@ public class GuiMissionPlanner extends GuiScreen {
         }
     }
 
+    /** Ammo lines drawPanel shows for the selected unit (grounded units only). */
+    private int groundedAmmoRows() {
+        PlannerOpenPacket.UnitView unit = currentUnit();
+        DroneType type = unit == null || !unit.isGrounded() ? null : DroneTypes.get(unit.typeId);
+        int rows = 0;
+        for (int station = 0; type != null && station < Loadout.STATIONS; station++) {
+            if (type.getWeapon(station) != DroneType.WeaponType.NONE) {
+                rows++;
+            }
+        }
+        return rows;
+    }
+
     private void clickWaypointList(int mouseY) {
-        int listTop = mapTop + ROW + (view.isRampMode() ? ROW + 4 : ROW * (Math.max(1, view.units.size()) + 1) + 4);
+        int listTop = mapTop + ROW * (Math.max(1, view.units.size()) + 2) + 4 + ROW * groundedAmmoRows();
         int row = (mouseY - listTop) / ROW;
         if (mouseY >= listTop && row < waypoints.size()) {
             selectedWaypoint = row;
@@ -848,10 +866,14 @@ public class GuiMissionPlanner extends GuiScreen {
                 dirty = true;
                 break;
             case BUTTON_SEND:
-                send(false);
+                send(false, false);
                 break;
             case BUTTON_LAUNCH:
-                send(true);
+                // The planner stays open and moves on to the launched unit (the server selects it)
+                send(true, false);
+                break;
+            case BUTTON_LAUNCH_FLY:
+                send(true, true);
                 mc.displayGuiScreen(null);
                 return;
             case BUTTON_CLOSE:
@@ -860,7 +882,7 @@ public class GuiMissionPlanner extends GuiScreen {
             case BUTTON_MARK:
                 if (currentUnit() != null) {
                     // The draft goes along, so marking in the world doesn't lose unsent edits
-                    ModNetwork.CHANNEL.sendToServer(new PlannerMarkPacket(view.rampId, view.isRampMode() ? -1 : currentUnit().entityId, currentRoute()));
+                    ModNetwork.CHANNEL.sendToServer(new PlannerMarkPacket(currentUnit().rampId, currentUnit().entityId, currentRoute()));
                 }
                 mc.displayGuiScreen(null);
                 return;
@@ -937,13 +959,13 @@ public class GuiMissionPlanner extends GuiScreen {
         return new Route(waypoints, terminal, loiterRadius, target);
     }
 
-    private void send(boolean launch) {
+    private void send(boolean launch, boolean fly) {
         PlannerOpenPacket.UnitView unit = currentUnit();
         if (unit == null) {
             return;
         }
-        ModNetwork.CHANNEL.sendToServer(view.isRampMode()
-                ? PlannerSubmitPacket.forRamp(view.rampId, currentRoute(), launch)
+        ModNetwork.CHANNEL.sendToServer(unit.isGrounded()
+                ? PlannerSubmitPacket.forRamp(unit.rampId, currentRoute(), launch, fly)
                 : PlannerSubmitPacket.forUnit(unit.entityId, currentRoute()));
         dirty = false;
     }

@@ -8,21 +8,24 @@ import net.minecraftforge.fml.common.network.simpleimpl.IMessage;
 import net.minecraftforge.fml.common.network.simpleimpl.IMessageHandler;
 import net.minecraftforge.fml.common.network.simpleimpl.MessageContext;
 
-/** Client to server: a route for a ramp's unit (optionally launching it) or for an airborne unit. Validated server-side. */
+/** Client to server: a route for a ramp's unit (optionally launching it, or launching and flying it) or for an airborne unit. Validated server-side. */
 public class PlannerSubmitPacket implements IMessage {
     int rampId = -1;
     int unitId = -1;
     Route route;
     boolean launch;
+    /** With launch: take manual control the moment it leaves the ramp. */
+    boolean fly;
 
     public PlannerSubmitPacket() {
     }
 
-    public static PlannerSubmitPacket forRamp(int rampId, Route route, boolean launch) {
+    public static PlannerSubmitPacket forRamp(int rampId, Route route, boolean launch, boolean fly) {
         PlannerSubmitPacket packet = new PlannerSubmitPacket();
         packet.rampId = rampId;
         packet.route = route;
         packet.launch = launch;
+        packet.fly = fly;
         return packet;
     }
 
@@ -38,6 +41,7 @@ public class PlannerSubmitPacket implements IMessage {
         buf.writeInt(rampId);
         buf.writeInt(unitId);
         buf.writeBoolean(launch);
+        buf.writeBoolean(fly);
         RouteCodec.write(buf, route);
     }
 
@@ -46,6 +50,7 @@ public class PlannerSubmitPacket implements IMessage {
         rampId = buf.readInt();
         unitId = buf.readInt();
         launch = buf.readBoolean();
+        fly = buf.readBoolean();
         route = RouteCodec.read(buf);
     }
 

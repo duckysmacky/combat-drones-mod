@@ -5,6 +5,7 @@ import io.github.duckysmacky.combatdrones.entity.EntityCruiseMissile;
 import io.github.duckysmacky.combatdrones.entity.EntityLaunchRamp;
 import io.github.duckysmacky.combatdrones.entity.EntityRampUnit;
 import io.github.duckysmacky.combatdrones.entity.Raytrace;
+import io.github.duckysmacky.combatdrones.entity.RemoteSessions;
 import io.github.duckysmacky.combatdrones.physics.Route;
 import io.github.duckysmacky.combatdrones.physics.RouteValidator;
 import io.github.duckysmacky.combatdrones.type.DroneType;
@@ -24,8 +25,6 @@ import java.util.UUID;
 
 /** Server side of the Mission Planner: what a player may see and change, all validated here. */
 public final class PlannerServer {
-    /** How close a player must stand to a ramp to plan or launch from it. */
-    private static final double RAMP_REACH = 8;
     /** How long an armed "Mark target" waits for the right-click, in ticks. */
     private static final int MARK_TIMEOUT_TICKS = 30 * 20;
 
@@ -53,38 +52,31 @@ public final class PlannerServer {
         return RouteValidator.allowedTerminals(type.isArmed(), type.getWeaponType() != DroneType.WeaponType.NONE);
     }
 
-    /** Opens the planner on a ramp (owner only). */
-    public static void openRamp(EntityPlayer player, EntityLaunchRamp ramp) {
-        DroneType type = ramp.getUnitType();
-        if (type == null) {
-            status(player, "message.combat_drones.ramp.empty");
-            return;
+    /** Right-click a ramp with the planner: the first click links it (owner only), later ones open the planner on it. */
+    public static void linkAndOpen(EntityPlayer player, EntityLaunchRamp ramp) {
+        if (ramp.isLinked() && ramp.isOwnedBy(player)) {
+            openAll((EntityPlayerMP) player, ramp.getEntityId());
+        } else {
+            ramp.link(player);
         }
-        if (!ramp.isOwnedBy(player)) {
-            status(player, "message.combat_drones.ramp.not_owner");
-            return;
-        }
-        PlannerOpenPacket packet = new PlannerOpenPacket();
-        packet.rampId = ramp.getEntityId();
-        PlannerOpenPacket.UnitView view = new PlannerOpenPacket.UnitView();
-        view.typeId = type.getId();
-        view.x = ramp.posX;
-        view.y = ramp.posY + 1;
-        view.z = ramp.posZ;
-        view.heading = ramp.rotationYaw;
-        view.fuelFraction = ramp.getFuelFraction();
-        view.loadout = ramp.getLoadout();
-        view.originY = view.y;
-        view.route = ramp.getRoute();
-        view.allowedTerminals = allowedTerminals(type);
-        packet.units.add(view);
-        ModNetwork.CHANNEL.sendTo(packet, (EntityPlayerMP) player);
     }
 
-    /** Opens (or refreshes) the airborne view: every unit this player owns that is flying in their world. */
-    public static void openAirborne(EntityPlayerMP player) {
+    /**
+     * Opens (or refreshes) the planner: every unit this player owns in their world, grounded on a linked ramp or in
+     * flight. {@code selectId} preselects the unit with that entity ID, or on the ramp with that ID (-1: keep the
+     * screen's selection).
+     */
+    public static void openAll(EntityPlayerMP player, int selectId) {
         PlannerOpenPacket packet = new PlannerOpenPacket();
+        packet.selectId = selectId;
         for (Entity entity : player.world.loadedEntityList) {
+            if (entity instanceof EntityLaunchRamp && !entity.isDead) {
+                EntityLaunchRamp ramp = (EntityLaunchRamp) entity;
+                if (ramp.isLinked() && ramp.isOwnedBy(player)) {
+                    packet.units.add(rampView(ramp));
+                }
+                continue;
+            }
             if (!(entity instanceof EntityRampUnit) || entity instanceof EntityCruiseMissile || entity.isDead || !player.getUniqueID().equals(((EntityRampUnit) entity).getOwner())) {
                 continue;
             }
@@ -111,6 +103,24 @@ public final class PlannerServer {
         ModNetwork.CHANNEL.sendTo(packet, player);
     }
 
+    /** A linked ramp's unit, still on the ground. */
+    private static PlannerOpenPacket.UnitView rampView(EntityLaunchRamp ramp) {
+        DroneType type = ramp.getUnitType();
+        PlannerOpenPacket.UnitView view = new PlannerOpenPacket.UnitView();
+        view.rampId = ramp.getEntityId();
+        view.typeId = type.getId();
+        view.x = ramp.posX;
+        view.y = ramp.posY + 1;
+        view.z = ramp.posZ;
+        view.heading = ramp.rotationYaw;
+        view.fuelFraction = ramp.getFuelFraction();
+        view.loadout = ramp.getLoadout();
+        view.originY = view.y;
+        view.route = ramp.getRoute();
+        view.allowedTerminals = allowedTerminals(type);
+        return view;
+    }
+
     public static void submit(EntityPlayerMP player, PlannerSubmitPacket packet) {
         if (packet.rampId >= 0) {
             submitToRamp(player, packet);
@@ -119,40 +129,54 @@ public final class PlannerServer {
         }
     }
 
+    /**
+     * A route for a linked ramp's unit: saved ("Apply"), launched, or launched straight into the owner's hands
+     * ({@code fly}, stick types only, where an empty route is fine: with nothing to follow it flies straight on).
+     */
     private static void submitToRamp(EntityPlayerMP player, PlannerSubmitPacket packet) {
         Entity entity = player.world.getEntityByID(packet.rampId);
         if (!(entity instanceof EntityLaunchRamp) || entity.isDead) {
             return;
         }
         EntityLaunchRamp ramp = (EntityLaunchRamp) entity;
-        if (player.getDistanceSq(ramp) > RAMP_REACH * RAMP_REACH) {
-            status(player, "message.combat_drones.planner.too_far");
-            return;
-        }
         DroneType type = ramp.getUnitType();
         if (type == null || !ramp.isOwnedBy(player)) {
             status(player, "message.combat_drones.ramp.not_owner");
             return;
         }
-        Route route = resolveTarget(player.world, packet.route);
-        String problem = RouteValidator.validate(route, ramp.posX, ramp.posZ, ModConfig.routeLimits(), allowedTerminals(type));
-        if (problem != null) {
-            status(player, problem);
+        if (!ramp.isLinked()) {
+            status(player, "message.combat_drones.ramp.not_linked");
             return;
+        }
+        boolean fly = packet.launch && packet.fly;
+        if (fly && type.getControlScheme() != DroneType.ControlScheme.STICK) {
+            return; // the GUI never offers it for these
+        }
+        Route route = resolveTarget(player.world, packet.route);
+        if (!(fly && route.size() == 0)) {
+            String problem = RouteValidator.validate(route, ramp.posX, ramp.posZ, ModConfig.routeLimits(), allowedTerminals(type));
+            if (problem != null) {
+                status(player, problem);
+                return;
+            }
         }
         ramp.setRoute(route);
         if (!packet.launch) {
             status(player, "message.combat_drones.planner.route_saved");
-            openRamp(player, ramp);
+            openAll(player, ramp.getEntityId());
             return;
         }
         if (ramp.getFuelFraction() < ModConfig.minLaunchFuel) {
             status(player, "message.combat_drones.planner.low_fuel");
-            openRamp(player, ramp);
+            openAll(player, ramp.getEntityId());
             return;
         }
-        ramp.launch();
-        status(player, "message.combat_drones.planner.launched");
+        EntityRampUnit unit = ramp.launch();
+        String problem = fly && unit != null ? RemoteSessions.start(player, unit, true) : null;
+        status(player, problem != null ? problem : "message.combat_drones.planner.launched");
+        if (!fly && unit != null) {
+            openAll(player, unit.getEntityId()); // the open planner follows it into the air
+        }
     }
 
     private static void submitToUnit(EntityPlayerMP player, PlannerSubmitPacket packet) {
@@ -174,7 +198,7 @@ public final class PlannerServer {
         }
         unit.setRoute(route);
         status(player, "message.combat_drones.planner.route_applied");
-        openAirborne(player);
+        openAll(player, -1);
     }
 
     /** A target picked on the map has no height yet: put it on the ground there. */
@@ -235,7 +259,7 @@ public final class PlannerServer {
             if (entity instanceof EntityLaunchRamp && ((EntityLaunchRamp) entity).isOwnedBy(player)) {
                 // Saved unvalidated, like an unsent draft: Send and Launch validate it
                 ((EntityLaunchRamp) entity).setRoute(route);
-                openRamp(player, (EntityLaunchRamp) entity);
+                openAll(player, mark.rampId);
             }
             return true;
         }
@@ -250,7 +274,7 @@ public final class PlannerServer {
                 unit.setRoute(route);
             }
         }
-        openAirborne(player);
+        openAll(player, -1);
         return true;
     }
 
