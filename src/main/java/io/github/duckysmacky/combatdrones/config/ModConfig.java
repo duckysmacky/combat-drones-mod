@@ -77,9 +77,9 @@ public final class ModConfig {
     public static int roundsPerRifleItem = 16;
     public static double rocketSpeed = 3.0;
     public static int rocketCooldownTicks = 15;
-    public static double cannonDamage = 8.0;
+    public static double cannonDamage = 14.0;
     public static double cannonBlastPower = 1.0;
-    public static double cannonSpeed = 5.0;
+    public static double cannonSpeed = 8.0;
     public static double cannonCooldownTicks = 10.0;
     public static double cannonSpread = 0.3;
     public static double gunDamagePerRound = 8.0;

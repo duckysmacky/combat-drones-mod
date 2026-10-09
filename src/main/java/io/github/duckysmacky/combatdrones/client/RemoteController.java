@@ -323,7 +323,15 @@ public final class RemoteController {
             }
         }
         boolean trigger = minecraft.currentScreen == null && Mouse.isButtonDown(0);
-        ModNetwork.CHANNEL.sendToServer(new GunnerInputPacket(unitId, Vec3d.fromPitchYaw(cameraPitch, cameraYaw), trigger, gunnerStation));
+        Vec3d aim = Vec3d.fromPitchYaw(cameraPitch, cameraYaw);
+        // While firing, also what the crosshair is on, so the server aims at that point from where the unit really is
+        Vec3d target = null;
+        if (trigger) {
+            Vec3d eye = new Vec3d(unit.posX, unit.posY + unit.getEyeHeight(), unit.posZ);
+            RayTraceResult hit = Raytrace.firstResult(unit.world, eye, eye.add(aim.scale(ANCHOR_RANGE)), unit);
+            target = hit != null ? hit.hitVec : null;
+        }
+        ModNetwork.CHANNEL.sendToServer(new GunnerInputPacket(unitId, aim, target, trigger, gunnerStation));
     }
 
     /** Space (jump) boosts a munition: faster, at several times the fuel burn. */

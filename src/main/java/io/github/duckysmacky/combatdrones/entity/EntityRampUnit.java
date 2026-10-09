@@ -71,6 +71,8 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder {
     /** Manual input older than this (ticks) is treated as a centred stick. */
     protected static final int STALE_INPUT_TICKS = 10;
     private static final int DESIGNATE_COOLDOWN_TICKS = 10;
+    /** Farthest crosshair point (blocks from the unit) the gunner's shots are aimed at; the client looks up to 512. */
+    public static final double GUNNER_AIM_RANGE = 544;
     // Client smoothing: share of the remaining rotation / position error taken out each tick, and the error beyond
     // which it just jumps (teleport, chunk reload)
     private static final float ROTATION_SMOOTHING = 0.5F;
@@ -117,6 +119,9 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder {
     private long manualInputTick = Long.MIN_VALUE;
     // Gunner seat (gunner scheme): where the camera aims and whether the trigger is held, and when that arrived
     private Vec3d gunnerAim = Vec3d.ZERO;
+    /** What the gunner's crosshair was on, if anything (the camera ray's first hit), so shots converge on it. */
+    @Nullable
+    private Vec3d gunnerTarget;
     private boolean gunnerTrigger;
     private long gunnerInputTick = Long.MIN_VALUE;
     /** A point picked from the camera (click-designate scheme): overrides the route with a strike. */
@@ -477,26 +482,40 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder {
             manualTrigger = false;
         }
         if (manualTrigger) {
-            fireWeapon(type, 0, Vec3d.fromPitchYaw(rotationPitch, rotationYaw));
+            fireWeapon(type, 0, Vec3d.fromPitchYaw(rotationPitch, rotationYaw), true);
         }
         double throttle = boosting ? 1 : manualThrottle;
         return manualFree ? FixedWingFlight.fromRates(flight, params, manualPitch, manualRoll, throttle, fuel > 0)
                 : FixedWingFlight.fromStick(manualPitch, manualRoll, throttle, fuel > 0);
     }
 
-    /** Gunner seat: fires the selected station along the camera while the autopilot flies on. Fresh input only. */
+    /**
+     * Gunner seat: fires the selected station at the crosshair while the autopilot flies on. Fresh input only. Aimed
+     * at the point the crosshair was on, from where the unit is now: the client's camera saw the unit a tick or two
+     * earlier, so firing along its direction alone would land that far off, toward the direction of flight.
+     */
     private void gunnerFire(DroneType type) {
-        if (type.getControlScheme() == DroneType.ControlScheme.GUNNER && gunnerTrigger && RemoteSessions.controllerOf(this) != null
-                && world.getTotalWorldTime() - gunnerInputTick <= STALE_INPUT_TICKS) {
-            fireWeapon(type, getSelectedStation(), gunnerAim);
+        if (type.getControlScheme() != DroneType.ControlScheme.GUNNER || !gunnerTrigger || RemoteSessions.controllerOf(this) == null
+                || world.getTotalWorldTime() - gunnerInputTick > STALE_INPUT_TICKS) {
+            return;
         }
+        Vec3d aim = gunnerAim;
+        if (gunnerTarget != null) {
+            Vec3d toTarget = gunnerTarget.subtract(posX, posY + height / 2, posZ);
+            if (toTarget.lengthSquared() > width * width) {
+                aim = toTarget.normalize();
+            }
+        }
+        fireWeapon(type, getSelectedStation(), aim, false);
     }
 
     /**
      * Fires one rocket or round from {@code station} along {@code aim} (a unit vector), if the weapon is ready and
-     * there's ammo. Manual control only.
+     * there's ammo. Manual control only. {@code inheritVelocity}: projectiles also carry the plane's own velocity,
+     * right when firing along the nose; the gunner fires across the flight path, where it would carry every shot
+     * off to the side (12 blocks over 100 for a cannon shell from a cruising gunship).
      */
-    private void fireWeapon(DroneType type, int station, Vec3d aim) {
+    private void fireWeapon(DroneType type, int station, Vec3d aim, boolean inheritVelocity) {
         Loadout loadout = getLoadout();
         DroneType.WeaponType weapon = type.getWeapon(station);
         if (weapon == DroneType.WeaponType.NONE || weaponCooldown > 0 || loadout.getAmmo(station) <= 0) {
@@ -505,16 +524,17 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder {
         loadout.setAmmo(station, loadout.getAmmo(station) - 1);
         setLoadout(loadout);
         Vec3d muzzle = new Vec3d(posX, posY + height / 2, posZ).add(aim.scale(Math.max(1.2, width)));
+        Vec3d carried = inheritVelocity ? new Vec3d(flight.velocity.x, flight.velocity.y, flight.velocity.z) : Vec3d.ZERO;
         if (weapon == DroneType.WeaponType.ROCKET_POD) {
             weaponCooldown += ModConfig.rocketCooldownTicks;
             RocketType kind = loadout.getRocketKind();
-            Vec3d velocity = aim.scale(ModConfig.rocketSpeed).add(flight.velocity.x, flight.velocity.y, flight.velocity.z);
+            Vec3d velocity = aim.scale(ModConfig.rocketSpeed).add(carried);
             world.spawnEntity(new EntityRocket(world, this, owner, muzzle, velocity,
                     kind == RocketType.HEAVY ? EntityRocket.Kind.HEAVY_ROCKET : EntityRocket.Kind.ROCKET, (float) kind.getBlastPower(), 0));
             world.playSound(null, posX, posY, posZ, ModSounds.GUNSHIP_ROCKET, SoundCategory.NEUTRAL, 4.5F, kind == RocketType.HEAVY ? 0.8F : 1.0F);
         } else if (weapon == DroneType.WeaponType.CANNON) {
             weaponCooldown += ModConfig.cannonCooldownTicks;
-            Vec3d velocity = spread(aim, ModConfig.cannonSpread).scale(ModConfig.cannonSpeed).add(flight.velocity.x, flight.velocity.y, flight.velocity.z);
+            Vec3d velocity = spread(aim, ModConfig.cannonSpread).scale(ModConfig.cannonSpeed).add(carried);
             world.spawnEntity(new EntityRocket(world, this, owner, muzzle, velocity, EntityRocket.Kind.CANNON_SHELL,
                     (float) ModConfig.cannonBlastPower, (float) ModConfig.cannonDamage));
             world.playSound(null, posX, posY, posZ, ModSounds.GUNSHIP_CANNON, SoundCategory.NEUTRAL, 6.0F, 0.95F + rand.nextFloat() * 0.1F);
@@ -565,9 +585,10 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder {
 
     /**
      * Server: latest gunner-seat input. Only the current controller of a gunner-scheme unit counts; the aim must be a
-     * real direction, and a station without a weapon falls back to the primary one.
+     * real direction, the crosshair point (null: on nothing, e.g. the sky) a real point within aiming range, and a
+     * station without a weapon falls back to the primary one.
      */
-    public void acceptGunnerInput(EntityPlayerMP sender, Vec3d aim, boolean trigger, int station) {
+    public void acceptGunnerInput(EntityPlayerMP sender, Vec3d aim, @Nullable Vec3d target, boolean trigger, int station) {
         DroneType type = getDroneType();
         double length = aim.length();
         if (RemoteSessions.controllerOf(this) != sender || type == null || type.getControlScheme() != DroneType.ControlScheme.GUNNER
@@ -575,6 +596,9 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder {
             return;
         }
         gunnerAim = aim.scale(1 / length);
+        boolean targetValid = target != null && Double.isFinite(target.x) && Double.isFinite(target.y) && Double.isFinite(target.z)
+                && target.squareDistanceTo(posX, posY, posZ) <= GUNNER_AIM_RANGE * GUNNER_AIM_RANGE;
+        gunnerTarget = targetValid ? target : null;
         gunnerTrigger = trigger;
         gunnerInputTick = world.getTotalWorldTime();
         boolean validStation = station >= 0 && station < Loadout.STATIONS && type.getWeapon(station) != DroneType.WeaponType.NONE;

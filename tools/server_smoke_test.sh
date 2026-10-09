@@ -32,8 +32,8 @@ exec 3>"$FIFO"
 say() { echo "$1" >&3; }
 for _ in $(seq 1 120); do grep -q 'Done (' "$LOG" && break; sleep 2; done
 UNIT='combat_drones:ramp_unit'
-summon() { # name x z type fuel heading route-nbt
-    say "summon $UNIT $2 $UP $3 {Type:\"$4\",Fuel:$5d,Health:100f,LaunchY:${LAUNCH}d,HomeX:${SX}d,HomeZ:${SZ}d,Speed:0.8d,Heading:$6d,CustomName:\"$1\",Route:$7}"
+summon() { # name x z type fuel heading route-nbt [home-x home-z, default spawn]
+    say "summon $UNIT $2 $UP $3 {Type:\"$4\",Fuel:$5d,Health:100f,LaunchY:${LAUNCH}d,HomeX:${8:-$SX}d,HomeZ:${9:-$SZ}d,Speed:0.8d,Heading:$6d,CustomName:\"$1\",Route:$7}"
 }
 wp() { echo "{X:$1d,Z:$2d,Alt:30d,Speed:\"${3:-FAST}\"}"; }
 WALL_X=$((SX + 30))
@@ -46,7 +46,7 @@ summon lowfuel "$SX" $((SZ + 20)) loitering_light 300 0 "{Terminal:\"LOITER\",Lo
 summon destroy $((SX - 20)) "$SZ" loitering_light 3600 90 "{Terminal:\"DESTROY\",LoiterRadius:24d,Target:{X:$((SX - 120))d,Y:${GROUND}d,Z:$((SZ - 60))d},Waypoints:[$(wp $((SX - 100)) "$SZ")]}"
 summon loop    $((SX + 20)) $((SZ - 40)) recon_uav 24000 180 "{Terminal:\"LOOP\",LoiterRadius:24d,Waypoints:[$(wp "$SX" $((SZ - 100))),$(wp $((SX + 80)) $((SZ - 100)))]}"
 summon lowloop $((SX + 20)) $((SZ + 40)) recon_uav 2000 0 "{Terminal:\"LOOP\",LoiterRadius:24d,Waypoints:[$(wp "$SX" $((SZ + 100))),$(wp $((SX + 80)) $((SZ + 100)))]}"
-summon retgs   $((SX + 20)) $((SZ - 70)) gunship 7200 -90 "{Terminal:\"RETURN\",LoiterRadius:24d,Waypoints:[$(wp $((SX + 150)) $((SZ - 70)))]}"
+summon retgs   $((SX + 20)) $((SZ - 70)) gunship 7200 -90 "{Terminal:\"RETURN\",LoiterRadius:24d,Waypoints:[$(wp $((SX + 150)) $((SZ - 70)))]}" "$SX" $((SZ - 70))
 summon crashg  $((SX - 30)) $((SZ + 60)) attack_plane 6000 -90 "{Terminal:\"LOITER\",LoiterRadius:24d,Waypoints:[$(wp $((SX + 160)) $((SZ + 60)) MEDIUM)]}"
 summon crashu  $((SX - 30)) $((SZ + 90)) recon_uav 24000 -90 "{Terminal:\"LOITER\",LoiterRadius:24d,Waypoints:[$(wp $((SX + 160)) $((SZ + 90)) MEDIUM)]}"
 for _ in $(seq 1 25); do sleep 4; say "tp @e[type=$UNIT] ~ ~ ~"; done

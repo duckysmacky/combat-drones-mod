@@ -13,9 +13,9 @@
   "hitboxWidth": 1.6,
   "hitboxHeight": 0.7,
   "defaultCruiseAltitude": 40,
-  "agility": 1.25,
+  "agility": 1.15,
   // Pitch rate multiplier on top of agility: pulls up out of a rocket run quickly
-  "pitchAgility": 1.5,
+  "pitchAgility": 1.25,
   "controlScheme": "STICK",
   "weaponType": "ROCKET_POD",
   "motorSoundRange": 160,
