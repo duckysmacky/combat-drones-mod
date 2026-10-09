@@ -6,7 +6,7 @@
   "acceleration": 0.2,
   "batteryOrFuelCapacity": 3600,
   "drainRatePerTick": 1.0,
-  "blastPower": 5.0,
+  "blastPower": 6.5,
   "payloadCapacity": 0,
   "maxHP": 30,
   // Collision box in blocks: the fuselage core, not the wingtips or props

@@ -10,7 +10,7 @@
   "batteryOrFuelCapacity": 6000,
   "drainRatePerTick": 1.0,
   // The warhead, set off only by an impact in the dive; shot down, only its fuel goes up ([missiles] fuelBlastPower)
-  "blastPower": 24,
+  "blastPower": 32,
   "payloadCapacity": 0,
   "maxHP": 300,
   // Upright missile: a tall, thin box (it stays near vertical the whole flight)

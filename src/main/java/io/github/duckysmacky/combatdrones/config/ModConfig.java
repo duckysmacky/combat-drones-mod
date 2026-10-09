@@ -108,7 +108,7 @@ public final class ModConfig {
     public static double missileSteerRateDegrees = 1.5;
     public static double missileBoostMultiplier = 2.0;
     public static double fuelBlastPower = 6.0;
-    public static double missileShrapnelDamage = 14.0;
+    public static double missileShrapnelDamage = 25.0;
     public static double missileShrapnelRadius = 24.0;
     public static double strikeAlertRadius = 128.0;
 
