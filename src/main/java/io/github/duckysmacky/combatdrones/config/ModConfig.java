@@ -71,7 +71,7 @@ public final class ModConfig {
     public static double boostFuelMultiplier = 4.0;
     public static boolean worldBorderCollision = false;
     public static boolean pilotHintEnabled = true;
-    public static double pilotHintRange = 24.0;
+    public static double pilotHintRange = 48.0;
 
     // [weapons]
     public static int roundsPerRifleItem = 16;
