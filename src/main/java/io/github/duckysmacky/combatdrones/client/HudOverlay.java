@@ -49,6 +49,10 @@ public final class HudOverlay {
     /** Ladders are shorter than the box so they clear the corner readouts. */
     private static final int LADDER_HALF_HEIGHT = 42;
     private static final int LINE = 10;
+    /** Weapons that reload faster than this (ticks) get no reload bar: it would only flicker. */
+    private static final int MIN_RELOAD_BAR_TICKS = 10;
+    private static final int RELOAD_COLOR = 0xFFFFAA00;
+    private static final int RELOAD_BACKGROUND = 0x60000000;
     private static final int TEXT = 0xFFFFFF;
     private static final int WARNING = 0xFF5555;
     private static final int LINE_COLOR = 0xD0FFFFFF;
@@ -214,7 +218,7 @@ public final class HudOverlay {
         }
         if (!ClientIntel.getMarks().isEmpty()) {
             String targets = I18n.format("hud.combat_drones.targets", ClientIntel.getMarks().size());
-            drawText(font, targets, right - font.getStringWidth(targets), top + LINE * 3, WARNING);
+            drawText(font, targets, right - font.getStringWidth(targets), top + LINE * (1 + Loadout.STATIONS), WARNING);
         }
 
         String fuelText = I18n.format("hud.combat_drones.fuel", percent(fuel));
@@ -228,7 +232,12 @@ public final class HudOverlay {
                 if (RemoteController.isGunner() && station == unit.getSelectedStation()) {
                     ammo = "> " + ammo;
                 }
-                drawText(font, ammo, right - font.getStringWidth(ammo), top + LINE * ammoLine++, loadout.getAmmo(station) > 0 ? 0xFFAA00 : WARNING);
+                int ammoY = top + LINE * ammoLine++;
+                drawText(font, ammo, right - font.getStringWidth(ammo), ammoY, loadout.getAmmo(station) > 0 ? 0xFFAA00 : WARNING);
+                drawReload(unit, station, right - font.getStringWidth(ammo), right, ammoY + 8);
+                if (RemoteController.isGunner() && station == unit.getSelectedStation()) {
+                    drawReload(unit, station, centerX - 12, centerX + 12, centerY + 10);
+                }
             }
         }
 
@@ -478,6 +487,16 @@ public final class HudOverlay {
 
     private static long percent(double fraction) {
         return Math.round(Math.max(0, Math.min(1, fraction)) * 100);
+    }
+
+    /** A thin bar from {@code x0} to {@code x1} filling up while {@code station} reloads; nothing when it's ready. */
+    private static void drawReload(EntityRampUnit unit, int station, int x0, int x1, int y) {
+        float left = unit.getCooldownLeft(station);
+        if (left <= 0 || unit.getCooldownLength(station) < MIN_RELOAD_BAR_TICKS) {
+            return;
+        }
+        Gui.drawRect(x0, y, x1, y + 1, RELOAD_BACKGROUND);
+        Gui.drawRect(x0, y, x0 + Math.round((x1 - x0) * (1 - left)), y + 1, RELOAD_COLOR);
     }
 
     private static void drawText(FontRenderer font, String text, int x, int y, int color) {

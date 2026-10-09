@@ -87,7 +87,7 @@ public final class ModContent {
                 Arrays.asList(fpvRemote, fpvGoggles),
                 Arrays.asList(lightBattery, standardBattery, heavyBattery, fragGrenade, bombLight, bomb, bombHeavy),
                 Arrays.asList(launchRamp, planeRamp, missionPlanner, fuelCan, missilePad, missileTablet),
-                Arrays.asList(rocket, rocketHeavy, rifleRounds, cannonShell));
+                Arrays.asList(rocket, rocketHeavy, rifleRounds, cannonShell, howitzerShell));
         for (int group = 0; group < groups.size(); group++) {
             int index = groups.get(group).indexOf(item);
             if (index >= 0) {
@@ -125,6 +125,7 @@ public final class ModContent {
     public static Item rocketHeavy;
     public static Item rifleRounds;
     public static Item cannonShell;
+    public static Item howitzerShell;
 
     private ModContent() {
     }
@@ -158,6 +159,7 @@ public final class ModContent {
         rocketHeavy = register(event, simpleItem(RocketType.HEAVY.itemName()).setMaxStackSize(16));
         rifleRounds = register(event, simpleItem("rifle_rounds"));
         cannonShell = register(event, simpleItem("cannon_shell"));
+        howitzerShell = register(event, simpleItem("howitzer_shell").setMaxStackSize(16));
         // One placeable item per data-defined type; the registry name is the type ID
         for (DroneType type : DroneTypes.all()) {
             register(event, named(new ItemDrone(type.getId()), type.getId()));

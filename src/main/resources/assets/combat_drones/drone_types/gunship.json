@@ -1,7 +1,7 @@
 {
   // Gunship: big, slow, tough fixed-wing for circling over a fight, ramp-launched and routed like the other planes.
   // "Take control" doesn't fly it: the autopilot keeps flying the route (or circling the loiter point) and the player
-  // sits in the gunner seat, aiming a free gimbal camera and switching between the cannon and the rocket rack.
+  // sits in the gunner seat, aiming a free gimbal camera and switching between the cannon, the rocket rack and the howitzer.
   // A hard crash or being shot down sets off its fuel and ammo (blastPower).
   "category": "RAMP_AUTOPILOT",
   "maxSpeed": 0.8,
@@ -10,7 +10,7 @@
   "drainRatePerTick": 1.0,
   "blastPower": 5.0,
   // Cannon shells (Cannon Shell items, one each)
-  "payloadCapacity": 64,
+  "payloadCapacity": 128,
   "maxHP": 250,
   // Collision box in blocks: the fuselage core, not the wingtips or props
   "hitboxWidth": 3.0,
@@ -19,9 +19,14 @@
   "agility": 0.7,
   "controlScheme": "GUNNER",
   "weaponType": "CANNON",
-  // Rocket rack, switched to in flight: bay units, one rocket size at a time like a rocket pod
+  // Rocket rack, switched to in flight: bay units (32 Rockets or 12 Heavy Rockets), one size at a time like a rocket pod
   "secondaryWeapon": "ROCKET_POD",
-  "secondaryCapacity": 16,
+  "secondaryCapacity": 96,
+  // Slower rocket fire than the Strike Plane's pods (0 would use [weapons] rocketCooldownTicks)
+  "rocketCooldownTicks": 30,
+  // 105 mm howitzer: few, slow, huge shells
+  "tertiaryWeapon": "HOWITZER",
+  "tertiaryCapacity": 8,
   // Loud on purpose: everyone below should know it's overhead
   "motorSoundRange": 256,
   // Engine loop sound event (combat_drones:<name>); unset = the family default

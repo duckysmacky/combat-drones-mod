@@ -3,13 +3,13 @@ package io.github.duckysmacky.combatdrones.type;
 import java.util.Locale;
 
 /**
- * Rocket sizes a rocket pod can fire, one size at a time. Each rocket takes bay units (a 32-unit bay holds 32 light or
- * 16 heavy) and explodes with its own blast power. Values come from the config ({@code [rockets.<name>]}) and are
+ * Rocket sizes a rocket pod can fire, one size at a time. Each rocket takes bay units (a 192-unit bay holds 64 light or
+ * 24 heavy; odd-looking unit sizes so both counts come out whole) and explodes with its own blast power. Values come from the config ({@code [rockets.<name>]}) and are
  * synced to clients for the HUD and tooltips.
  */
 public enum RocketType {
-    LIGHT("rocket", 1, 3.0),
-    HEAVY("rocket_heavy", 2, 5.5);
+    LIGHT("rocket", 3, 3.0),
+    HEAVY("rocket_heavy", 8, 5.5);
 
     private final String itemName;
     private final int defaultBayUnits;

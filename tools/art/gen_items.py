@@ -317,6 +317,24 @@ SPRITES = {
         "...KKKKKKKK.....",
         "................",
     ], pal(G="#4b5320", H="#66702c", Y="#d6b23a", y="#3d4248", b="#b08d3c", c="#8a6d2e", C="#c9a24a")),
+    "howitzer_shell": ([
+        "......KK........",
+        ".....KyyK.......",
+        ".....KyyK.......",
+        "....KGGGGK......",
+        "...KGHGGGGK.....",
+        "...KYYYYYYK.....",
+        "...KGHGGGGK.....",
+        "...KGHGGGGK.....",
+        "...KGHGGGGK.....",
+        "...KGHGGGGK.....",
+        "...KGHGGGGK.....",
+        "...KrrrrrrK.....",
+        "...KGGGGGGK.....",
+        "...KdddddDK.....",
+        "...KKKKKKKK.....",
+        "................",
+    ], pal(G="#4b5320", H="#66702c", Y="#d6b23a", y="#b08d3c", r="#b06a3c", d="#3d4248", D="#2a2d31")),
 }
 
 BLOCKS = {

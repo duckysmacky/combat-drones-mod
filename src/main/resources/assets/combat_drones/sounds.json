@@ -133,6 +133,13 @@
       "combat_drones:gunship/cannon"
     ]
   },
+  "gunship.howitzer": {
+    "category": "neutral",
+    "subtitle": "subtitles.combat_drones.gunship.howitzer",
+    "sounds": [
+      "combat_drones:gunship/howitzer"
+    ]
+  },
   "bullet.impact": {
     "category": "neutral",
     "subtitle": "subtitles.combat_drones.bullet.impact",

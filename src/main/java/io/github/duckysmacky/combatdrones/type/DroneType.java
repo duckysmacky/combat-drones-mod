@@ -38,7 +38,7 @@ public final class DroneType {
         }
     }
 
-    public enum WeaponType { NONE, ROCKET_POD, GUN_MOUNT, CANNON }
+    public enum WeaponType { NONE, ROCKET_POD, GUN_MOUNT, CANNON, HOWITZER }
 
     /** What a hand-flown drone's payload slots hold: grenades boost a racer's impact blast, bombs are dropped. */
     public enum PayloadKind { GRENADE, BOMB }
@@ -90,6 +90,11 @@ public final class DroneType {
     private WeaponType secondaryWeapon = WeaponType.NONE;
     /** Rounds (or rocket bay units) the secondary station holds. */
     private int secondaryCapacity;
+    /** Optional third weapon station (the gunship's howitzer) and the rounds it holds. */
+    private WeaponType tertiaryWeapon = WeaponType.NONE;
+    private int tertiaryCapacity;
+    /** Ticks between rockets for this type's rocket pod; 0 = the global [weapons] rocketCooldownTicks. */
+    private double rocketCooldownTicks;
     /** Detonates on any collision (racer family). */
     private boolean impactDetonates;
     /** False for the recon UAV: no warhead or weapon, never dives or strikes (a crash can still set off its fuel). */
@@ -128,7 +133,9 @@ public final class DroneType {
             if ((name.equals("signalRange") && category != Category.HAND_FLOWN)
                     || ((name.equals("defaultCruiseAltitude") || name.equals("agility") || name.equals("pitchAgility"))
                             && category != Category.RAMP_AUTOPILOT)
-                    || (name.equals("secondaryCapacity") && secondaryWeapon == WeaponType.NONE)) {
+                    || (name.equals("secondaryCapacity") && secondaryWeapon == WeaponType.NONE)
+                    || (name.equals("tertiaryCapacity") && tertiaryWeapon == WeaponType.NONE)
+                    || (name.equals("rocketCooldownTicks") && stationOf(WeaponType.ROCKET_POD) < 0)) {
                 continue;
             }
             stats.put(name, value.getAsNumber());
@@ -159,8 +166,13 @@ public final class DroneType {
         require(category != null, "missing or unknown 'category'");
         require(weaponType != null, "unknown 'weaponType'");
         require(secondaryWeapon != null, "unknown 'secondaryWeapon'");
+        require(rocketCooldownTicks >= 0, "'rocketCooldownTicks' must be >= 0");
+        require(tertiaryWeapon != null, "unknown 'tertiaryWeapon'");
         require(secondaryWeapon == WeaponType.NONE || (secondaryCapacity > 0 && secondaryWeapon != weaponType && weaponType != WeaponType.NONE),
                 "a 'secondaryWeapon' needs 'secondaryCapacity' > 0, a primary weapon, and must differ from it");
+        require(tertiaryWeapon == WeaponType.NONE || (tertiaryCapacity > 0 && secondaryWeapon != WeaponType.NONE
+                        && tertiaryWeapon != weaponType && tertiaryWeapon != secondaryWeapon),
+                "a 'tertiaryWeapon' needs 'tertiaryCapacity' > 0, a secondary weapon, and must differ from both");
         require(maxSpeed > 0, "'maxSpeed' must be > 0");
         require(acceleration > 0, "'acceleration' must be > 0");
         require(batteryOrFuelCapacity > 0, "'batteryOrFuelCapacity' must be > 0");
@@ -189,7 +201,8 @@ public final class DroneType {
         }
         if (!armed) {
             // blastPower is allowed: it's the fuel going up in a crash, not a warhead
-            require(!impactDetonates && weaponType == WeaponType.NONE && secondaryWeapon == WeaponType.NONE && payloadCapacity == 0, "unarmed types can't detonate on impact or carry a weapon or payload");
+            require(!impactDetonates && weaponType == WeaponType.NONE && secondaryWeapon == WeaponType.NONE && tertiaryWeapon == WeaponType.NONE
+                    && payloadCapacity == 0, "unarmed types can't detonate on impact or carry a weapon or payload");
             require(controlScheme == null || controlScheme == ControlScheme.GIMBAL_OBSERVE, "unarmed types can only use GIMBAL_OBSERVE");
         }
     }
@@ -285,14 +298,36 @@ public final class DroneType {
         return weaponType;
     }
 
-    /** The weapon on {@code station} (0 = primary, 1 = secondary), or NONE. */
+    public double getRocketCooldownTicks() {
+        return rocketCooldownTicks;
+    }
+
+    /** The weapon on {@code station} (0 = primary, 1 = secondary, 2 = tertiary), or NONE. */
     public WeaponType getWeapon(int station) {
-        return station == 0 ? weaponType : station == 1 ? secondaryWeapon : WeaponType.NONE;
+        switch (station) {
+            case 0:
+                return weaponType;
+            case 1:
+                return secondaryWeapon;
+            case 2:
+                return tertiaryWeapon;
+            default:
+                return WeaponType.NONE;
+        }
     }
 
     /** Rounds (or rocket bay units, for a rocket pod) {@code station} holds. */
     public int getStationCapacity(int station) {
-        return station == 0 ? payloadCapacity : station == 1 ? secondaryCapacity : 0;
+        switch (station) {
+            case 0:
+                return payloadCapacity;
+            case 1:
+                return secondaryCapacity;
+            case 2:
+                return tertiaryCapacity;
+            default:
+                return 0;
+        }
     }
 
     /** The station with {@code weapon}, or -1 if the airframe doesn't carry it. */

@@ -251,6 +251,9 @@ public class EntityLaunchRamp extends Entity {
         if (stack.getItem() == ModContent.cannonShell) {
             return DroneType.WeaponType.CANNON;
         }
+        if (stack.getItem() == ModContent.howitzerShell) {
+            return DroneType.WeaponType.HOWITZER;
+        }
         return stack.getItem() == ModContent.rifleRounds ? DroneType.WeaponType.GUN_MOUNT : null;
     }
 
@@ -266,7 +269,7 @@ public class EntityLaunchRamp extends Entity {
 
     /**
      * Loads as much of the held ammo as fits into the station that takes it: rockets into a rocket pod, rifle rounds
-     * onto a gun mount's belt, shells into a cannon. A pod holds one rocket size at a time, so loading the other size hands the rockets
+     * onto a gun mount's belt, shells into a cannon or howitzer. A pod holds one rocket size at a time, so loading the other size hands the rockets
      * already in it back.
      */
     private void loadAmmo(EntityPlayer player, ItemStack stack) {

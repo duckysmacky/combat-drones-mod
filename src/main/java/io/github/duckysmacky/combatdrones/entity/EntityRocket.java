@@ -29,7 +29,8 @@ public class EntityRocket extends Entity {
     public enum Kind {
         ROCKET("rocket", true),
         HEAVY_ROCKET("rocket_heavy", true),
-        CANNON_SHELL("cannon_shell", false);
+        CANNON_SHELL("cannon_shell", false),
+        HOWITZER_SHELL("howitzer_shell", false);
 
         private final String modelName;
         private final boolean rocketMotor;

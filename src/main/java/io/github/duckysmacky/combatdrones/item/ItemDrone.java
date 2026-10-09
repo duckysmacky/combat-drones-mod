@@ -40,6 +40,7 @@ public class ItemDrone extends Item {
     private static final String TAG_FUEL = "Fuel";
     private static final String TAG_AMMO = "Ammo";
     private static final String TAG_AMMO_SECONDARY = "Ammo2";
+    private static final String TAG_AMMO_TERTIARY = "Ammo3";
     private static final String TAG_ROCKET_KIND = "RocketKind";
 
     /** Fuel stored in a ramp-launched unit's item (kept when it's taken off a ramp or lands). */
@@ -77,6 +78,7 @@ public class ItemDrone extends Item {
         Loadout loadout = new Loadout();
         loadout.setAmmo(0, tag.getInteger(TAG_AMMO));
         loadout.setAmmo(1, tag.getInteger(TAG_AMMO_SECONDARY));
+        loadout.setAmmo(2, tag.getInteger(TAG_AMMO_TERTIARY));
         // Missing (older saves, from before rocket sizes) reads as 0: light rockets
         loadout.setRocketKind(RocketType.byIndex(tag.getInteger(TAG_ROCKET_KIND)));
         return loadout;
@@ -85,6 +87,7 @@ public class ItemDrone extends Item {
     public static void writeLoadout(NBTTagCompound tag, Loadout loadout) {
         tag.setInteger(TAG_AMMO, loadout.getAmmo(0));
         tag.setInteger(TAG_AMMO_SECONDARY, loadout.getAmmo(1));
+        tag.setInteger(TAG_AMMO_TERTIARY, loadout.getAmmo(2));
         tag.setInteger(TAG_ROCKET_KIND, loadout.getRocketKind().ordinal());
     }
 

@@ -237,6 +237,11 @@ def gunship():
     body.box((-6.6, -2.2, -9), (2.4, 3.0, 3.6), dark)
     for offset in (-0.45, 0.45):
         body.cylinder_x((-10.0, -2.2 + offset, -9 + offset), 0.6, 5, gun)
+    # 105 mm howitzer aft of the wing: a long, fat barrel with a recoil sleeve
+    body.box((-6.8, -1.6, 9), (2.6, 5, 7), dark)
+    body.cylinder_x((-10.2, -1.8, 9), 3.0, 5, gun)
+    body.cylinder_x((-15.0, -1.8, 9), 2.0, 6, gun)
+    body.box((-18.2, -1.8, 9), (0.8, 2.8, 2.8), gun)  # muzzle brake
     body.cylinder_y((0, -6.4, -24), 3.4, 2.6, dark)  # sensor ball
     body.box((0, -6.4, -25.75), (1.8, 1.8, 0.2), GLASS)
     return model, (3.0, 1.2)
@@ -485,6 +490,18 @@ def cannon_shell():
     return model, None
 
 
+def howitzer_shell():
+    """105 mm howitzer shell in flight: long olive HE body, pointed fuze, copper driving band."""
+    model = Model("howitzer_shell", density=6)
+    bone = model.bone("body")
+    bone.cylinder_z((0, 0, -4.6), 1.0, 1.6, BRASS)  # fuze
+    bone.cylinder_z((0, 0, -3.0), 2.2, 2.0, Mat("#4b5320", noise=0.04, edge=0.1))
+    bone.cylinder_z((0, 0, 0.6), 3.0, 5.6, Mat("#4b5320", noise=0.04, edge=0.1, patterns=(zband(0.08, 0.2, "#d6b23a"),)))
+    bone.cylinder_z((0, 0, 3.6), 3.2, 0.5, Mat("#b06a3c", noise=0.04, edge=0.1, shine=0.15))  # driving band
+    bone.cylinder_z((0, 0, 4.4), 2.6, 1.0, Mat("#3d4248", noise=0.03, edge=0.1))
+    return model, None
+
+
 def frag_grenade():
     """RGD-5-style grenade on a drop clip, as it hangs under a racer (nose -Z)."""
     model = Model("frag_grenade", density=8)
@@ -568,6 +585,7 @@ MODELS = {
     "rocket": rocket,
     "rocket_heavy": rocket_heavy,
     "cannon_shell": cannon_shell,
+    "howitzer_shell": howitzer_shell,
     "frag_grenade": frag_grenade,
     "cruise_missile": cruise_missile,
     "missile_pad": missile_pad,

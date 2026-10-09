@@ -12,14 +12,14 @@ class LoadoutTest {
     private static final DroneType STRIKE_PLANE = DroneType.parse("strike_plane", new StringReader("{"
             + "\"category\": \"RAMP_AUTOPILOT\", \"maxSpeed\": 0.9, \"acceleration\": 0.05, \"batteryOrFuelCapacity\": 6000,"
             + "\"drainRatePerTick\": 1, \"maxHP\": 100, \"defaultCruiseAltitude\": 40, \"controlScheme\": \"STICK\","
-            + "\"weaponType\": \"ROCKET_POD\", \"payloadCapacity\": 32}"));
+            + "\"weaponType\": \"ROCKET_POD\", \"payloadCapacity\": 192}"));
 
     @Test
     void rocketPodCapacityDependsOnTheLoadedSize() {
         Loadout loadout = new Loadout();
-        assertEquals(32, loadout.capacity(STRIKE_PLANE, 0));
+        assertEquals(64, loadout.capacity(STRIKE_PLANE, 0));
         loadout.setRocketKind(RocketType.HEAVY);
-        assertEquals(16, loadout.capacity(STRIKE_PLANE, 0));
+        assertEquals(24, loadout.capacity(STRIKE_PLANE, 0));
         assertEquals(0, loadout.capacity(STRIKE_PLANE, 1), "no secondary weapon");
     }
 
@@ -31,11 +31,11 @@ class LoadoutTest {
 
     @Test
     void secondaryStationHasItsOwnMagazine() {
-        DroneType type = DroneType.parse("gunship", new StringReader(gunship(", \"secondaryWeapon\": \"ROCKET_POD\", \"secondaryCapacity\": 16")));
+        DroneType type = DroneType.parse("gunship", new StringReader(gunship(", \"secondaryWeapon\": \"ROCKET_POD\", \"secondaryCapacity\": 96")));
         Loadout loadout = new Loadout();
         loadout.setRocketKind(RocketType.HEAVY);
         assertEquals(64, loadout.capacity(type, 0));
-        assertEquals(8, loadout.capacity(type, 1));
+        assertEquals(12, loadout.capacity(type, 1));
         assertEquals(1, type.stationOf(DroneType.WeaponType.ROCKET_POD));
         assertEquals(-1, type.stationOf(DroneType.WeaponType.GUN_MOUNT));
         assertTrue(type.getControlScheme().isFlyable());
@@ -56,7 +56,7 @@ class LoadoutTest {
         loadout.setAmmo(0, 30);
         loadout.setAmmo(1, 5);
         loadout.clampTo(STRIKE_PLANE);
-        assertEquals(16, loadout.getAmmo(0));
+        assertEquals(24, loadout.getAmmo(0));
         assertEquals(0, loadout.getAmmo(1));
     }
 }

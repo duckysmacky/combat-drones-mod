@@ -48,6 +48,8 @@ import net.minecraftforge.fml.relauncher.SideOnly;
 
 import javax.annotation.Nullable;
 import javax.vecmath.Quat4d;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -93,9 +95,23 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder {
     // Loadout, synced for the HUD: rounds or rockets left per weapon station, and the rocket size in the pod
     private static final DataParameter<Integer> AMMO = EntityDataManager.createKey(EntityRampUnit.class, DataSerializers.VARINT);
     private static final DataParameter<Integer> AMMO_SECONDARY = EntityDataManager.createKey(EntityRampUnit.class, DataSerializers.VARINT);
+    private static final DataParameter<Integer> AMMO_TERTIARY = EntityDataManager.createKey(EntityRampUnit.class, DataSerializers.VARINT);
     private static final DataParameter<Integer> ROCKET_KIND = EntityDataManager.createKey(EntityRampUnit.class, DataSerializers.VARINT);
     /** Weapon station the gunner has selected (gunner scheme). */
     private static final DataParameter<Integer> STATION = EntityDataManager.createKey(EntityRampUnit.class, DataSerializers.VARINT);
+    /**
+     * Per weapon station, for the HUD's reload bars: the world tick the station is ready again and how long its last
+     * cooldown was. Only changes when a shot is fired, unlike a countdown that would go out every tick.
+     */
+    private static final List<DataParameter<Integer>> COOLDOWN_READY_TICK = new ArrayList<>();
+    private static final List<DataParameter<Integer>> COOLDOWN_LENGTH = new ArrayList<>();
+
+    static {
+        for (int station = 0; station < Loadout.STATIONS; station++) {
+            COOLDOWN_READY_TICK.add(EntityDataManager.createKey(EntityRampUnit.class, DataSerializers.VARINT));
+            COOLDOWN_LENGTH.add(EntityDataManager.createKey(EntityRampUnit.class, DataSerializers.VARINT));
+        }
+    }
     private static final DataParameter<Float> HEALTH_FRACTION = EntityDataManager.createKey(EntityRampUnit.class, DataSerializers.FLOAT);
 
     protected final FixedWingFlight.State flight = new FixedWingFlight.State();
@@ -128,8 +144,8 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder {
     @Nullable
     private Vec3d designatedTarget;
     private int designateCooldown;
-    /** Ticks until the weapon can fire again; fractional so fire rates aren't limited to 20 / whole ticks. */
-    private double weaponCooldown;
+    /** Per station, ticks until it can fire again; fractional so fire rates aren't limited to 20 / whole ticks. */
+    private final double[] weaponCooldown = new double[Loadout.STATIONS];
     /** This tick the autopilot was flying Return's final landing approach. */
     private boolean landingApproach;
     /** Keeps the unit's chunk (and the next one ahead) loaded, so it keeps flying far from any player. */
@@ -179,8 +195,13 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder {
         dataManager.register(HEALTH_FRACTION, 1.0F);
         dataManager.register(AMMO, 0);
         dataManager.register(AMMO_SECONDARY, 0);
+        dataManager.register(AMMO_TERTIARY, 0);
         dataManager.register(ROCKET_KIND, 0);
         dataManager.register(STATION, 0);
+        for (int station = 0; station < Loadout.STATIONS; station++) {
+            dataManager.register(COOLDOWN_READY_TICK.get(station), 0);
+            dataManager.register(COOLDOWN_LENGTH.get(station), 0);
+        }
         dataManager.register(STRIKING, false);
         dataManager.register(STRIKE_POINT, Optional.absent());
         dataManager.register(BOOSTING, false);
@@ -229,6 +250,7 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder {
         Loadout loadout = new Loadout();
         loadout.setAmmo(0, dataManager.get(AMMO));
         loadout.setAmmo(1, dataManager.get(AMMO_SECONDARY));
+        loadout.setAmmo(2, dataManager.get(AMMO_TERTIARY));
         loadout.setRocketKind(RocketType.byIndex(dataManager.get(ROCKET_KIND)));
         return loadout;
     }
@@ -241,6 +263,7 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder {
     private void setLoadout(Loadout loadout) {
         dataManager.set(AMMO, loadout.getAmmo(0));
         dataManager.set(AMMO_SECONDARY, loadout.getAmmo(1));
+        dataManager.set(AMMO_TERTIARY, loadout.getAmmo(2));
         dataManager.set(ROCKET_KIND, loadout.getRocketKind().ordinal());
     }
 
@@ -314,8 +337,10 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder {
         if (designateCooldown > 0) {
             designateCooldown--;
         }
-        if (weaponCooldown > 0) {
-            weaponCooldown -= 1; // may dip just below 0; the next shot keeps that remainder
+        for (int station = 0; station < Loadout.STATIONS; station++) {
+            if (weaponCooldown[station] > 0) {
+                weaponCooldown[station] -= 1; // may dip just below 0; the next shot keeps that remainder
+            }
         }
         // The entity position is the truth (picks up /tp and positions set after NBT load)
         flight.position.set(posX, posY, posZ);
@@ -518,7 +543,7 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder {
     private void fireWeapon(DroneType type, int station, Vec3d aim, boolean inheritVelocity) {
         Loadout loadout = getLoadout();
         DroneType.WeaponType weapon = type.getWeapon(station);
-        if (weapon == DroneType.WeaponType.NONE || weaponCooldown > 0 || loadout.getAmmo(station) <= 0) {
+        if (weapon == DroneType.WeaponType.NONE || weaponCooldown[station] > 0 || loadout.getAmmo(station) <= 0) {
             return;
         }
         loadout.setAmmo(station, loadout.getAmmo(station) - 1);
@@ -526,22 +551,47 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder {
         Vec3d muzzle = new Vec3d(posX, posY + height / 2, posZ).add(aim.scale(Math.max(1.2, width)));
         Vec3d carried = inheritVelocity ? new Vec3d(flight.velocity.x, flight.velocity.y, flight.velocity.z) : Vec3d.ZERO;
         if (weapon == DroneType.WeaponType.ROCKET_POD) {
-            weaponCooldown += ModConfig.rocketCooldownTicks;
+            startCooldown(station, type.getRocketCooldownTicks() > 0 ? type.getRocketCooldownTicks() : ModConfig.rocketCooldownTicks);
             RocketType kind = loadout.getRocketKind();
             Vec3d velocity = aim.scale(ModConfig.rocketSpeed).add(carried);
             world.spawnEntity(new EntityRocket(world, this, owner, muzzle, velocity,
                     kind == RocketType.HEAVY ? EntityRocket.Kind.HEAVY_ROCKET : EntityRocket.Kind.ROCKET, (float) kind.getBlastPower(), 0));
             world.playSound(null, posX, posY, posZ, ModSounds.GUNSHIP_ROCKET, SoundCategory.NEUTRAL, 4.5F, kind == RocketType.HEAVY ? 0.8F : 1.0F);
         } else if (weapon == DroneType.WeaponType.CANNON) {
-            weaponCooldown += ModConfig.cannonCooldownTicks;
+            startCooldown(station, ModConfig.cannonCooldownTicks);
             Vec3d velocity = spread(aim, ModConfig.cannonSpread).scale(ModConfig.cannonSpeed).add(carried);
             world.spawnEntity(new EntityRocket(world, this, owner, muzzle, velocity, EntityRocket.Kind.CANNON_SHELL,
                     (float) ModConfig.cannonBlastPower, (float) ModConfig.cannonDamage));
             world.playSound(null, posX, posY, posZ, ModSounds.GUNSHIP_CANNON, SoundCategory.NEUTRAL, 6.0F, 0.95F + rand.nextFloat() * 0.1F);
+        } else if (weapon == DroneType.WeaponType.HOWITZER) {
+            startCooldown(station, ModConfig.howitzerCooldownTicks);
+            Vec3d velocity = spread(aim, ModConfig.howitzerSpread).scale(ModConfig.howitzerSpeed).add(carried);
+            world.spawnEntity(new EntityRocket(world, this, owner, muzzle, velocity, EntityRocket.Kind.HOWITZER_SHELL,
+                    (float) ModConfig.howitzerBlastPower, (float) ModConfig.howitzerDamage));
+            world.playSound(null, posX, posY, posZ, ModSounds.GUNSHIP_HOWITZER, SoundCategory.NEUTRAL, 10.0F, 0.95F + rand.nextFloat() * 0.1F);
         } else {
-            weaponCooldown += ModConfig.gunCooldownTicks;
+            startCooldown(station, ModConfig.gunCooldownTicks);
             fireRound(muzzle, aim);
         }
+    }
+
+    private void startCooldown(int station, double ticks) {
+        weaponCooldown[station] += ticks;
+        int length = (int) Math.ceil(weaponCooldown[station]);
+        dataManager.set(COOLDOWN_LENGTH.get(station), length);
+        dataManager.set(COOLDOWN_READY_TICK.get(station), (int) world.getTotalWorldTime() + length);
+    }
+
+    /** Client: share of {@code station}'s cooldown still to go (0 = ready), for the HUD. */
+    public float getCooldownLeft(int station) {
+        int length = dataManager.get(COOLDOWN_LENGTH.get(station));
+        int remaining = dataManager.get(COOLDOWN_READY_TICK.get(station)) - (int) world.getTotalWorldTime();
+        return length <= 0 || remaining <= 0 ? 0 : Math.min(1, remaining / (float) length);
+    }
+
+    /** Client: the length of {@code station}'s last cooldown, in ticks. */
+    public int getCooldownLength(int station) {
+        return dataManager.get(COOLDOWN_LENGTH.get(station));
     }
 
     /** Gun mount: hitscan along {@code aim} with a little spread; nearby players see a tracer. */

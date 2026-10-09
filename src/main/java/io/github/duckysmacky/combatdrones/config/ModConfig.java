@@ -77,11 +77,16 @@ public final class ModConfig {
     public static int roundsPerRifleItem = 16;
     public static double rocketSpeed = 3.0;
     public static int rocketCooldownTicks = 15;
-    public static double cannonDamage = 14.0;
+    public static double cannonDamage = 17.0;
     public static double cannonBlastPower = 1.0;
     public static double cannonSpeed = 8.0;
     public static double cannonCooldownTicks = 10.0;
     public static double cannonSpread = 0.3;
+    public static double howitzerDamage = 30.0;
+    public static double howitzerBlastPower = 8.25;
+    public static double howitzerSpeed = 6.0;
+    public static double howitzerCooldownTicks = 80.0;
+    public static double howitzerSpread = 0.2;
     public static double gunDamagePerRound = 8.0;
     public static double gunCooldownTicks = 1.0;
     public static double gunSpread = 1.5;
@@ -287,6 +292,13 @@ public final class ModConfig {
             cannonCooldownTicks = defaults.number("weapons.cannonCooldownTicks", cannonCooldownTicks, 1, 200,
                     "Ticks between cannon shells while the trigger is held; fractions work.");
             cannonSpread = defaults.number("weapons.cannonSpread", cannonSpread, 0, 10, "Gunship cannon spread: random aim error per shell, in degrees.");
+            howitzerDamage = defaults.number("weapons.howitzerDamage", howitzerDamage, 0, 100,
+                    "Gunship 105 mm howitzer: damage (half-hearts) to whatever a shell hits directly, on top of its blast.");
+            howitzerBlastPower = defaults.number("weapons.howitzerBlastPower", howitzerBlastPower, 0, 20, "Howitzer shell blast (vanilla TNT = 4).");
+            howitzerSpeed = defaults.number("weapons.howitzerSpeed", howitzerSpeed, 0.5, 20, "Howitzer shell speed, in blocks/tick.");
+            howitzerCooldownTicks = defaults.number("weapons.howitzerCooldownTicks", howitzerCooldownTicks, 1, 1200,
+                    "Ticks between howitzer shells while the trigger is held.");
+            howitzerSpread = defaults.number("weapons.howitzerSpread", howitzerSpread, 0, 10, "Howitzer spread: random aim error per shell, in degrees.");
             gunDamagePerRound = defaults.number("weapons.gunDamagePerRound", gunDamagePerRound, 0, 40, "Damage per gun round (half-hearts).");
             gunCooldownTicks = defaults.number("weapons.gunCooldownTicks", gunCooldownTicks, 1, 40,
                     "Ticks between gun rounds while the trigger is held; fractions work (1 = 20 rounds/s, 1.25 = 16 rounds/s).");

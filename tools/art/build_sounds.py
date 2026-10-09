@@ -152,9 +152,7 @@ def main():
     write("gunship/rocket", fade(peak(load("fpv:basic_ocp_rocket")), fade_out=0.2))
     for index, source in enumerate(("mw:m249", "mw:m60")):
         write(f"gunship/gun{index}", fade(peak(cut(load(source), 0, 0.55)), fade_out=0.2))
-    # Gunship cannon: a 20 mm anti-materiel rifle pitched down into a heavier thump, over a low distant boom
-    write("gunship/cannon", fade(peak(mix((speed(cut(load("mw:ntw20"), 0, 0.9), 0.75), 1.0),
-                                          (lowpass(cut(load("fpv:bomblet_distant0"), 0, 1.2), 900), 0.45))), fade_out=0.3))
+    gunship_guns()
     for index, source in enumerate(("mw:bullet_1_rock", "mw:bullet_6_iron", "mw:bullet_5_grass")):
         write(f"bullet/impact{index}", fade(peak(cut(load(source), 0, 0.6), 0.8), fade_out=0.2))
     for index, source in enumerate(("mw:bullet_10_snap", "mw:bullet_13_snap")):
@@ -172,6 +170,26 @@ def main():
     for index, source in enumerate(("fpv:bomblet_distant0", "fpv:bomblet_distant1", "fpv:rocketboom_distant0",
                                     "fpv:airboom_distant0", "fpv:airboom_distant2")):
         write(f"explosion/far{index}", fade(peak(cut(load(source), 0, 3.5)), fade_out=0.6))
+
+
+def drive(samples, amount):
+    """Soft-clips (tanh) for a denser, louder-sounding report at the same peak."""
+    return np.tanh(samples * amount) / np.tanh(amount)
+
+
+def gunship_guns():
+    """Gunship cannon and 105 mm howitzer: rifle reports pitched way down for weight, layered over low-passed
+    explosion bodies for the thump, then driven so they read as loud at the same peak level."""
+    # Cannon: 20 mm rifle at 0.6 speed, a low-passed close blast for the chest thump, a short distant tail
+    report = lowpass(speed(cut(load("mw:ntw20"), 0, 0.8), 0.6), 3500)
+    thump = lowpass(speed(cut(load("fpv:bomblet_close0"), 0, 0.7), 0.7), 350)
+    tail = lowpass(cut(load("fpv:bomblet_distant0"), 0, 1.0), 700)
+    write("gunship/cannon", fade(peak(drive(peak(mix((report, 1.0), (thump, 1.1), (tail, 0.4))), 2.5)), fade_out=0.25))
+    # Howitzer: .50 rifle at 0.42 speed over a slowed rocket blast: a deep, long boom
+    report = lowpass(speed(cut(load("mw:m82"), 0, 1.0), 0.42), 2200)
+    blast = lowpass(speed(cut(load("fpv:rocketboom0"), 0, 2.4), 0.75), 500)
+    tail = lowpass(speed(cut(load("fpv:airboom_distant0"), 0, 2.4), 0.8), 600)
+    write("gunship/howitzer", fade(peak(drive(peak(mix((report, 1.0), (blast, 1.2), (tail, 0.6))), 3.0)), fade_out=0.6))
 
 
 def load_file(name):

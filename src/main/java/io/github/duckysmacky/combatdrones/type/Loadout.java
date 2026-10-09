@@ -5,8 +5,8 @@ package io.github.duckysmacky.combatdrones.type;
  * rocket pod holds (one size at a time). Travels between the unit's item, its ramp and the flying unit.
  */
 public final class Loadout {
-    /** Weapon stations per airframe: the primary weapon and an optional secondary one. */
-    public static final int STATIONS = 2;
+    /** Weapon stations per airframe: the primary weapon and optional secondary and tertiary ones. */
+    public static final int STATIONS = 3;
 
     private final int[] ammo = new int[STATIONS];
     private RocketType rocketKind = RocketType.LIGHT;
