@@ -103,7 +103,9 @@ public class EntityPilotBody extends EntityLivingBase {
         int phase = ticksExisted + getEntityId(); // bodies spawned together don't crackle in sync
         if (phase % 40 == 0) {
             // A sound reaches 16 * volume blocks and fades linearly over that distance
-            world.playSound(null, posX, posY + getEyeHeight(), posZ, ModSounds.DRONE_PILOT_STATIC, SoundCategory.PLAYERS,
+            // Skip the pilot themselves: they fly from first person at this spot and shouldn't hear their own leak
+            UUID owner = getOwner();
+            world.playSound(owner == null ? null : world.getPlayerEntityByUUID(owner), posX, posY + getEyeHeight(), posZ, ModSounds.DRONE_PILOT_STATIC, SoundCategory.PLAYERS,
                     (float) (ModConfig.pilotHintRange / 16), 0.9F + rand.nextFloat() * 0.2F);
         }
         if (phase % 20 == 0) {

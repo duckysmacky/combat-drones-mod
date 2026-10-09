@@ -64,27 +64,26 @@ def hit():
 
 
 def pilot_static():
-    """Analog video receiver hiss with crackles and a telemetry chirp, leaking from a pilot's stand-in body."""
+    """Handheld radio squelch: a "tssh" breaking open, fading hiss with sparse pops, a short tail as it closes."""
     rng = np.random.default_rng(11)
-    seconds = 1.6
+    seconds = 1.2
     t = time(seconds)
     noise = rng.standard_normal(len(t))
-    # Crude band-pass (difference of moving averages) to take the harsh top and the rumble off the hiss
-    hiss = np.convolve(noise, np.ones(4) / 4, 'same') - np.convolve(noise, np.ones(40) / 40, 'same')
-    flutter = 0.6 + 0.4 * np.sin(2 * np.pi * 3.3 * t + rng.uniform(0, 2 * np.pi)) * np.sin(2 * np.pi * 0.7 * t)
-    signal = 0.35 * hiss * flutter
-    for start in rng.uniform(0.2, seconds - 0.1, 6):
+    # Band-pass roughly 400 Hz - 4 kHz, the narrow-FM voice channel a real radio passes
+    hiss = np.convolve(noise, np.ones(6) / 6, 'same') - np.convolve(noise, np.ones(60) / 60, 'same')
+    drift = 0.7 + 0.3 * np.sin(2 * np.pi * 1.7 * t + rng.uniform(0, 2 * np.pi)) * np.sin(2 * np.pi * 0.45 * t)
+    signal = 0.3 * hiss * drift
+    # Squelch opening: a loud noise burst that decays into the carrier hiss
+    signal += 0.9 * hiss * np.exp(-t / 0.05)
+    # Sparse atmospheric pops
+    for start in rng.uniform(0.15, seconds - 0.2, 4):
         at = int(start * RATE)
-        length = int(0.015 * RATE)
-        signal[at:at + length] += rng.standard_normal(length) * np.exp(-np.arange(length) / (0.003 * RATE)) * 0.9
-    # Two-tone FSK burst, like telemetry on the control link
-    bit_samples = int(0.012 * RATE)
-    frequencies = np.repeat(np.where(rng.integers(0, 2, 12) == 1, 1200, 2200), bit_samples)
-    edges = np.minimum(1, np.minimum(np.arange(len(frequencies)), len(frequencies) - np.arange(len(frequencies))) / (0.005 * RATE))
-    chirp = np.sin(2 * np.pi * np.cumsum(frequencies) / RATE) * edges
-    at = int(0.15 * RATE)
-    signal[at:at + len(chirp)] += 0.5 * chirp
-    fade = np.minimum(1, np.minimum(t / 0.08, (seconds - t) / 0.25))
+        length = int(0.008 * RATE)
+        signal[at:at + length] += rng.standard_normal(length) * np.exp(-np.arange(length) / (0.002 * RATE)) * 0.8
+    # Squelch tail: the carrier drops, a brief burst as the gate closes
+    tail = np.exp(-np.maximum(0, t - (seconds - 0.12)) / 0.02) * (t > seconds - 0.12)
+    signal += 0.5 * hiss * tail
+    fade = np.minimum(1, (seconds - t) / 0.03)
     return normalize(signal * fade, 0.6)
 
 
