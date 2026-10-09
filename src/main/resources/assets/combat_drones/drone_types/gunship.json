@@ -4,8 +4,8 @@
   // sits in the gunner seat, aiming a free gimbal camera and switching between the cannon, the rocket rack and the howitzer.
   // A hard crash or being shot down sets off its fuel and ammo (blastPower).
   "category": "RAMP_AUTOPILOT",
-  "maxSpeed": 0.8,
-  "acceleration": 0.04,
+  "maxSpeed": 0.7,
+  "acceleration": 0.035,
   "batteryOrFuelCapacity": 7200,
   "drainRatePerTick": 1.0,
   "blastPower": 5.0,
@@ -16,7 +16,7 @@
   "hitboxWidth": 3.0,
   "hitboxHeight": 1.2,
   "defaultCruiseAltitude": 80,
-  "agility": 0.7,
+  "agility": 0.6,
   "controlScheme": "GUNNER",
   "weaponType": "CANNON",
   // Rocket rack, switched to in flight: bay units (32 Rockets or 12 Heavy Rockets), one size at a time like a rocket pod

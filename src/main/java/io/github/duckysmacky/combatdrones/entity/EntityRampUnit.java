@@ -379,9 +379,10 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder {
         flight.position.set(posX, posY, posZ);
         syncPresentation();
         // onGround catches shallow touchdowns, which lose too little movement to count as a crash
-        boolean hitEntity = hitsEntity(swept);
+        // Only warheads care about entities: a plane that merely clips a player or drone must not blow up
+        boolean hitEntity = type.isImpactDetonates() && hitsEntity(swept);
         if (blocked > CRASH_THRESHOLD || onGround || hitEntity) {
-            onCollision(type, hitEntity);
+            onCollision(type);
             return;
         }
         ReconIntel.sweep(this, type);
@@ -749,11 +750,11 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder {
 
     /**
      * Ran into terrain or something solid. Warheads go off. Every other unit lands intact as an item only when it
-     * was actually landing (Return's approach, or a flat, slow belly landing); anything else (a wall, a hillside, an
-     * entity, a steep or fast touchdown) goes off with the type's blastPower (a gunship's fuel and ammo, the recon
+     * was actually landing (Return's approach, or a flat, slow belly landing); anything else (a wall, a hillside, a
+     * steep or fast touchdown) goes off with the type's blastPower (a gunship's fuel and ammo, the recon
      * UAV's fuel), or just wrecks it.
      */
-    private void onCollision(DroneType type, boolean hitEntity) {
+    private void onCollision(DroneType type) {
         if (type.isArmed() && type.isImpactDetonates()) {
             detonate(type);
             return;
@@ -763,7 +764,7 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder {
         boolean returnLanding = landingApproach && flight.speed < LANDING_SPEED_FRACTION * type.getMaxSpeed();
         boolean bellyLanding = onGround && !collidedHorizontally && flight.speed < BELLY_LANDING_SPEED_FRACTION * type.getMaxSpeed()
                 && Math.abs(flight.velocity.y) < BELLY_LANDING_SINK_RATE;
-        if (!hitEntity && (returnLanding || bellyLanding)) {
+        if (returnLanding || bellyLanding) {
             land(type);
         } else {
             detonate(type);
