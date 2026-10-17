@@ -13,8 +13,8 @@
   "payloadCapacity": 128,
   "maxHP": 250,
   // Collision box in blocks: the fuselage core, not the wingtips or props
-  "hitboxWidth": 3.0,
-  "hitboxHeight": 1.2,
+  "hitboxWidth": 3.75,
+  "hitboxHeight": 1.5,
   "defaultCruiseAltitude": 80,
   // Loiter is never flown lower or tighter than this, whatever the route says
   "minLoiterAltitude": 80,
@@ -26,7 +26,7 @@
   "secondaryWeapon": "ROCKET_POD",
   "secondaryCapacity": 96,
   // Slower rocket fire than the Strike Plane's pods (0 would use [weapons] rocketCooldownTicks)
-  "rocketCooldownTicks": 30,
+  "rocketCooldownTicks": 40,
   // 105 mm howitzer: few, slow, huge shells
   "tertiaryWeapon": "HOWITZER",
   "tertiaryCapacity": 8,

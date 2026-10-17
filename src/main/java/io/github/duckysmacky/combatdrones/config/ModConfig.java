@@ -80,12 +80,12 @@ public final class ModConfig {
     public static double cannonDamage = 17.0;
     public static double cannonBlastPower = 1.0;
     public static double cannonSpeed = 8.0;
-    public static double cannonCooldownTicks = 10.0;
+    public static double cannonCooldownTicks = 15.0;
     public static double cannonSpread = 0.3;
     public static double howitzerDamage = 30.0;
     public static double howitzerBlastPower = 8.25;
     public static double howitzerSpeed = 6.0;
-    public static double howitzerCooldownTicks = 80.0;
+    public static double howitzerCooldownTicks = 160.0;
     public static double howitzerSpread = 0.2;
     public static double gunDamagePerRound = 8.0;
     public static double gunCooldownTicks = 1.0;
