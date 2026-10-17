@@ -416,7 +416,7 @@ public final class ModConfig {
         planeMouseSensitivity = defaults.number("client.planeMouseSensitivity", (Double) compiledDefault("planeMouseSensitivity"), 0.1, 5,
                 "Mouse sensitivity when flying a ramp unit by hand (1 = default).");
         staticIntensity = defaults.number("client.staticIntensity", (Double) compiledDefault("staticIntensity"), 0, 1,
-                "Strength of the analog-goggle static while flying (0 = off). It grows as the signal weakens.");
+                "Strength of the analog-goggle static while flying (0 = off). It grows as the signal weakens. Also scales the gunner's CRT lines.");
         maxEngineVoices = (int) defaults.number("client.maxEngineVoices", (Integer) compiledDefault("maxEngineVoices"), 1, 32,
                 "How many drone/plane engines you hear at once: the nearest ones in earshot. Each takes up to 3 sound channels.");
         maxProjectileSounds = (int) defaults.number("client.maxProjectileSounds", (Integer) compiledDefault("maxProjectileSounds"), 1, 32,
