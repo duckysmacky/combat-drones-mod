@@ -1,28 +1,24 @@
 .context/
-docs/
+.worktrees/
 
 reference_mods/
-!gradle/wrapper/gradle-wrapper.jar
+graphify-out/
+tools/
 
 # Gradle
-build/
 .gradle/
+build/
 run/
+!gradle/wrapper/gradle-wrapper.jar
 
 # IDE
-out/
 .idea/
+.vscode/
+.settings/
+out/
+bin/
 *.iml
 *.ipr
 *.iws
-.vscode/
-bin/
 .classpath
 .project
-.settings/
-
-# graphify knowledge graph
-graphify-out/
-
-# git worktrees
-.worktrees/
