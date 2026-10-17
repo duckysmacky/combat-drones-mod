@@ -76,6 +76,9 @@ public final class DroneType {
     private Sound sound;
     /** Ramp-launched only: blocks above the launch point. */
     private double defaultCruiseAltitude;
+    /** Ramp-launched only: lowest orbit height (blocks above the launch point) and radius a Loiter is flown at. */
+    private double minLoiterAltitude;
+    private double minLoiterRadius;
     /** Ramp-launched only: multiplies roll, pitch and turn rates (1 = plane-like, higher = rocket-like). */
     private double agility = 1.0;
     /** Ramp-launched only: multiplies the pitch rate on top of agility (snappier climbs and dives). */
@@ -128,7 +131,8 @@ public final class DroneType {
             }
             String name = entry.getKey();
             if ((name.equals("signalRange") && category != Category.HAND_FLOWN)
-                    || ((name.equals("defaultCruiseAltitude") || name.equals("agility") || name.equals("pitchAgility"))
+                    || ((name.equals("defaultCruiseAltitude") || name.equals("agility") || name.equals("pitchAgility")
+                            || name.equals("minLoiterAltitude") || name.equals("minLoiterRadius"))
                             && category != Category.RAMP_AUTOPILOT)
                     || (name.equals("secondaryCapacity") && secondaryWeapon == WeaponType.NONE)
                     || (name.equals("tertiaryCapacity") && tertiaryWeapon == WeaponType.NONE)
@@ -183,6 +187,7 @@ public final class DroneType {
         }
         require(agility > 0, "'agility' must be > 0");
         require(pitchAgility > 0, "'pitchAgility' must be > 0");
+        require(minLoiterAltitude >= 0 && minLoiterRadius >= 0, "'minLoiterAltitude' and 'minLoiterRadius' must be >= 0");
         require(hitboxWidth >= 0.1 && hitboxWidth <= 4, "'hitboxWidth' must be in 0.1..4");
         require(hitboxHeight >= 0.1 && hitboxHeight <= 8, "'hitboxHeight' must be in 0.1..8");
         if (category == Category.HAND_FLOWN) {
@@ -267,6 +272,14 @@ public final class DroneType {
 
     public double getDefaultCruiseAltitude() {
         return defaultCruiseAltitude;
+    }
+
+    public double getMinLoiterAltitude() {
+        return minLoiterAltitude;
+    }
+
+    public double getMinLoiterRadius() {
+        return minLoiterRadius;
     }
 
     public float getHitboxWidth() {

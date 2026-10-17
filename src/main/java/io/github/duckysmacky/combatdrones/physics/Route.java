@@ -110,6 +110,22 @@ public final class Route {
         return loiterRadius;
     }
 
+    /** True if the route ends circling its last waypoint: Loiter, or a one-waypoint Loop. */
+    public boolean endsInOrbit() {
+        return !waypoints.isEmpty() && (terminal == TerminalAction.LOITER || (terminal == TerminalAction.LOOP && waypoints.size() == 1));
+    }
+
+    /** This route with its orbit raised and widened to at least a unit type's minimum height and radius. */
+    public Route withLoiterMinimums(double minAltitude, double minRadius) {
+        List<Waypoint> raised = waypoints;
+        if (endsInOrbit()) {
+            raised = new ArrayList<>(waypoints);
+            Waypoint last = raised.get(raised.size() - 1);
+            raised.set(raised.size() - 1, last.withAltitude(Math.max(last.altitude, minAltitude)));
+        }
+        return new Route(raised, terminal, Math.max(loiterRadius, minRadius), target);
+    }
+
     public static Route empty(TerminalAction terminal) {
         return new Route(Collections.emptyList(), terminal);
     }

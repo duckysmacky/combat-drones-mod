@@ -53,6 +53,20 @@ class RouteValidatorTest {
     }
 
     @Test
+    void loiterMinimumsRaiseOnlyAnOrbit() {
+        Route loiter = new Route(Arrays.asList(new Waypoint(0, 0, 30), new Waypoint(10, 10, 40)), TerminalAction.LOITER, 24)
+                .withLoiterMinimums(60, 50);
+        assertEquals(30, loiter.get(0).altitude, 1e-9);
+        assertEquals(60, loiter.get(1).altitude, 1e-9);
+        assertEquals(50, loiter.getLoiterRadius(), 1e-9);
+        Route high = new Route(Collections.singletonList(new Waypoint(10, 10, 90)), TerminalAction.LOOP, 80).withLoiterMinimums(60, 50);
+        assertEquals(90, high.get(0).altitude, 1e-9);
+        assertEquals(80, high.getLoiterRadius(), 1e-9);
+        Route loop = new Route(Arrays.asList(new Waypoint(0, 0, 30), new Waypoint(10, 10, 30)), TerminalAction.LOOP).withLoiterMinimums(60, 50);
+        assertEquals(30, loop.get(1).altitude, 1e-9);
+    }
+
+    @Test
     void lengthIncludesTheLegFromLaunch() {
         Route route = new Route(Arrays.asList(new Waypoint(30, 40, 20), new Waypoint(30, 0, 20)), TerminalAction.LOITER);
         assertEquals(90, route.length(0, 0), 1e-9);

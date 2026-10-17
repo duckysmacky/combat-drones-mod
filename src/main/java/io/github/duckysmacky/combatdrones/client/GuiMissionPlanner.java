@@ -182,6 +182,7 @@ public class GuiMissionPlanner extends GuiScreen {
         if (selectedWaypoint >= waypoints.size()) {
             selectedWaypoint = -1;
         }
+        clampToLoiterMinimums();
     }
 
     private PlannerOpenPacket.UnitView currentUnit() {
@@ -231,6 +232,8 @@ public class GuiMissionPlanner extends GuiScreen {
     }
 
     private void refreshButtons() {
+        // Runs after every edit: keep the orbit at the unit's minimums, as the server will on Apply
+        clampToLoiterMinimums();
         PlannerOpenPacket.UnitView unit = currentUnit();
         terminalButton.displayString = I18n.format("gui.combat_drones.planner.terminal",
                 I18n.format("gui.combat_drones.terminal." + terminal.name().toLowerCase(Locale.ROOT)));
@@ -784,7 +787,20 @@ public class GuiMissionPlanner extends GuiScreen {
     private double previewRadius(int mouseX, int mouseY) {
         Route.Waypoint last = waypoints.get(waypoints.size() - 1);
         double distance = Math.hypot(toWorldX(mouseX) - last.x, toWorldZ(mouseY) - last.z);
-        return Math.max(Route.MIN_LOITER_RADIUS, Math.min(Route.MAX_LOITER_RADIUS, Math.round(distance)));
+        DroneType type = currentType();
+        double min = Math.max(Route.MIN_LOITER_RADIUS, type == null ? 0 : type.getMinLoiterRadius());
+        return Math.max(min, Math.min(Route.MAX_LOITER_RADIUS, Math.round(distance)));
+    }
+
+    private void clampToLoiterMinimums() {
+        DroneType type = currentType();
+        if (type == null) {
+            return;
+        }
+        Route clamped = currentRoute().withLoiterMinimums(type.getMinLoiterAltitude(), type.getMinLoiterRadius());
+        waypoints.clear();
+        waypoints.addAll(clamped.getWaypoints());
+        loiterRadius = clamped.getLoiterRadius();
     }
 
     @Override
@@ -798,9 +814,13 @@ public class GuiMissionPlanner extends GuiScreen {
         super.keyTyped(typedChar, keyCode);
     }
 
-    private double defaultAltitude() {
+    private DroneType currentType() {
         PlannerOpenPacket.UnitView unit = currentUnit();
-        DroneType type = unit == null ? null : DroneTypes.get(unit.typeId);
+        return unit == null ? null : DroneTypes.get(unit.typeId);
+    }
+
+    private double defaultAltitude() {
+        DroneType type = currentType();
         return type != null && type.getDefaultCruiseAltitude() > 0 ? type.getDefaultCruiseAltitude() : 30;
     }
 

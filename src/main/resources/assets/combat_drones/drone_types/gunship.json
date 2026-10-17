@@ -16,6 +16,9 @@
   "hitboxWidth": 3.0,
   "hitboxHeight": 1.2,
   "defaultCruiseAltitude": 80,
+  // Loiter is never flown lower or tighter than this, whatever the route says
+  "minLoiterAltitude": 80,
+  "minLoiterRadius": 70,
   "agility": 0.6,
   "controlScheme": "GUNNER",
   "weaponType": "CANNON",

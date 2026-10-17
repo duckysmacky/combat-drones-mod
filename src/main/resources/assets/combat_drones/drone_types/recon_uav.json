@@ -3,7 +3,7 @@
   // the only manual input is the camera gimbal. A hard crash or being shot down sets off its fuel (blastPower).
   // A gentle touchdown (Return) lands it intact.
   "category": "RAMP_AUTOPILOT",
-  "maxSpeed": 1.0,
+  "maxSpeed": 0.75,
   "acceleration": 0.08,
   "batteryOrFuelCapacity": 24000,
   "drainRatePerTick": 1.0,
@@ -14,6 +14,9 @@
   "hitboxWidth": 1.4,
   "hitboxHeight": 0.6,
   "defaultCruiseAltitude": 60,
+  // Loiter is never flown lower or tighter than this, whatever the route says
+  "minLoiterAltitude": 60,
+  "minLoiterRadius": 50,
   "agility": 1.2,
   "controlScheme": "GIMBAL_OBSERVE",
   "armed": false,
