@@ -85,7 +85,8 @@ are never hardcoded. Sections, keys and sync rules: `.context/spec/CONFIG.md`.
   `pack_format` 3).
 - **minecraft-ci-release**: CI, versioning and publishing for the public release.
 - **minecraft-imagegen**: mod icon, promo art, concept textures.
-- **generate-changelog**: release notes from commits.
+- **generate-changelog**: release notes from commits. Once the user confirms a changelog, also append it to
+  `CHANGELOG.md` (the player-facing changelog shown on the mod page).
 - **minecraft-modding** covers modern loaders only: use it for general patterns, never for 1.12.2 APIs.
 
 These skills target modern Minecraft versions; check every API, registry or file format against 1.12.2 Forge
