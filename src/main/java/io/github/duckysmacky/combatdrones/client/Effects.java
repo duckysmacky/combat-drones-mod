@@ -1,8 +1,10 @@
 package io.github.duckysmacky.combatdrones.client;
 
+import io.github.duckysmacky.combatdrones.CombatDrones;
 import io.github.duckysmacky.combatdrones.ModSounds;
 import io.github.duckysmacky.combatdrones.network.EffectPacket;
 import io.github.duckysmacky.combatdrones.network.GunFirePacket;
+import io.github.duckysmacky.combatdrones.physics.SoundBands;
 import net.minecraft.block.Block;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.client.Minecraft;
@@ -11,6 +13,7 @@ import net.minecraft.client.audio.PositionedSoundRecord;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.util.EnumParticleTypes;
+import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.SoundCategory;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
@@ -23,13 +26,21 @@ import java.util.Random;
 
 /** Client-built effects: explosions (near/far sound with a speed-of-sound delay), catapult launches, gunfire. */
 public final class Effects {
-    /** Blocks per tick: 343 m/s at 20 ticks a second. */
-    private static final double SOUND_SPEED = 17;
-    /** Closer than this you hear the sharp blast; further out, the delayed rumble. */
+    /** A missile liftoff closer than this is the roar itself; further out, the delayed rumble. */
     private static final double NEAR_DISTANCE = 64;
+    /** Blast layers by size (small, medium, large), crossfaded by distance like the engines (see {@link SoundBands}). */
+    private static final String[][] BLAST_EVENTS = {
+            {"explosion.small.near", "explosion.small.far"},
+            {"explosion.medium.near", "explosion.medium.far"},
+            {"explosion.large.near", "explosion.large.mid", "explosion.large.far"}};
+    private static final double[][] BLAST_UNTILS = {{0.3, 1}, {0.3, 1}, {0.3, 0.65, 1}};
+    private static final double[] TWO_BANDS = {0.3, 1};
+    private static final double BLAST_CROSSFADE = 0.2;
     private static final double PARTICLE_DISTANCE = 192;
-    /** Rounds passing closer than this crack overhead. */
-    private static final double FLYBY_DISTANCE = 4;
+    /** Rounds passing closer than this crack overhead... */
+    private static final double FLYBY_DISTANCE = 5;
+    /** ...and whiz past out to this, fainter further off: being shot at is heard, not just the hits. */
+    private static final double WHIZ_DISTANCE = 16;
 
     private static final List<Pending> PENDING = new ArrayList<>();
 
@@ -43,8 +54,13 @@ public final class Effects {
             return;
         }
         switch (packet.getKind()) {
+            case CANNON_SHOT:
+            case HOWITZER_SHOT:
+                gunShot(player.getPositionEyes(1), packet.getPosition(), packet.getKind() == EffectPacket.Kind.HOWITZER_SHOT, world.rand);
+                break;
             case EXPLOSION:
-                explosion(world, player, packet.getPosition(), packet.getScale());
+            case AIR_EXPLOSION:
+                explosion(world, player, packet.getPosition(), packet.getScale(), packet.getKind() == EffectPacket.Kind.AIR_EXPLOSION);
                 break;
             case LAUNCH:
                 launch(world, packet.getPosition(), packet.getDirection());
@@ -61,18 +77,9 @@ public final class Effects {
         }
     }
 
-    private static void explosion(World world, EntityPlayer player, Vec3d at, float power) {
+    private static void explosion(World world, EntityPlayer player, Vec3d at, float power, boolean airBurst) {
         double distance = player.getPositionEyes(1).distanceTo(at);
-        float pitch = 0.9F + world.rand.nextFloat() * 0.2F - Math.min(0.25F, power / 40);
-        if (distance < NEAR_DISTANCE) {
-            play(new PositionedSoundRecord(ModSounds.EXPLOSION_NEAR, SoundCategory.BLOCKS, Math.max(2, power), pitch,
-                    (float) at.x, (float) at.y, (float) at.z), 0);
-        } else {
-            // A distant rumble isn't positional to the ear; loudness falls with distance and grows with the blast
-            float volume = (float) Math.max(0.12, (1 - distance / EffectPacket.EXPLOSION_RANGE) * Math.min(1.2, power / 5));
-            play(new PositionedSoundRecord(ModSounds.EXPLOSION_FAR.getSoundName(), SoundCategory.BLOCKS, volume, pitch, false, 0,
-                    ISound.AttenuationType.NONE, 0, 0, 0), (int) (distance / SOUND_SPEED));
-        }
+        blastSound(player.getPositionEyes(1), at, power, airBurst, 0.9F + world.rand.nextFloat() * 0.2F - Math.min(0.25F, power / 40));
         if (distance > PARTICLE_DISTANCE) {
             return;
         }
@@ -116,8 +123,8 @@ public final class Effects {
                     (float) pad.x, (float) pad.y, (float) pad.z), 0);
         } else {
             float volume = (float) Math.max(0.15, (1 - distance / EffectPacket.EXPLOSION_RANGE) * 0.9);
-            play(new PositionedSoundRecord(ModSounds.EXPLOSION_FAR.getSoundName(), SoundCategory.NEUTRAL, volume, 0.6F, false, 0,
-                    ISound.AttenuationType.NONE, 0, 0, 0), (int) (distance / SOUND_SPEED));
+            play(new PositionedSoundRecord(new ResourceLocation(CombatDrones.MOD_ID, "explosion.large.far"), SoundCategory.NEUTRAL, volume, 0.6F,
+                    false, 0, ISound.AttenuationType.NONE, (float) pad.x, (float) pad.y, (float) pad.z), (int) (distance / SoundBands.SOUND_SPEED));
         }
         if (distance > PARTICLE_DISTANCE) {
             return;
@@ -183,9 +190,15 @@ public final class Effects {
             Vec3d ear = player.getPositionEyes(1);
             double along = Math.max(0, Math.min(length, ear.subtract(from).dotProduct(direction)));
             Vec3d closest = from.add(direction.scale(along));
-            if (along > 3 && closest.distanceTo(ear) < FLYBY_DISTANCE) {
+            double miss = closest.distanceTo(ear);
+            if (along > 3 && miss < FLYBY_DISTANCE) {
                 play(new PositionedSoundRecord(ModSounds.BULLET_FLYBY, SoundCategory.NEUTRAL, 1.0F, 0.9F + random.nextFloat() * 0.2F,
                         (float) closest.x, (float) closest.y, (float) closest.z), 0);
+            } else if (along > 3 && miss < WHIZ_DISTANCE) {
+                float volume = (float) (0.9 - 0.65 * (miss - FLYBY_DISTANCE) / (WHIZ_DISTANCE - FLYBY_DISTANCE));
+                play(new PositionedSoundRecord(new ResourceLocation(CombatDrones.MOD_ID, "bullet.whiz"), SoundCategory.NEUTRAL, volume,
+                        0.85F + random.nextFloat() * 0.3F, false, 0, ISound.AttenuationType.NONE, (float) closest.x, (float) closest.y,
+                        (float) closest.z), 0);
             }
         }
     }
@@ -193,6 +206,57 @@ public final class Effects {
     private static Vec3d randomDirection(Random random) {
         Vec3d direction = new Vec3d(random.nextGaussian(), random.nextGaussian(), random.nextGaussian());
         return direction.lengthSquared() < 1.0E-6 ? new Vec3d(0, 1, 0) : direction.normalize();
+    }
+
+    /**
+     * A blast's sound layers for this listener: close crack, mid boom, far rumble by distance over a range that grows
+     * with the blast, all arriving at the speed of sound. An air burst's far layers are its distant boom; from indoors
+     * it's the muffled thump through the walls instead.
+     */
+    private static void blastSound(Vec3d listener, Vec3d at, float power, boolean airBurst, float pitch) {
+        double distance = listener.distanceTo(at);
+        double fraction = distance / (EffectPacket.EXPLOSION_RANGE * Math.min(1, 0.35 + 0.065 * power));
+        if (fraction >= 1) {
+            return;
+        }
+        int size = power < 3 ? 0 : power < 6 ? 1 : 2;
+        boolean indoors = DroneSounds.isIndoors(listener);
+        String[] events = indoors ? new String[]{"explosion.indoor.near", "explosion.indoor.far"}
+                : airBurst ? new String[]{BLAST_EVENTS[size][0], "explosion.air.far"} : BLAST_EVENTS[size];
+        double[] gains = SoundBands.bandGains(fraction, indoors || airBurst ? TWO_BANDS : BLAST_UNTILS[size], BLAST_CROSSFADE);
+        // Booms carry: a gentler falloff than engines, louder for bigger blasts
+        double loudness = Math.sqrt(SoundBands.distanceGain(fraction)) * Math.min(1, 0.6 + power / 15) * (indoors ? 0.7 : 1);
+        float bandPitch = pitch * (float) SoundBands.distancePitch(fraction);
+        for (int band = 0; band < events.length; band++) {
+            double volume = gains[band] * loudness;
+            if (volume > 0.002) {
+                play(new PositionedSoundRecord(new ResourceLocation(CombatDrones.MOD_ID, events[band]), SoundCategory.BLOCKS, (float) volume, bandPitch,
+                        false, 0, ISound.AttenuationType.NONE, (float) at.x, (float) at.y, (float) at.z), (int) (distance / SoundBands.SOUND_SPEED));
+            }
+        }
+    }
+
+    /**
+     * A gunship gun's report for this listener: the sharp shot close in, a deep, delayed boom further out (the
+     * howitzer heavier and heard much further), from where the plane is.
+     */
+    private static void gunShot(Vec3d listener, Vec3d at, boolean howitzer, Random random) {
+        double distance = listener.distanceTo(at);
+        double fraction = distance / (howitzer ? EffectPacket.HOWITZER_RANGE : EffectPacket.CANNON_RANGE);
+        if (fraction >= 1) {
+            return;
+        }
+        String[] events = howitzer ? new String[]{"gunship.howitzer", "gunship.howitzer_far"} : new String[]{"gunship.cannon", "gunship.cannon_far"};
+        double[] gains = SoundBands.bandGains(fraction, TWO_BANDS, BLAST_CROSSFADE);
+        double loudness = Math.sqrt(SoundBands.distanceGain(fraction)) * (DroneSounds.isIndoors(listener) ? 0.7 : 1);
+        float pitch = (0.95F + random.nextFloat() * 0.1F) * (float) SoundBands.distancePitch(fraction);
+        for (int band = 0; band < events.length; band++) {
+            double volume = gains[band] * loudness;
+            if (volume > 0.002) {
+                play(new PositionedSoundRecord(new ResourceLocation(CombatDrones.MOD_ID, events[band]), SoundCategory.NEUTRAL, (float) volume, pitch,
+                        false, 0, ISound.AttenuationType.NONE, (float) at.x, (float) at.y, (float) at.z), (int) (distance / SoundBands.SOUND_SPEED));
+            }
+        }
     }
 
     private static void play(ISound sound, int delayTicks) {

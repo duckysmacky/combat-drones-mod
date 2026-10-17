@@ -116,6 +116,8 @@ public final class ModConfig {
     public static boolean invertMousePitch = false;
     public static double staticIntensity = 1.0;
     public static double planeMouseSensitivity = 1.0;
+    public static int maxEngineVoices = 4;
+    public static int maxProjectileSounds = 6;
 
     /**
      * Every knob's compiled default, captured before the first load (static initializers run in source order, so
@@ -415,6 +417,10 @@ public final class ModConfig {
                 "Mouse sensitivity when flying a ramp unit by hand (1 = default).");
         staticIntensity = defaults.number("client.staticIntensity", (Double) compiledDefault("staticIntensity"), 0, 1,
                 "Strength of the analog-goggle static while flying (0 = off). It grows as the signal weakens.");
+        maxEngineVoices = (int) defaults.number("client.maxEngineVoices", (Integer) compiledDefault("maxEngineVoices"), 1, 32,
+                "How many drone/plane engines you hear at once: the nearest ones in earshot. Each takes up to 3 sound channels.");
+        maxProjectileSounds = (int) defaults.number("client.maxProjectileSounds", (Integer) compiledDefault("maxProjectileSounds"), 1, 32,
+                "How many rockets, shells and bombs in flight you hear at once: the nearest ones in earshot.");
     }
 
     private static void applyDroneTable(Defaults defaults, DroneType type) {

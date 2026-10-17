@@ -29,6 +29,13 @@
   "tertiaryCapacity": 8,
   // Loud on purpose: everyone below should know it's overhead
   "motorSoundRange": 256,
-  // Engine loop sound event (combat_drones:<name>); unset = the family default
-  "engineSound": "unit.engine_piston"
+  // Engine loops by distance (fractions of motorSoundRange): close, mid, far
+  "sound": {
+    "crossfade": 0.2,
+    "bands": [
+      {"event": "engine.gunship.near", "until": 0.3},
+      {"event": "engine.gunship.mid", "until": 0.65},
+      {"event": "engine.gunship.far", "until": 1.0}
+    ]
+  }
 }

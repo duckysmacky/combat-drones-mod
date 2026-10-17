@@ -18,6 +18,17 @@
   "hitboxHeight": 7.0,
   "controlScheme": "MISSILE",
   "motorSoundRange": 250,
-  "engineSound": "missile.engine",
+  // Engine loops by distance (fractions of motorSoundRange): close, mid, far
+  "sound": {
+    "crossfade": 0.2,
+    "bands": [
+      {"event": "engine.missile.near", "until": 0.3},
+      {"event": "engine.missile.mid", "until": 0.65},
+      {"event": "engine.missile.far", "until": 1.0}
+    ],
+    // Its incoming roar, swelling over the engine in the dive (not for its own pilot), then its closest pass
+    "dive": "missile.scream",
+    "terminal": "missile.terminal"
+  },
   "impactDetonates": true
 }

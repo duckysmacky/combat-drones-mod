@@ -19,5 +19,14 @@
   "armed": false,
   // Sweeps for enemies in line of sight and marks them on the owner's Mission Planner; its camera can lock targets
   "sensor": true,
-  "motorSoundRange": 128
+  "motorSoundRange": 128,
+  // Engine loops by distance (fractions of motorSoundRange): close, mid, far
+  "sound": {
+    "crossfade": 0.2,
+    "bands": [
+      {"event": "engine.recon.near", "until": 0.3},
+      {"event": "engine.recon.mid", "until": 0.65},
+      {"event": "engine.recon.far", "until": 1.0}
+    ]
+  }
 }

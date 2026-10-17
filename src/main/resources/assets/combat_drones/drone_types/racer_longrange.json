@@ -15,6 +15,17 @@
   "signalRange": 400,
   "impactDetonates": true,
   "motorSoundRange": 60,
+  // Engine loops by distance (fractions of motorSoundRange): close, mid, far
+  "sound": {
+    "crossfade": 0.2,
+    // A touch quieter than the planes: racers are everywhere in a fight
+    "volume": 0.7,
+    "bands": [
+      {"event": "engine.quad.near", "until": 0.3},
+      {"event": "engine.quad.mid", "until": 0.65},
+      {"event": "engine.quad.far", "until": 1.0}
+    ]
+  },
   "defaultBattery": "HEAVY",
   "controlScheme": "FPV",
   "payload": "GRENADE"

@@ -17,7 +17,17 @@
   "agility": 2.75,
   "controlScheme": "CLICK_DESIGNATE",
   "motorSoundRange": 128,
-  // Engine loop sound event (combat_drones:<name>); unset = the family default
-  "engineSound": "unit.engine_electric",
+  // Engine loops by distance (fractions of motorSoundRange): close, mid, far
+  "sound": {
+    "crossfade": 0.2,
+    "bands": [
+      {"event": "engine.light.near", "until": 0.3},
+      {"event": "engine.light.mid", "until": 0.65},
+      {"event": "engine.light.far", "until": 1.0}
+    ],
+    // Air roar swelling in a steep, fast dive; the scream of the last seconds before impact
+    "dive": "unit.dive_light",
+    "terminal": "unit.terminal_light"
+  },
   "impactDetonates": true
 }

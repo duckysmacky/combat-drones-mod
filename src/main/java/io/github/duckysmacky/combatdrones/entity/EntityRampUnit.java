@@ -6,6 +6,7 @@ import io.github.duckysmacky.combatdrones.config.ModConfig;
 import io.github.duckysmacky.combatdrones.item.ItemDrone;
 import io.github.duckysmacky.combatdrones.ModSounds;
 import io.github.duckysmacky.combatdrones.network.GunFirePacket;
+import io.github.duckysmacky.combatdrones.network.EffectPacket;
 import io.github.duckysmacky.combatdrones.network.ModNetwork;
 import io.github.duckysmacky.combatdrones.network.RouteCodec;
 import io.github.duckysmacky.combatdrones.physics.DroneSystems;
@@ -563,13 +564,13 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder {
             Vec3d velocity = spread(aim, ModConfig.cannonSpread).scale(ModConfig.cannonSpeed).add(carried);
             world.spawnEntity(new EntityRocket(world, this, owner, muzzle, velocity, EntityRocket.Kind.CANNON_SHELL,
                     (float) ModConfig.cannonBlastPower, (float) ModConfig.cannonDamage));
-            world.playSound(null, posX, posY, posZ, ModSounds.GUNSHIP_CANNON, SoundCategory.NEUTRAL, 6.0F, 0.95F + rand.nextFloat() * 0.1F);
+            EffectPacket.gunShot(world, getPositionVector(), false);
         } else if (weapon == DroneType.WeaponType.HOWITZER) {
             startCooldown(station, ModConfig.howitzerCooldownTicks);
             Vec3d velocity = spread(aim, ModConfig.howitzerSpread).scale(ModConfig.howitzerSpeed).add(carried);
             world.spawnEntity(new EntityRocket(world, this, owner, muzzle, velocity, EntityRocket.Kind.HOWITZER_SHELL,
                     (float) ModConfig.howitzerBlastPower, (float) ModConfig.howitzerDamage));
-            world.playSound(null, posX, posY, posZ, ModSounds.GUNSHIP_HOWITZER, SoundCategory.NEUTRAL, 10.0F, 0.95F + rand.nextFloat() * 0.1F);
+            EffectPacket.gunShot(world, getPositionVector(), true);
         } else {
             startCooldown(station, ModConfig.gunCooldownTicks);
             fireRound(muzzle, aim);

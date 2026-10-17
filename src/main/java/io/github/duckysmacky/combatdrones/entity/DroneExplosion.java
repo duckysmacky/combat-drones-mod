@@ -10,6 +10,7 @@ import net.minecraft.network.play.server.SPacketExplosion;
 import net.minecraft.util.DamageSource;
 import net.minecraft.util.EntityDamageSourceIndirect;
 import net.minecraft.util.math.AxisAlignedBB;
+import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.Explosion;
 import net.minecraft.world.WorldServer;
@@ -52,16 +53,28 @@ public class DroneExplosion extends Explosion {
         if (ForgeEventFactory.onExplosionStart(world, explosion)) {
             return;
         }
+        // Before the blast digs its crater
+        boolean airBurst = isAirBurst(world, new BlockPos(x, y, z));
         explosion.doExplosionA();
         explosion.doExplosionB(false);
         if (!damagesTerrain) {
             explosion.clearAffectedBlockPositions();
         }
         sendToNearbyPlayers(world, explosion, x, y, z, power);
-        EffectPacket.explosion(world, x, y, z, power);
+        EffectPacket.explosion(world, x, y, z, power, airBurst);
         if (shrapnelDamage > 0 && shrapnelRadius > 0) {
             throwShrapnel(world, source, placedBy, new Vec3d(x, y, z), shrapnelDamage, shrapnelRadius);
         }
+    }
+
+    /** No ground (solid block or water) within a few blocks of the blast: it went off in the air. */
+    static boolean isAirBurst(WorldServer world, BlockPos center) {
+        for (BlockPos pos : BlockPos.getAllInBoxMutable(center.add(-2, -3, -2), center.add(2, 1, 2))) {
+            if (world.isBlockLoaded(pos) && (world.getBlockState(pos).getMaterial().isSolid() || world.getBlockState(pos).getMaterial().isLiquid())) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static void sendToNearbyPlayers(WorldServer world, DroneExplosion explosion, double x, double y, double z, float power) {

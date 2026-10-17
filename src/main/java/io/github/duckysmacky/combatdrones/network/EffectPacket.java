@@ -23,10 +23,18 @@ public class EffectPacket implements IMessage {
         /** A cruise missile lifting off its pad: a blast heard out to {@link #EXPLOSION_RANGE}. */
         MISSILE_LIFTOFF,
         /** A cruise missile starting its dive: alarm and HUD alert for everyone it's sent to. */
-        STRIKE_ALERT
+        STRIKE_ALERT,
+        /** An {@link #EXPLOSION} with no ground near it (a unit shot down): the distant boom of an air burst. */
+        AIR_EXPLOSION,
+        /** The gunship's cannon firing: its report, heard out to {@link #CANNON_RANGE}. */
+        CANNON_SHOT,
+        /** The gunship's howitzer firing: a heavy report heard out to {@link #HOWITZER_RANGE}. */
+        HOWITZER_SHOT
     }
 
     public static final double EXPLOSION_RANGE = 400;
+    public static final double CANNON_RANGE = 192;
+    public static final double HOWITZER_RANGE = 320;
     private static final double LAUNCH_RANGE = 96;
 
     private Kind kind;
@@ -44,8 +52,8 @@ public class EffectPacket implements IMessage {
         this.scale = scale;
     }
 
-    public static void explosion(World world, double x, double y, double z, float power) {
-        send(world, new EffectPacket(Kind.EXPLOSION, new Vec3d(x, y, z), Vec3d.ZERO, power), EXPLOSION_RANGE);
+    public static void explosion(World world, double x, double y, double z, float power, boolean airBurst) {
+        send(world, new EffectPacket(airBurst ? Kind.AIR_EXPLOSION : Kind.EXPLOSION, new Vec3d(x, y, z), Vec3d.ZERO, power), EXPLOSION_RANGE);
     }
 
     public static void launch(World world, Vec3d position, Vec3d direction) {
@@ -54,6 +62,12 @@ public class EffectPacket implements IMessage {
 
     public static void missileLiftoff(World world, Vec3d position) {
         send(world, new EffectPacket(Kind.MISSILE_LIFTOFF, position, new Vec3d(0, 1, 0), 1), EXPLOSION_RANGE);
+    }
+
+    /** A gun's report, which each client layers by distance (see {@code Effects}). */
+    public static void gunShot(World world, Vec3d position, boolean howitzer) {
+        send(world, new EffectPacket(howitzer ? Kind.HOWITZER_SHOT : Kind.CANNON_SHOT, position, Vec3d.ZERO, 1),
+                howitzer ? HOWITZER_RANGE : CANNON_RANGE);
     }
 
     /** To every player within {@code radius} of the strike point. */

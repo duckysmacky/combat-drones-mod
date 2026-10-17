@@ -1,45 +1,24 @@
 package io.github.duckysmacky.combatdrones.client;
 
-import io.github.duckysmacky.combatdrones.ModSounds;
 import io.github.duckysmacky.combatdrones.entity.EntityCruiseMissile;
 import io.github.duckysmacky.combatdrones.entity.EntityRampUnit;
+import io.github.duckysmacky.combatdrones.physics.SoundBands;
 import io.github.duckysmacky.combatdrones.type.DroneType;
-import net.minecraft.client.audio.MovingSound;
-import net.minecraft.util.SoundCategory;
-import net.minecraft.util.SoundEvent;
+import net.minecraft.util.math.RayTraceResult;
+import net.minecraft.util.math.Vec3d;
 
-/** Engine drone that follows a flying ramp unit while it has fuel; range comes from the type's {@code motorSoundRange}. */
-public class UnitEngineSound extends MovingSound {
+/** Engine of a flying ramp unit this client tracks, while it has fuel. */
+class UnitEngineSound extends EngineVoice {
+    /** Look this far ahead (ticks) for what it's about to hit. */
+    private static final int IMPACT_LOOKAHEAD_TICKS = 80;
+
     private final EntityRampUnit unit;
-    /** The unit's age when this sound started (a missile's scream rises from the start of its dive). */
-    private final int startTick;
+    /** Age when its dive started (a missile's scream rises from the start of its dive); -1 = not diving. */
+    private int diveStartTick = -1;
 
-    public UnitEngineSound(EntityRampUnit unit) {
-        super(engineOf(unit), SoundCategory.NEUTRAL);
+    UnitEngineSound(EntityRampUnit unit, DroneType type) {
+        super(type);
         this.unit = unit;
-        this.startTick = unit.ticksExisted;
-        repeat = true;
-        repeatDelay = 0;
-        DroneType type = unit.getDroneType();
-        // Range comes from volume; the pilot riding a missile sits on top of it and needs no range
-        volume = isPilot(unit) ? 1.0F : (float) Math.max(1.0, (type == null ? 64 : type.getMotorSoundRange()) / 16.0);
-        update();
-    }
-
-    private static boolean isPilot(EntityRampUnit unit) {
-        return unit == RemoteController.getUnit();
-    }
-
-    /**
-     * The type's own engine loop (electric whine, two-stroke, piston...), or the generic one. A diving missile comes
-     * in with the incoming roar for everyone below; its pilot keeps hearing the engine.
-     */
-    private static SoundEvent engineOf(EntityRampUnit unit) {
-        if (unit instanceof EntityCruiseMissile && ((EntityCruiseMissile) unit).isDiving() && !isPilot(unit)) {
-            return ModSounds.MISSILE_SCREAM;
-        }
-        DroneType type = unit.getDroneType();
-        return ModSounds.engine(type == null ? null : type.getEngineSound(), ModSounds.UNIT_ENGINE);
     }
 
     /** A diving missile's roar rises a little as it comes down (over about an unboosted dive), more when boosting. */
@@ -51,23 +30,81 @@ public class UnitEngineSound extends MovingSound {
         return !unit.isDead && unit.getFuelFraction() > 0;
     }
 
+    /** Engine pitch from speed against top speed, up when boosting. */
+    static double speedPitch(DroneType type, double speed, boolean boosting) {
+        double speedFraction = type.getMaxSpeed() <= 0 ? 0.8 : speed / type.getMaxSpeed();
+        return 0.8 + 0.4 * Math.max(0, Math.min(1, speedFraction)) + (boosting ? 0.25 : 0);
+    }
+
     @Override
-    public void update() {
-        if (!isRunning(unit) || !engineOf(unit).getSoundName().equals(positionedSoundLocation)) {
-            // Gone quiet, or a missile went from its hold into the dive: the sound tick starts the right one afresh
-            donePlaying = true;
-            return;
-        }
-        xPosF = (float) unit.posX;
-        yPosF = (float) unit.posY;
-        zPosF = (float) unit.posZ;
-        if (unit instanceof EntityCruiseMissile && ((EntityCruiseMissile) unit).isDiving()) {
-            pitch = screamPitch(unit.ticksExisted - startTick, unit.isBoosting());
-            return;
-        }
+    boolean isRunning() {
+        return isRunning(unit);
+    }
+
+    @Override
+    Vec3d position() {
+        return unit.getPositionVector();
+    }
+
+    @Override
+    double enginePitch() {
         DroneType type = unit.getDroneType();
-        double speed = unit.getSyncedSpeed();
-        double speedFraction = type == null || type.getMaxSpeed() <= 0 ? 0.8 : speed / type.getMaxSpeed();
-        pitch = 0.8F + 0.4F * (float) Math.max(0, Math.min(1, speedFraction)) + (unit.isBoosting() ? 0.25F : 0);
+        return type == null ? 1 : speedPitch(type, unit.getSyncedSpeed(), unit.isBoosting());
+    }
+
+    @Override
+    boolean heardFromInside() {
+        return unit == RemoteController.getUnit();
+    }
+
+    /** A missile's dive scream and closing roar are the warning for those below; its pilot keeps the engine. */
+    @Override
+    boolean diveHeardInside() {
+        return !(unit instanceof EntityCruiseMissile);
+    }
+
+    private double speedFraction() {
+        DroneType type = unit.getDroneType();
+        return type == null || type.getMaxSpeed() <= 0 ? 0 : unit.getSyncedSpeed() / type.getMaxSpeed();
+    }
+
+    private Vec3d velocity() {
+        return Vec3d.fromPitchYaw(unit.rotationPitch, unit.rotationYaw).scale(unit.getSyncedSpeed());
+    }
+
+    @Override
+    double diveAmount() {
+        if (!(unit instanceof EntityCruiseMissile)) {
+            return SoundBands.diveAmount(unit.rotationPitch, speedFraction());
+        }
+        if (!((EntityCruiseMissile) unit).isDiving()) {
+            diveStartTick = -1;
+            return 0;
+        }
+        if (diveStartTick < 0) {
+            diveStartTick = unit.ticksExisted;
+        }
+        return 1;
+    }
+
+    @Override
+    double divePitch() {
+        if (!(unit instanceof EntityCruiseMissile)) {
+            // The air roar climbs with speed
+            return 0.85 + 0.3 * Math.min(1, speedFraction()) + (unit.isBoosting() ? 0.1 : 0);
+        }
+        return screamPitch(unit.ticksExisted - diveStartTick, unit.isBoosting());
+    }
+
+    @Override
+    double ticksToImpact() {
+        Vec3d velocity = velocity();
+        double speed = velocity.length();
+        if (speed < 0.05) {
+            return Double.POSITIVE_INFINITY;
+        }
+        Vec3d from = unit.getPositionVector();
+        RayTraceResult hit = unit.world.rayTraceBlocks(from, from.add(velocity.scale(IMPACT_LOOKAHEAD_TICKS)), true, true, false);
+        return hit == null ? Double.POSITIVE_INFINITY : hit.hitVec.distanceTo(from) / speed;
     }
 }

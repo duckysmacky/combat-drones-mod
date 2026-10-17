@@ -72,11 +72,8 @@ public final class DroneType {
     /** Collision box (blocks): the fuselage core, not the wingtips. What gets hit, so it's a balance stat too. */
     private double hitboxWidth = 0.6;
     private double hitboxHeight = 0.3;
-    /**
-     * Engine loop sound event under {@code combat_drones:} (e.g. "unit.engine_shahed"): heard by others for hand-flown
-     * drones, by everyone for ramp units. Null = the family default.
-     */
-    private String engineSound;
+    /** Engine sound heard by others (and by everyone for ramp units), banded over {@code motorSoundRange}. Null = silent. */
+    private Sound sound;
     /** Ramp-launched only: blocks above the launch point. */
     private double defaultCruiseAltitude;
     /** Ramp-launched only: multiplies roll, pitch and turn rates (1 = plane-like, higher = rocket-like). */
@@ -181,6 +178,9 @@ public final class DroneType {
         require(payloadCapacity >= 0, "'payloadCapacity' must be >= 0");
         require(maxHP > 0, "'maxHP' must be > 0");
         require(motorSoundRange >= 0, "'motorSoundRange' must be >= 0");
+        if (sound != null) {
+            sound.validate(this);
+        }
         require(agility > 0, "'agility' must be > 0");
         require(pitchAgility > 0, "'pitchAgility' must be > 0");
         require(hitboxWidth >= 0.1 && hitboxWidth <= 4, "'hitboxWidth' must be in 0.1..4");
@@ -278,8 +278,8 @@ public final class DroneType {
     }
 
     @Nullable
-    public String getEngineSound() {
-        return engineSound;
+    public Sound getSound() {
+        return sound;
     }
 
     public double getAgility() {
@@ -350,5 +350,87 @@ public final class DroneType {
 
     public boolean isArmed() {
         return armed;
+    }
+
+    /**
+     * Engine sound: loops under {@code combat_drones:}, one per distance band (close, mid, far), each owning the
+     * stretch of {@code motorSoundRange} up to its {@code until} (a fraction, the last one 1). Optional {@code dive}
+     * loop swells in a steep fast dive, and the one-shot {@code terminal} plays just before impact.
+     */
+    public static final class Sound {
+        /** Width of the crossfade round each band boundary, as a fraction of the range. */
+        private double crossfade = 0.2;
+        /** Loudness of the whole engine (bands, dive layer), 0..1. */
+        private double volume = 1;
+        private Band[] bands;
+        private String dive;
+        private String terminal;
+
+        /** A single loop over the whole range, at full volume (projectiles in flight). */
+        public static Sound single(String event) {
+            Sound sound = new Sound();
+            sound.crossfade = 0;
+            sound.bands = new Band[]{new Band(event, 1)};
+            return sound;
+        }
+
+        private void validate(DroneType type) {
+            type.require(bands != null && bands.length > 0, "'sound' needs at least one band");
+            double previous = 0;
+            double narrowest = 1;
+            for (Band band : bands) {
+                type.require(band != null && band.event != null && !band.event.isEmpty(), "every sound band needs an 'event'");
+                type.require(band.until > previous && band.until <= 1, "sound band 'until' values must increase within 0..1");
+                narrowest = Math.min(narrowest, band.until - previous);
+                previous = band.until;
+            }
+            type.require(previous == 1, "the last sound band must reach 'until' 1");
+            type.require(crossfade >= 0 && crossfade <= narrowest, "sound 'crossfade' must be in 0..(narrowest band)");
+            type.require(volume > 0 && volume <= 1, "sound 'volume' must be in (0, 1]");
+        }
+
+        public double getCrossfade() {
+            return crossfade;
+        }
+
+        public double getVolume() {
+            return volume;
+        }
+
+        public String[] getEvents() {
+            String[] events = new String[bands.length];
+            for (int index = 0; index < bands.length; index++) {
+                events[index] = bands[index].event;
+            }
+            return events;
+        }
+
+        public double[] getUntils() {
+            double[] untils = new double[bands.length];
+            for (int index = 0; index < bands.length; index++) {
+                untils[index] = bands[index].until;
+            }
+            return untils;
+        }
+
+        @Nullable
+        public String getDive() {
+            return dive;
+        }
+
+        @Nullable
+        public String getTerminal() {
+            return terminal;
+        }
+    }
+
+    private static final class Band {
+        private String event;
+        private double until;
+
+        private Band(String event, double until) {
+            this.event = event;
+            this.until = until;
+        }
     }
 }
