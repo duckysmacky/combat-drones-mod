@@ -1,0 +1,33 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Gradle daemon runs on JDK 21; the JDK 8 toolchain is auto-downloaded
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - run: ./gradlew build
+
+      # Exact jar path, so the -dev and -shaded jars are not attached. Fails if the tag doesn't match mod_version.
+      - name: Create draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >
+          gh release create "$GITHUB_REF_NAME"
+          "build/libs/combat_drones-${GITHUB_REF_NAME#v}.jar"
+          --draft --generate-notes --title "$GITHUB_REF_NAME"

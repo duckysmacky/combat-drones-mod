@@ -11,7 +11,8 @@ planned routes. Everything is loud, can be shot down and runs on the server, so 
 Inspired by the [FPV Drones](https://www.curseforge.com/minecraft/mc-mods/fpvdrones) mod for Minecraft 1.20.1.
 
 > [!NOTE]
-> Combat Drones isn't on CurseForge or Modrinth yet; a release there is coming soon. For now, build it from source
+> Combat Drones isn't on CurseForge or Modrinth yet, a release there is coming soon. For now, grab the jar from the
+> [Releases page](https://github.com/duckysmacky/combat-drones-mod/releases) or build it from source
 > (see [Installation](#installation)).
 
 ## Features
@@ -146,9 +147,15 @@ All mod keys can be rebound under Controls -> Combat Drones.
 - [GeckoLib](https://www.curseforge.com/minecraft/mc-mods/geckolib) for 1.12.2 (**3.0.31**). Clients need it to
   render the models. Dedicated servers don't need it.
 
+### Download
+
+Download `combat_drones-<version>.jar` from the latest release on the
+[Releases page](https://github.com/duckysmacky/combat-drones-mod/releases).
+
 ### Building from source
 
-Building needs JDK 21 and JDK 8. If JDK 8 is missing, Gradle downloads it automatically.
+Alternatively, build the jar yourself. Building needs JDK 21 and JDK 8. If JDK 8 is missing, Gradle downloads it
+automatically.
 
 ```sh
 git clone https://github.com/duckysmacky/combat-drones-mod.git
