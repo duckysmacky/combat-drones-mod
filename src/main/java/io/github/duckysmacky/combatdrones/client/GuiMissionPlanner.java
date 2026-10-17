@@ -14,6 +14,7 @@ import io.github.duckysmacky.combatdrones.physics.Route;
 import io.github.duckysmacky.combatdrones.physics.RouteValidator;
 import io.github.duckysmacky.combatdrones.type.DroneType;
 import io.github.duckysmacky.combatdrones.type.DroneTypes;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.GuiButton;
 import net.minecraft.client.gui.GuiScreen;
@@ -91,7 +92,7 @@ public class GuiMissionPlanner extends GuiScreen {
     // Map view
     private double centerX;
     private double centerZ;
-    private double scale = 0.5;
+    private double scale = 1.0;
     private int mapLeft;
     private int mapTop;
     private int mapRight;
@@ -159,6 +160,10 @@ public class GuiMissionPlanner extends GuiScreen {
         if (unit != null) {
             centerX = unit.x;
             centerZ = unit.z;
+        } else if (Minecraft.getMinecraft().player != null) {
+            // Nothing linked yet: start over the player (also called from the constructor, before mc is set)
+            centerX = Minecraft.getMinecraft().player.posX;
+            centerZ = Minecraft.getMinecraft().player.posZ;
         }
     }
 
@@ -675,7 +680,12 @@ public class GuiMissionPlanner extends GuiScreen {
             }
             return;
         }
-        if (!insideMap(mouseX, mouseY) || currentUnit() == null) {
+        if (!insideMap(mouseX, mouseY)) {
+            return;
+        }
+        // Panning works on an empty planner too; everything else edits the selected unit's route
+        if (currentUnit() == null) {
+            panning = button == 0;
             return;
         }
         int hit = waypointAt(mouseX, mouseY);

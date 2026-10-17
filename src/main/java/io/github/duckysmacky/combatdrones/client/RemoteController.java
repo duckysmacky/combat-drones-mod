@@ -95,6 +95,8 @@ public final class RemoteController {
     private static boolean freeMode;
     /** Gunner seat: the selected weapon station. */
     private static int gunnerStation;
+    /** False until LMB is up once, so the click that opened the session (e.g. on "Take control") doesn't fire. */
+    private static boolean triggerReleased;
 
     private RemoteController() {
     }
@@ -180,6 +182,7 @@ public final class RemoteController {
         anchorPoint = null;
         zoom = 1;
         gunnerStation = 0;
+        triggerReleased = false;
         stickPitch = 0;
         stickRoll = 0;
         throttle = START_THROTTLE;
@@ -277,7 +280,7 @@ public final class RemoteController {
         if (minecraft.gameSettings.keyBindBack.isKeyDown()) {
             throttle = Math.max(0, throttle - THROTTLE_STEP);
         }
-        boolean trigger = minecraft.currentScreen == null && Mouse.isButtonDown(0);
+        boolean trigger = isTriggerHeld(minecraft);
         ModNetwork.CHANNEL.sendToServer(new PlaneInputPacket(unitId, pitch, roll, throttle, trigger, freeMode, isBoostKeyDown(minecraft)));
     }
 
@@ -297,7 +300,7 @@ public final class RemoteController {
         boolean keysBack = DroneKeys.PITCH_BACK.isKeyDown() || minecraft.gameSettings.keyBindBack.isKeyDown();
         right = clamp(right + axis(keysRight, keysLeft));
         forward = clamp(forward + axis(keysForward, keysBack));
-        boolean boost = minecraft.currentScreen == null && Mouse.isButtonDown(0);
+        boolean boost = isTriggerHeld(minecraft);
         ModNetwork.CHANNEL.sendToServer(new PlaneInputPacket(unitId, forward, right, 0, false, false, boost));
     }
 
@@ -322,7 +325,7 @@ public final class RemoteController {
                 }
             }
         }
-        boolean trigger = minecraft.currentScreen == null && Mouse.isButtonDown(0);
+        boolean trigger = isTriggerHeld(minecraft);
         Vec3d aim = Vec3d.fromPitchYaw(cameraPitch, cameraYaw);
         // While firing, also what the crosshair is on, so the server aims at that point from where the unit really is
         Vec3d target = null;
@@ -332,6 +335,13 @@ public final class RemoteController {
             target = hit != null ? hit.hitVec : null;
         }
         ModNetwork.CHANNEL.sendToServer(new GunnerInputPacket(unitId, aim, target, trigger, gunnerStation));
+    }
+
+    /** LMB held in the world, ignoring a press that began before the session did. */
+    private static boolean isTriggerHeld(Minecraft minecraft) {
+        boolean down = Mouse.isButtonDown(0);
+        triggerReleased |= !down;
+        return minecraft.currentScreen == null && down && triggerReleased;
     }
 
     /** Space (jump) boosts a munition: faster, at several times the fuel burn. */
