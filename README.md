@@ -2,7 +2,7 @@
 
 ![Platform](https://img.shields.io/badge/platform-Forge-E04E14)
 ![Minecraft](https://img.shields.io/badge/minecraft-1.12.2-62B47A)
-![Version](https://img.shields.io/badge/version-0.2.0-4C8DFF)
+![Version](https://img.shields.io/badge/version-0.2.1-4C8DFF)
 
 Combat Drones is a Minecraft 1.12.2 Forge mod for PvP. It adds FPV kamikaze drones, bomb-dropping quadcopters,
 loitering munitions, armed planes, a recon UAV and a cruise missile. You fly them yourself or send them along

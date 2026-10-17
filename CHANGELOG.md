@@ -2,6 +2,33 @@
 
 All notable changes to Combat Drones, newest first.
 
+## v0.2.1
+
+Added
+
+- Distance-banded sounds: engines, explosions, gun reports and projectiles in flight play as close, mid or far variants, each with its own falloff and Doppler shift.
+- Munition dive sounds, plus a terminal sound as a munition closes on its target.
+- Bullet whizz sounds as rounds pass close by.
+- Flight sounds for rockets, shells and bombs.
+- Air-burst and indoor explosion sounds.
+- Far-range sounds for the Gunship cannon and howitzer.
+- Subtitles for the new munition, bullet and projectile sounds.
+- Client config options maxEngineVoices (default 4) and maxProjectileSounds (default 6). They cap how many engines and projectiles you hear at once, nearest first.
+- CRT overlay on the gunner camera. The analog static setting also controls its strength.
+
+Changed
+
+- Gunship model reworked, with a larger hitbox.
+- Gunship cannon, howitzer and rocket fire slower.
+- Recon UAV has a lower top speed.
+- Loiter routes are limited by a per-type minimum altitude and radius. Gunship and Recon UAV have these set.
+- Mission Planner opens at a closer default zoom.
+
+Fixed
+
+- Mission Planner panning works with no unit selected, and the map centers on you when nothing is linked.
+- Clicks that open a control session no longer fire the weapon. The trigger must be released once first.
+
 ## v0.2.0
 
 ### Added
