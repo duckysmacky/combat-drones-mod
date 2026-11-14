@@ -1,5 +1,6 @@
 package io.github.duckysmacky.combatdrones.entity;
 
+import net.minecraft.init.SoundEvents;
 import io.github.duckysmacky.combatdrones.CombatDrones;
 import io.github.duckysmacky.combatdrones.ModContent;
 import io.github.duckysmacky.combatdrones.ModSounds;
@@ -49,17 +50,20 @@ public class EntityLaunchRamp extends Entity implements ChunkAnchor.Holder {
     /** Which ramp it is. The rail geometry scales with the length (the 4-block original is scale 1). */
     public enum Kind {
         // Ramps placed before the split default to MUNITION (ordinal 0)
-        MUNITION("launch_ramp", 3, 1.6F),
-        PLANE("plane_ramp", 5, 2.2F);
+        MUNITION("launch_ramp", 3, 1.6F, 1.7F),
+        PLANE("plane_ramp", 5, 2.2F, 2.3F);
 
         private final String name;
         private final int lengthBlocks;
         private final float hitboxWidth;
+        /** Tall enough to take in the unit sitting on the raised rail, so clicking the unit reaches its ramp. */
+        private final float hitboxHeight;
 
-        Kind(String name, int lengthBlocks, float hitboxWidth) {
+        Kind(String name, int lengthBlocks, float hitboxWidth, float hitboxHeight) {
             this.name = name;
             this.lengthBlocks = lengthBlocks;
             this.hitboxWidth = hitboxWidth;
+            this.hitboxHeight = hitboxHeight;
         }
 
         /** Item registry name, also its geo model. */
@@ -104,7 +108,7 @@ public class EntityLaunchRamp extends Entity implements ChunkAnchor.Holder {
 
     public EntityLaunchRamp(World world) {
         super(world);
-        setSize(1.6F, 0.8F);
+        setSize(Kind.MUNITION.hitboxWidth, Kind.MUNITION.hitboxHeight);
     }
 
     public EntityLaunchRamp(World world, Kind kind, double x, double y, double z, float yaw) {
@@ -129,7 +133,7 @@ public class EntityLaunchRamp extends Entity implements ChunkAnchor.Holder {
     public void notifyDataManagerChange(DataParameter<?> key) {
         super.notifyDataManagerChange(key);
         if (KIND.equals(key)) {
-            setSize(getKind().hitboxWidth, 0.8F);
+            setSize(getKind().hitboxWidth, getKind().hitboxHeight);
             setPosition(posX, posY, posZ);
         }
     }
@@ -294,7 +298,7 @@ public class EntityLaunchRamp extends Entity implements ChunkAnchor.Holder {
         if (!player.capabilities.isCreativeMode) {
             stack.shrink(1);
         }
-        Feedback.done(this, ModSounds.UNIT_FUEL, 1.0F);
+        Feedback.done(this, SoundEvents.ITEM_BUCKET_EMPTY, 0.9F);
         status(player, "message.combat_drones.ramp.refuelled");
     }
 
