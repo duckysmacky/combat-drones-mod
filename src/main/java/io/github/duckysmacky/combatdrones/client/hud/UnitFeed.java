@@ -20,6 +20,9 @@ import java.util.Locale;
  * heavy one's bare nose camera.
  */
 public final class UnitFeed {
+    /** Pitch of the weapon list: a text line plus room for the reload bar under it. */
+    private static final int WEAPON_LINE = 14;
+
     private UnitFeed() {
     }
 
@@ -125,7 +128,7 @@ public final class UnitFeed {
             }
             String ammo = I18n.format("hud.combat_drones.ammo." + ItemDrone.ammoKey(type, station, loadout), loadout.getAmmo(station),
                     loadout.capacity(type, station));
-            int y = bottomY - (armed - 1 - line++) * (Ui.LINE + 1);
+            int y = bottomY - (armed - 1 - line++) * WEAPON_LINE;
             int color = loadout.getAmmo(station) <= 0 ? Ui.DANGER : station == selected ? Ui.WARN : idleColor;
             Ui.labelledRight(weaponIcon(weapon), ammo, right, y, color);
             Widgets.reload(unit, station, right - Ui.width(ammo), y + 9, Ui.width(ammo));
@@ -191,21 +194,9 @@ public final class UnitFeed {
         Ui.rect(centerX, centerY, centerX + 1, centerY + 1, Ui.TEXT);
         Ui.brackets(centerX, centerY, 84, 56, 9, Ui.DIM);
 
-        // Selected weapon: name and rounds, then ready or the reload bar
+        // The selected weapon is the highlighted line of the list; its reload also shows under the reticle
         int station = unit.getSelectedStation();
-        Loadout loadout = unit.getLoadout();
         if (RemoteController.isGunner() && type.getWeapon(station) != DroneType.WeaponType.NONE) {
-            String ammo = I18n.format("hud.combat_drones.ammo." + ItemDrone.ammoKey(type, station, loadout), loadout.getAmmo(station),
-                    loadout.capacity(type, station));
-            boolean empty = loadout.getAmmo(station) <= 0;
-            int boxWidth = Math.max(96, Ui.width(ammo) + 28);
-            Ui.panel(centerX - boxWidth / 2, bottom - 4, boxWidth, 24);
-            OsdFont.icon(weaponIcon(type.getWeapon(station)), centerX - boxWidth / 2 + 5, bottom, empty ? Ui.DANGER : Ui.WARN);
-            Ui.textCentered(ammo, centerX + 5, bottom, empty ? Ui.DANGER : Ui.WARN);
-            if (!Widgets.reload(unit, station, centerX - boxWidth / 2 + 6, bottom + 13, boxWidth - 12)) {
-                Ui.textCentered(I18n.format(empty ? "hud.combat_drones.weapon.empty" : "hud.combat_drones.weapon.ready"), centerX, bottom + 10,
-                        empty ? Ui.DANGER : Ui.OK);
-            }
             Widgets.reload(unit, station, centerX - 14, centerY + 13, 28);
         }
         weapons(unit, type, right, bottom - 10, RemoteController.isGunner() ? station : -1, Ui.DIM);
