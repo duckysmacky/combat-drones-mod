@@ -18,6 +18,8 @@ import java.util.function.Function;
 
 /** Dropped bombs and rockets: their geo model, nose along the direction of travel. Rockets get an exhaust glow. */
 public class RenderProjectile<T extends Entity> extends Render<T> {
+    /** Rockets and shells roll about their axis this many degrees per tick. */
+    private static final float SPIN_DEGREES = 28.0F;
     private final Function<T, String> modelName;
     private final boolean exhaust;
 
@@ -47,6 +49,10 @@ public class RenderProjectile<T extends Entity> extends Render<T> {
         GlStateManager.rotate(-yaw, 0, 1, 0);
         GlStateManager.rotate(pitch, 1, 0, 0);
         String model = modelName.apply(entity);
+        if (exhaust) {
+            GlStateManager.rotate((entity.ticksExisted + partialTicks) * SPIN_DEGREES, 0, 0, 1); // spin-stabilised
+        }
+        GeoModels.reset(model);
         GeoModels.render(model, 1.0F, 1.0F, 1.0F);
         if (exhaust) {
             renderExhaust(GeoModels.bounds(model)[2], entity.ticksExisted + partialTicks);

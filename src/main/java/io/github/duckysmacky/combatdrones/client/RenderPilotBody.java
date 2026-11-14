@@ -2,6 +2,9 @@ package io.github.duckysmacky.combatdrones.client;
 
 import io.github.duckysmacky.combatdrones.entity.EntityPilotBody;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.model.ModelBase;
+import net.minecraft.entity.Entity;
+import net.minecraft.client.model.ModelBiped;
 import net.minecraft.client.model.ModelPlayer;
 import net.minecraft.client.network.NetHandlerPlayClient;
 import net.minecraft.client.network.NetworkPlayerInfo;
@@ -19,12 +22,18 @@ import java.util.UUID;
 /** Draws a stand-in body as its player: their skin (slim or wide arms), armour and held items. */
 public class RenderPilotBody extends RenderLivingBase<EntityPilotBody> {
     private final ModelPlayer wideModel;
-    private final ModelPlayer slimModel = new ModelPlayer(0.0F, true);
+    private final ModelPlayer slimModel = new PilotModel(true);
 
     public RenderPilotBody(RenderManager renderManager) {
-        super(renderManager, new ModelPlayer(0.0F, false), 0.5F);
+        super(renderManager, new PilotModel(false), 0.5F);
         wideModel = (ModelPlayer) mainModel;
-        addLayer(new LayerBipedArmor(this));
+        addLayer(new LayerBipedArmor(this) {
+            @Override
+            protected void initArmor() {
+                modelLeggings = new PilotArmor(0.5F);
+                modelArmor = new PilotArmor(1.0F);
+            }
+        });
         addLayer(new LayerHeldItem(this));
     }
 
@@ -45,6 +54,47 @@ public class RenderPilotBody extends RenderLivingBase<EntityPilotBody> {
         }
         UUID owner = body.getOwner();
         return owner != null ? DefaultPlayerSkin.getDefaultSkin(owner) : DefaultPlayerSkin.getDefaultSkinLegacy();
+    }
+
+    /** The pilot's stance: both hands up on the controller, head tipped down into the goggles. */
+    private static void pose(ModelBiped model) {
+        model.bipedRightArm.rotateAngleX = -0.95F;
+        model.bipedRightArm.rotateAngleY = -0.38F;
+        model.bipedRightArm.rotateAngleZ = 0;
+        model.bipedLeftArm.rotateAngleX = -0.95F;
+        model.bipedLeftArm.rotateAngleY = 0.38F;
+        model.bipedLeftArm.rotateAngleZ = 0;
+        model.bipedHead.rotateAngleX += 0.14F;
+        ModelBase.copyModelAngles(model.bipedHead, model.bipedHeadwear);
+    }
+
+    private static final class PilotModel extends ModelPlayer {
+        PilotModel(boolean slim) {
+            super(0.0F, slim);
+        }
+
+        @Override
+        public void setRotationAngles(float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw, float headPitch,
+                                      float scaleFactor, Entity entity) {
+            super.setRotationAngles(limbSwing, limbSwingAmount, ageInTicks, netHeadYaw, headPitch, scaleFactor, entity);
+            pose(this);
+            copyModelAngles(bipedRightArm, bipedRightArmwear);
+            copyModelAngles(bipedLeftArm, bipedLeftArmwear);
+        }
+    }
+
+    /** Armour that follows the pilot's stance instead of vanilla's arms-down one. */
+    private static final class PilotArmor extends ModelBiped {
+        PilotArmor(float size) {
+            super(size);
+        }
+
+        @Override
+        public void setRotationAngles(float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw, float headPitch,
+                                      float scaleFactor, Entity entity) {
+            super.setRotationAngles(limbSwing, limbSwingAmount, ageInTicks, netHeadYaw, headPitch, scaleFactor, entity);
+            pose(this);
+        }
     }
 
     /** The owner's tab-list entry, which holds their downloaded skin (null if they're offline). */

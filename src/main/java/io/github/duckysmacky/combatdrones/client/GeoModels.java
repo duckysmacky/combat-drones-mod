@@ -6,6 +6,7 @@ import io.github.duckysmacky.combatdrones.type.DroneTypes;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.BufferBuilder;
 import net.minecraft.client.renderer.GlStateManager;
+import net.minecraft.client.renderer.OpenGlHelper;
 import net.minecraft.client.renderer.tileentity.TileEntityItemStackRenderer;
 import net.minecraft.entity.Entity;
 import net.minecraft.item.ItemStack;
@@ -19,6 +20,7 @@ import software.bernie.geckolib3.geo.render.built.GeoVertex;
 import software.bernie.geckolib3.model.provider.GeoModelProvider;
 import software.bernie.geckolib3.renderers.geo.IGeoRenderer;
 import software.bernie.geckolib3.resource.GeckoLibCache;
+import org.lwjgl.opengl.GL11;
 
 import javax.annotation.Nullable;
 import javax.vecmath.Vector3f;
@@ -40,13 +42,46 @@ import java.util.WeakHashMap;
  *
  * <p>Bone naming drives the moving parts: {@code rotor*} bones spin about Y (multirotor props), {@code prop*} bones
  * about Z (plane propellers). A sibling bone named {@code <bone>_blur} replaces the blades while spinning fast.
+ * {@code glow*} bones are lamps and flames: hidden unless a renderer shows them, and drawn full-bright. Renderers
+ * pose any other bone by name ({@link #rotate}, {@link #offset}, {@link #show}); a model without that bone ignores it.
+ *
+ * <p>A model's bones are shared by everything drawn with it, so every draw starts from {@link #reset} (which
+ * {@link #spinProps} does) and sets what it needs.
+ *
+ * <p>Drawn in up to three passes: solid cubes, then blur discs (translucent, blended), then lit glow bones.
  */
 public final class GeoModels implements IGeoRenderer<Object> {
     private static final GeoModels RENDERER = new GeoModels();
     /** Radians per tick above which a prop shows its blur disc instead of its blades. */
     private static final float BLUR_SPEED = 1.2F;
+    /** How fast a prop spools toward its target speed, per tick. */
+    private static final float SPOOL_RATE = 0.12F;
+    private static final int SOLID = 0;
+    private static final int BLUR = 1;
+    private static final int GLOW = 2;
     private static final Map<GeoModel, float[]> BOUNDS = new HashMap<>();
     private static final Map<Entity, float[]> PROP_ANGLES = new WeakHashMap<>();
+    /** Per model: every bone by name, with the rotation it was modelled with (radians, GeckoLib's signs). */
+    private static final Map<GeoModel, Map<String, Posed>> BONES = new WeakHashMap<>();
+    /** Which pass is being drawn, and which pass the bone subtree being walked belongs to. */
+    private static int pass;
+    private static int boneKind;
+    private static boolean blurShown;
+    private static boolean glowShown;
+
+    private static final class Posed {
+        final GeoBone bone;
+        final float x;
+        final float y;
+        final float z;
+
+        Posed(GeoBone bone) {
+            this.bone = bone;
+            x = bone.getRotationX();
+            y = bone.getRotationY();
+            z = bone.getRotationZ();
+        }
+    }
     private static final Set<String> MISSING = new HashSet<>();
 
     private GeoModels() {
@@ -87,60 +122,174 @@ public final class GeoModels implements IGeoRenderer<Object> {
             return false;
         }
         Minecraft.getMinecraft().getTextureManager().bindTexture(texture(name));
+        blurShown = false;
+        glowShown = false;
+        for (Posed posed : bones(model).values()) {
+            if (!posed.bone.isHidden()) {
+                blurShown |= posed.bone.getName().endsWith("_blur");
+                glowShown |= posed.bone.getName().startsWith("glow");
+            }
+        }
         GlStateManager.pushMatrix();
         GlStateManager.scale(1.0F, 1.0F, -1.0F);
+        pass = SOLID;
         RENDERER.render(model, null, 0, red, green, blue, 1.0F);
+        if (blurShown) {
+            // Prop discs: translucent, and never hiding what's behind them
+            GlStateManager.enableBlend();
+            GlStateManager.tryBlendFuncSeparate(GlStateManager.SourceFactor.SRC_ALPHA, GlStateManager.DestFactor.ONE_MINUS_SRC_ALPHA,
+                    GlStateManager.SourceFactor.ONE, GlStateManager.DestFactor.ZERO);
+            GlStateManager.alphaFunc(GL11.GL_GREATER, 0.004F);
+            GlStateManager.depthMask(false);
+            pass = BLUR;
+            RENDERER.render(model, null, 0, red, green, blue, 1.0F);
+            GlStateManager.depthMask(true);
+            GlStateManager.alphaFunc(GL11.GL_GREATER, 0.1F);
+            GlStateManager.disableBlend();
+        }
+        if (glowShown) {
+            // Lamps and flames: lit by themselves, whatever the light where they are
+            float skyLight = OpenGlHelper.lastBrightnessY;
+            float blockLight = OpenGlHelper.lastBrightnessX;
+            OpenGlHelper.setLightmapTextureCoords(OpenGlHelper.lightmapTexUnit, 240.0F, 240.0F);
+            pass = GLOW;
+            RENDERER.render(model, null, 0, 1.0F, 1.0F, 1.0F, 1.0F);
+            OpenGlHelper.setLightmapTextureCoords(OpenGlHelper.lightmapTexUnit, blockLight, skyLight);
+        }
+        pass = SOLID;
         GlStateManager.popMatrix();
         return true;
     }
 
     /**
      * Advances and returns an entity's prop angle for this frame. Integrated per entity so changing RPM doesn't make
-     * the props jump; kept client-side only, keyed weakly so unloaded entities drop out.
+     * the props jump, and spooled toward {@code radiansPerTick} so engines wind up and down; kept client-side only,
+     * keyed weakly so unloaded entities drop out. {@link #propSpeed} gives the spooled speed it turned at.
      */
     public static float propAngle(Entity entity, float radiansPerTick, float partialTicks) {
         float time = entity.ticksExisted + partialTicks;
-        float[] state = PROP_ANGLES.computeIfAbsent(entity, key -> new float[] {time, 0});
-        state[1] = (state[1] + radiansPerTick * Math.max(0, time - state[0])) % (float) (Math.PI * 2);
+        float[] state = PROP_ANGLES.computeIfAbsent(entity, key -> new float[] {time, 0, radiansPerTick});
+        float elapsed = Math.max(0, time - state[0]);
+        state[2] += (radiansPerTick - state[2]) * Math.min(1, elapsed * SPOOL_RATE);
+        state[1] = (state[1] + state[2] * elapsed) % (float) (Math.PI * 2);
         state[0] = time;
         return state[1];
     }
 
-    /** Sets every {@code rotor*} / {@code prop*} bone to {@code angle}, swapping in blur discs above blur speed. */
-    public static void spinProps(String name, float angle, float radiansPerTick) {
-        GeoModel model = get(name);
-        if (model != null) {
-            boolean blurred = Math.abs(radiansPerTick) > BLUR_SPEED;
-            for (GeoBone bone : model.topLevelBones) {
-                spinProps(bone, angle, blurred);
+    /** The speed (radians per tick) an entity's props are turning at right now, after spooling. */
+    public static float propSpeed(Entity entity) {
+        float[] state = PROP_ANGLES.get(entity);
+        return state == null ? 0 : state[2];
+    }
+
+    private static Map<String, Posed> bones(GeoModel model) {
+        return BONES.computeIfAbsent(model, key -> {
+            Map<String, Posed> all = new HashMap<>();
+            for (GeoBone bone : key.topLevelBones) {
+                collect(all, bone);
             }
+            return all;
+        });
+    }
+
+    private static void collect(Map<String, Posed> all, GeoBone bone) {
+        all.put(bone.getName(), new Posed(bone));
+        for (GeoBone child : bone.childBones) {
+            collect(all, child);
         }
     }
 
-    private static void spinProps(GeoBone bone, float angle, boolean blurred) {
-        String name = bone.getName();
-        boolean rotor = name.startsWith("rotor");
-        if (rotor || name.startsWith("prop")) {
-            boolean blur = name.endsWith("_blur");
-            boolean hasBlur = !blur && bone.parent != null && bone.parent.childBones.stream().anyMatch(other -> other.getName().equals(name + "_blur"));
-            bone.setHidden(blur ? !blurred : hasBlur && blurred);
+    /** Back to the modelled pose: every bone unrotated and unmoved, blades instead of blur discs, lamps off. */
+    public static void reset(String name) {
+        GeoModel model = get(name);
+        if (model == null) {
+            return;
+        }
+        for (Posed posed : bones(model).values()) {
+            GeoBone bone = posed.bone;
+            bone.setRotationX(posed.x);
+            bone.setRotationY(posed.y);
+            bone.setRotationZ(posed.z);
+            bone.setPositionX(0);
+            bone.setPositionY(0);
+            bone.setPositionZ(0);
+            bone.setHidden(bone.getName().endsWith("_blur") || bone.getName().startsWith("glow"));
+        }
+    }
+
+    /**
+     * Resets the model, then sets every {@code rotor*} / {@code prop*} bone to {@code angle}, swapping in blur discs
+     * above blur speed.
+     */
+    public static void spinProps(String name, float angle, float radiansPerTick) {
+        GeoModel model = get(name);
+        if (model == null) {
+            return;
+        }
+        reset(name);
+        boolean blurred = Math.abs(radiansPerTick) > BLUR_SPEED;
+        Map<String, Posed> all = bones(model);
+        for (Posed posed : all.values()) {
+            GeoBone bone = posed.bone;
+            String boneName = bone.getName();
+            boolean rotor = boneName.startsWith("rotor");
+            if (!rotor && !boneName.startsWith("prop")) {
+                continue;
+            }
+            boolean blur = boneName.endsWith("_blur");
+            bone.setHidden(blur ? !blurred : blurred && all.containsKey(boneName + "_blur"));
             if (rotor) {
                 bone.setRotationY(angle);
             } else {
                 bone.setRotationZ(angle);
             }
         }
-        for (GeoBone child : bone.childBones) {
-            spinProps(child, angle, blurred);
+    }
+
+    /**
+     * Turns a bone from its modelled pose, in Blockbench degrees about the model's own axes (X: positive tips the
+     * nose side down, Y: positive swings the nose toward the model's left). No-op if the model doesn't have it.
+     */
+    public static void rotate(String name, String bone, float x, float y, float z) {
+        GeoModel model = get(name);
+        Posed posed = model == null ? null : bones(model).get(bone);
+        if (posed != null) {
+            posed.bone.setRotationX(posed.x - (float) Math.toRadians(x));
+            posed.bone.setRotationY(posed.y - (float) Math.toRadians(y));
+            posed.bone.setRotationZ(posed.z + (float) Math.toRadians(z));
         }
     }
 
-    /** Hides or shows a named bone (bomb racks, grenade clips...). No-op if the model doesn't have it. */
-    public static void setVisible(String name, String bone, boolean visible) {
+    /** Slides a bone from where it was modelled, in model pixels along its parent's axes (nose toward -Z). */
+    public static void offset(String name, String bone, float x, float y, float z) {
         GeoModel model = get(name);
-        if (model != null) {
-            model.getBone(bone).ifPresent(found -> found.setHidden(!visible));
+        Posed posed = model == null ? null : bones(model).get(bone);
+        if (posed != null) {
+            posed.bone.setPositionX(x);
+            posed.bone.setPositionY(y);
+            posed.bone.setPositionZ(z);
         }
+    }
+
+    /** Shows or hides every bone whose name starts with {@code prefix} (lamps, flames, racks). Returns how many. */
+    public static int show(String name, String prefix, boolean visible) {
+        GeoModel model = get(name);
+        int count = 0;
+        if (model != null) {
+            for (Posed posed : bones(model).values()) {
+                if (posed.bone.getName().startsWith(prefix)) {
+                    posed.bone.setHidden(!visible);
+                    count++;
+                }
+            }
+        }
+        return count;
+    }
+
+    /** Lamps a running aircraft shows: steady navigation lights and a strobe that flashes about once a second. */
+    public static void lights(String name, boolean on, float time) {
+        show(name, "glow_nav", on);
+        show(name, "glow_strobe", on && time % 24 < 2);
     }
 
     /**
@@ -235,6 +384,9 @@ public final class GeoModels implements IGeoRenderer<Object> {
      */
     @Override
     public void renderCube(BufferBuilder builder, GeoCube cube, float red, float green, float blue, float alpha) {
+        if (boneKind != pass) {
+            return;
+        }
         MATRIX_STACK.moveToPivot(cube);
         MATRIX_STACK.rotate(cube);
         MATRIX_STACK.moveBackFromPivot(cube);
@@ -261,6 +413,19 @@ public final class GeoModels implements IGeoRenderer<Object> {
                         .color(red, green, blue, alpha).normal(normal.getX(), normal.getY(), normal.getZ()).endVertex();
             }
         }
+    }
+
+    /** Tags the bone subtree being walked with its pass: blur discs and glow bones are drawn after the solid cubes. */
+    @Override
+    public void renderRecursively(BufferBuilder builder, GeoBone bone, float red, float green, float blue, float alpha) {
+        int outer = boneKind;
+        if (bone.getName().startsWith("glow")) {
+            boneKind = GLOW;
+        } else if (bone.getName().endsWith("_blur")) {
+            boneKind = BLUR;
+        }
+        IGeoRenderer.super.renderRecursively(builder, bone, red, green, blue, alpha);
+        boneKind = outer;
     }
 
     @Override

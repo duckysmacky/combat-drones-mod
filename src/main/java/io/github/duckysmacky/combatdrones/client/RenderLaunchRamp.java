@@ -6,6 +6,11 @@ import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.client.renderer.entity.Render;
 import net.minecraft.client.renderer.entity.RenderManager;
 import net.minecraft.util.ResourceLocation;
+import net.minecraft.util.math.AxisAlignedBB;
+import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.World;
+import java.util.Map;
+import java.util.WeakHashMap;
 
 import javax.annotation.Nullable;
 
@@ -23,6 +28,13 @@ public class RenderLaunchRamp extends Render<EntityLaunchRamp> {
     /** Where along the rail (pixels from the back end) the loaded unit's centre sits, and the carriage height. */
     private static final float SEAT_ALONG = 34.0F;
     private static final float CARRIAGE_HEIGHT = 2.0F;
+    /** How far the carriage runs from the seat to the end stop (pixels on the 4-block design), and its timing in ticks. */
+    private static final float CARRIAGE_TRAVEL = 25.0F;
+    private static final float SHOT_TICKS = 3.0F;
+    private static final float HOLD_TICKS = 30.0F;
+    private static final float RETURN_TICKS = 40.0F;
+    /** Per ramp: when (entity ticks) it last launched. */
+    private static final Map<EntityLaunchRamp, Float> LAUNCHED = new WeakHashMap<>();
 
     public RenderLaunchRamp(RenderManager renderManager) {
         super(renderManager);
@@ -35,8 +47,11 @@ public class RenderLaunchRamp extends Render<EntityLaunchRamp> {
         GlStateManager.translate(x, y, z);
         GlStateManager.rotate(-ramp.rotationYaw, 0, 1, 0); // nose (+Z) along the ramp's heading
         EntityLaunchRamp.Kind kind = ramp.getKind();
-        GeoModels.render(kind.getName(), 1.0F, 1.0F, 1.0F);
         DroneType unit = ramp.getUnitType();
+        GeoModels.reset(kind.getName());
+        GeoModels.show(kind.getName(), "glow_ready", unit != null);
+        GeoModels.offset(kind.getName(), "carriage", 0, 0, -CARRIAGE_TRAVEL * kind.railScale() * carriageRun(ramp, partialTicks));
+        GeoModels.render(kind.getName(), 1.0F, 1.0F, 1.0F);
         if (unit != null) {
             double incline = Math.toRadians(RAIL_ANGLE);
             float seatAlong = SEAT_ALONG * kind.railScale();
@@ -49,6 +64,32 @@ public class RenderLaunchRamp extends Render<EntityLaunchRamp> {
         }
         GlStateManager.popMatrix();
         super.doRender(ramp, x, y, z, entityYaw, partialTicks);
+    }
+
+    /** A catapult shot went off at this point: the nearest ramp's carriage runs down its rail. */
+    static void launched(World world, Vec3d at) {
+        EntityLaunchRamp nearest = null;
+        for (EntityLaunchRamp ramp : world.getEntitiesWithinAABB(EntityLaunchRamp.class, new AxisAlignedBB(at, at).grow(6))) {
+            if (nearest == null || ramp.getDistanceSq(at.x, at.y, at.z) < nearest.getDistanceSq(at.x, at.y, at.z)) {
+                nearest = ramp;
+            }
+        }
+        if (nearest != null) {
+            LAUNCHED.put(nearest, (float) nearest.ticksExisted);
+        }
+    }
+
+    /** 0 = carriage at the seat, 1 = against the end stop: shot forward, held, then wound back. */
+    private static float carriageRun(EntityLaunchRamp ramp, float partialTicks) {
+        Float launch = LAUNCHED.get(ramp);
+        if (launch == null) {
+            return 0;
+        }
+        float age = ramp.ticksExisted + partialTicks - launch;
+        if (age < 0 || age >= SHOT_TICKS + HOLD_TICKS + RETURN_TICKS) {
+            return 0;
+        }
+        return age < SHOT_TICKS ? age / SHOT_TICKS : age < SHOT_TICKS + HOLD_TICKS ? 1 : 1 - (age - SHOT_TICKS - HOLD_TICKS) / RETURN_TICKS;
     }
 
     @Nullable

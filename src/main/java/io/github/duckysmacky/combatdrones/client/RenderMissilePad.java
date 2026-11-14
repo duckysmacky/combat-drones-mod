@@ -7,6 +7,8 @@ import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.client.renderer.entity.Render;
 import net.minecraft.client.renderer.entity.RenderManager;
 import net.minecraft.util.ResourceLocation;
+import java.util.Map;
+import java.util.WeakHashMap;
 
 import javax.annotation.Nullable;
 import javax.vecmath.AxisAngle4d;
@@ -16,6 +18,12 @@ import javax.vecmath.AxisAngle4d;
  * how) the {@code EntityCruiseMissile} appears at ignition, so the hand-over on launch doesn't jump.
  */
 public class RenderMissilePad extends Render<EntityMissilePad> {
+    /** How far the clamp jaws draw back along the pad's diagonals (model pixels), and how fast (per tick). */
+    private static final float CLAMP_TRAVEL = 2.4F;
+    private static final float CLAMP_RATE = 0.12F;
+    /** Per pad: {jaws open 0..1, time of the last frame}. */
+    private static final Map<EntityMissilePad, float[]> CLAMPS = new WeakHashMap<>();
+
     public RenderMissilePad(RenderManager renderManager) {
         super(renderManager);
         shadowSize = 1.2F;
@@ -27,9 +35,21 @@ public class RenderMissilePad extends Render<EntityMissilePad> {
         GlStateManager.translate(x, y, z);
         GlStateManager.pushMatrix();
         GlStateManager.rotate(-pad.rotationYaw, 0, 1, 0);
+        DroneType missile = pad.getMissileType();
+        // Clamp jaws draw back when the pad is empty and close on a loaded missile; lamps: green fuelled, red not
+        float[] clamps = CLAMPS.computeIfAbsent(pad, key -> new float[] {missile == null ? 1 : 0, pad.ticksExisted});
+        float time = pad.ticksExisted + partialTicks;
+        clamps[0] += ((missile == null ? 1 : 0) - clamps[0]) * Math.min(1, Math.max(0, time - clamps[1]) * CLAMP_RATE);
+        clamps[1] = time;
+        GeoModels.reset("missile_pad");
+        for (int jaw = 0; jaw < 4; jaw++) {
+            GeoModels.offset("missile_pad", "clamp_" + jaw, (jaw >= 2 ? 1 : -1) * CLAMP_TRAVEL * clamps[0], 0,
+                    (jaw % 2 == 1 ? 1 : -1) * CLAMP_TRAVEL * clamps[0]);
+        }
+        GeoModels.show("missile_pad", "glow_ready", missile != null && pad.getFuelFraction() > 0);
+        GeoModels.show("missile_pad", "glow_standby", missile != null && pad.getFuelFraction() <= 0);
         GeoModels.render("missile_pad", 1.0F, 1.0F, 1.0F);
         GlStateManager.popMatrix();
-        DroneType missile = pad.getMissileType();
         if (missile != null) {
             GlStateManager.translate(0, EntityMissilePad.DECK_HEIGHT + missile.getHitboxHeight() / 2, 0);
             AxisAngle4d rotation = new AxisAngle4d();

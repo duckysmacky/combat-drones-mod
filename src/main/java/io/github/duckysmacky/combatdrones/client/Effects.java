@@ -2,6 +2,7 @@ package io.github.duckysmacky.combatdrones.client;
 
 import io.github.duckysmacky.combatdrones.CombatDrones;
 import io.github.duckysmacky.combatdrones.ModSounds;
+import io.github.duckysmacky.combatdrones.entity.EntityRampUnit;
 import io.github.duckysmacky.combatdrones.network.EffectPacket;
 import io.github.duckysmacky.combatdrones.network.GunFirePacket;
 import io.github.duckysmacky.combatdrones.physics.SoundBands;
@@ -15,6 +16,7 @@ import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.util.EnumParticleTypes;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.SoundCategory;
+import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
@@ -57,6 +59,7 @@ public final class Effects {
             case CANNON_SHOT:
             case HOWITZER_SHOT:
                 gunShot(player.getPositionEyes(1), packet.getPosition(), packet.getKind() == EffectPacket.Kind.HOWITZER_SHOT, world.rand);
+                recoil(world, packet.getPosition(), packet.getKind() == EffectPacket.Kind.HOWITZER_SHOT ? "recoil_howitzer" : "recoil_cannon");
                 break;
             case EXPLOSION:
             case AIR_EXPLOSION:
@@ -64,6 +67,7 @@ public final class Effects {
                 break;
             case LAUNCH:
                 launch(world, packet.getPosition(), packet.getDirection());
+                RenderLaunchRamp.launched(world, packet.getPosition());
                 break;
             case MISSILE_LIFTOFF:
                 missileLiftoff(world, player, packet.getPosition());
@@ -142,6 +146,19 @@ public final class Effects {
         }
     }
 
+    /** A gunship gun fired from this point: the nearest unit's barrel kicks back. */
+    private static void recoil(World world, Vec3d at, String bone) {
+        EntityRampUnit nearest = null;
+        for (EntityRampUnit unit : world.getEntitiesWithinAABB(EntityRampUnit.class, new AxisAlignedBB(at, at).grow(8))) {
+            if (nearest == null || unit.getDistanceSq(at.x, at.y, at.z) < nearest.getDistanceSq(at.x, at.y, at.z)) {
+                nearest = unit;
+            }
+        }
+        if (nearest != null) {
+            RenderRampUnit.kick(nearest, bone);
+        }
+    }
+
     /** Catapult shot: a burst of compressed air at the back of the rail and a puff along it. */
     private static void launch(World world, Vec3d ramp, Vec3d heading) {
         Random random = world.rand;
@@ -186,6 +203,9 @@ public final class Effects {
                     (float) to.x, (float) to.y, (float) to.z), 0);
         }
         Entity shooter = world.getEntityByID(packet.getShooter());
+        if (shooter != null) {
+            RenderRampUnit.kick(shooter, "recoil_gun");
+        }
         if (shooter == null || player.getRidingEntity() != shooter) {
             Vec3d ear = player.getPositionEyes(1);
             double along = Math.max(0, Math.min(length, ear.subtract(from).dotProduct(direction)));
