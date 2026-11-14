@@ -33,8 +33,10 @@ public class IntelPacket implements IMessage {
         public final boolean player;
         /** Follow the entity live on the client; otherwise stay at the server's snapshot until the next update. */
         public final boolean live;
+        /** A lock-on's ticks left (0 for a dot). */
+        public final int ticksLeft;
 
-        public Entry(double x, double y, double z, int entityId, String name, boolean locked, boolean player, boolean live) {
+        public Entry(double x, double y, double z, int entityId, String name, boolean locked, boolean player, boolean live, int ticksLeft) {
             this.x = x;
             this.y = y;
             this.z = z;
@@ -43,6 +45,7 @@ public class IntelPacket implements IMessage {
             this.locked = locked;
             this.player = player;
             this.live = live;
+            this.ticksLeft = ticksLeft;
         }
     }
 
@@ -65,7 +68,7 @@ public class IntelPacket implements IMessage {
         entries = new ArrayList<>(count);
         for (int index = 0; index < count; index++) {
             entries.add(new Entry(buf.readDouble(), buf.readDouble(), buf.readDouble(), buf.readInt(), ByteBufUtils.readUTF8String(buf),
-                    buf.readBoolean(), buf.readBoolean(), buf.readBoolean()));
+                    buf.readBoolean(), buf.readBoolean(), buf.readBoolean(), buf.readInt()));
         }
     }
 
@@ -82,6 +85,7 @@ public class IntelPacket implements IMessage {
             buf.writeBoolean(entry.locked);
             buf.writeBoolean(entry.player);
             buf.writeBoolean(entry.live);
+            buf.writeInt(entry.ticksLeft);
         }
     }
 

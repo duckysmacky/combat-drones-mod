@@ -22,6 +22,7 @@ import java.util.List;
 @Mod.EventBusSubscriber(modid = CombatDrones.MOD_ID, value = Side.CLIENT)
 public final class ClientIntel {
     private static List<IntelPacket.Entry> marks = Collections.emptyList();
+    private static long marksReceived;
     /** Lock-on progress from the UAV camera, 0..1 (0 = no attempt, 1 = just locked on). */
     private static float lockProgress;
     /** Ticks to the next lock-on beep. */
@@ -47,6 +48,12 @@ public final class ClientIntel {
 
     static void set(List<IntelPacket.Entry> newMarks) {
         marks = newMarks;
+        marksReceived = Minecraft.getSystemTime();
+    }
+
+    /** Milliseconds left on a lock-on mark, counting down from when the server sent it. */
+    public static long millisLeft(IntelPacket.Entry mark) {
+        return Math.max(0, mark.ticksLeft * 50L - (Minecraft.getSystemTime() - marksReceived));
     }
 
     public static float getLockProgress() {

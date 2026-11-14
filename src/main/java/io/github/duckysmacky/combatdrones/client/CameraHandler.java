@@ -17,12 +17,20 @@ import javax.vecmath.Quat4d;
 public final class CameraHandler {
     /** Racing quads tilt the camera up so it looks ahead while the drone pitches forward to fly. */
     private static final Quat4d CAMERA_UPTILT = HandFlownFlight.fromEuler(0, -20, 0);
+    /**
+     * The direction this frame's camera looks when it's one of ours (remote unit or FPV): vanilla's render manager still
+     * has the body's held rotation then, so billboards drawn in the world have to face this instead.
+     */
+    private static boolean customView;
+    private static float viewYaw;
+    private static float viewPitch;
 
     private CameraHandler() {
     }
 
     @SubscribeEvent
     public static void onCameraSetup(EntityViewRenderEvent.CameraSetup event) {
+        customView = false;
         EntityRampUnit remoteUnit = RemoteController.getUnit();
         if (remoteUnit != null && event.getEntity() == remoteUnit) {
             remoteCamera(event, remoteUnit);
@@ -45,9 +53,30 @@ public final class CameraHandler {
             view.mul(CAMERA_UPTILT);
             euler = HandFlownFlight.toEuler(view);
         }
-        event.setYaw((float) euler[0] + 180.0F); // vanilla's camera yaw convention is offset by 180
-        event.setPitch((float) euler[1]);
-        event.setRoll((float) euler[2]);
+        aim(event, (float) euler[0], (float) euler[1], (float) euler[2]);
+    }
+
+    /** Points the camera (yaw/pitch in entity terms) and remembers where, for {@link #isCustomView}. */
+    private static void aim(EntityViewRenderEvent.CameraSetup event, float yaw, float pitch, float roll) {
+        event.setYaw(yaw + 180.0F); // vanilla's camera yaw convention is offset by 180
+        event.setPitch(pitch);
+        event.setRoll(roll);
+        customView = true;
+        viewYaw = yaw;
+        viewPitch = pitch;
+    }
+
+    /** True while this frame's camera is a remote unit's or an FPV drone's (see {@link #getViewYaw}). */
+    public static boolean isCustomView() {
+        return customView;
+    }
+
+    public static float getViewYaw() {
+        return viewYaw;
+    }
+
+    public static float getViewPitch() {
+        return viewPitch;
     }
 
     /** Zoomed look camera: narrower field of view. */
@@ -69,13 +98,9 @@ public final class CameraHandler {
         if (RemoteController.isStickControl()) {
             // Through the airframe's orientation, so a missile's near-vertical dive (where yaw is meaningless) is smooth
             double[] euler = HandFlownFlight.toEuler(unit.renderOrientation(partialTicks));
-            event.setYaw((float) euler[0] + 180.0F); // vanilla's camera yaw convention is offset by 180
-            event.setPitch((float) euler[1]);
-            event.setRoll((float) euler[2]);
+            aim(event, (float) euler[0], (float) euler[1], (float) euler[2]);
         } else {
-            event.setYaw(RemoteController.getCameraYaw() + 180.0F);
-            event.setPitch(RemoteController.getCameraPitch());
-            event.setRoll(0);
+            aim(event, RemoteController.getCameraYaw(), RemoteController.getCameraPitch(), 0);
         }
     }
 

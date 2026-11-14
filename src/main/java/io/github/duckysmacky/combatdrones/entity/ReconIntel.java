@@ -360,7 +360,7 @@ public final class ReconIntel {
         for (Dots dots : DOTS.values()) {
             if (dots.dimension == player.dimension && sees(player, dots.owner, ModConfig.trackingDotsForAllies)) {
                 for (Mark mark : dots.marks) {
-                    merged.putIfAbsent(mark.targetId, entry(mark, false, live));
+                    merged.putIfAbsent(mark.targetId, entry(mark, false, live, 0));
                 }
             }
         }
@@ -369,8 +369,10 @@ public final class ReconIntel {
                 continue;
             }
             for (LockOn lockOn : owner.getValue().values()) {
-                if (now <= lockOn.until && lockOn.mark.dimension == player.dimension) {
-                    merged.put(lockOn.mark.targetId, entry(lockOn.mark, true, true));
+                IntelPacket.Entry known = merged.get(lockOn.mark.targetId);
+                // Several lock-ons on one target: the one that lasts longest
+                if (now <= lockOn.until && lockOn.mark.dimension == player.dimension && (known == null || known.ticksLeft < lockOn.until - now)) {
+                    merged.put(lockOn.mark.targetId, entry(lockOn.mark, true, true, (int) (lockOn.until - now)));
                 }
             }
         }
@@ -392,7 +394,7 @@ public final class ReconIntel {
         return owner.equals(player.getUniqueID()) || (sharedWithAllies && isTeammate(owner, player));
     }
 
-    private static IntelPacket.Entry entry(Mark mark, boolean locked, boolean live) {
-        return new IntelPacket.Entry(mark.x, mark.y, mark.z, mark.entityId, mark.name, locked, mark.player, live);
+    private static IntelPacket.Entry entry(Mark mark, boolean locked, boolean live, int ticksLeft) {
+        return new IntelPacket.Entry(mark.x, mark.y, mark.z, mark.entityId, mark.name, locked, mark.player, live, ticksLeft);
     }
 }

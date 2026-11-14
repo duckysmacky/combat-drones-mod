@@ -223,9 +223,13 @@ public final class UnitFeed {
         Ui.labelled(OsdFont.Icon.FUEL, fuelText, left, bottom - 4, fuelColor);
         Ui.labelledRight(OsdFont.Icon.HEALTH, healthText, right, bottom - 4, healthColor);
         Widgets.marks(right, top);
+        int y = top + Ui.LINE;
         if (unit.getLockMaxCharges() > 0) {
-            Widgets.lockCharges(unit, right, top + Ui.LINE);
+            y = Widgets.lockCharges(unit, right, y);
+            // Its reload also shows under the reticle, like a gunship weapon's
+            Widgets.lockReload(unit, centerX - 14, centerY + 13, 28);
         }
+        Widgets.lockOns(right, y);
 
         Ui.hline(centerX - 11, centerX - 3, centerY, Ui.TEXT);
         Ui.hline(centerX + 4, centerX + 12, centerY, Ui.TEXT);

@@ -116,9 +116,11 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder {
     }
     private static final DataParameter<Float> HEALTH_FRACTION = EntityDataManager.createKey(EntityRampUnit.class, DataSerializers.FLOAT);
     /**
-     * Sensor units: lock-on charges left, how many it holds (0 = lock-on off on this server) and the world tick the next
-     * one is back (0 = not reloading, -1 = reload on hold).
+     * Sensor units: lock-on charges left, how many it holds (0 = lock-on off on this server), the reload length in ticks
+     * and the world tick the next one is back (0 = not reloading; while the reload is on hold, -1 minus the ticks
+     * already reloaded).
      */
+    private static final DataParameter<Integer> LOCK_RELOAD_LENGTH = EntityDataManager.createKey(EntityRampUnit.class, DataSerializers.VARINT);
     private static final DataParameter<Integer> LOCK_MAX = EntityDataManager.createKey(EntityRampUnit.class, DataSerializers.VARINT);
     private static final DataParameter<Integer> LOCK_CHARGES = EntityDataManager.createKey(EntityRampUnit.class, DataSerializers.VARINT);
     private static final DataParameter<Integer> LOCK_READY_TICK = EntityDataManager.createKey(EntityRampUnit.class, DataSerializers.VARINT);
@@ -205,6 +207,7 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder {
         dataManager.register(FUEL_FRACTION, 1.0F);
         dataManager.register(HEALTH_FRACTION, 1.0F);
         dataManager.register(LOCK_MAX, 0);
+        dataManager.register(LOCK_RELOAD_LENGTH, 1);
         dataManager.register(LOCK_CHARGES, 0);
         dataManager.register(LOCK_READY_TICK, 0);
         dataManager.register(AMMO, 0);
@@ -871,8 +874,9 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder {
         int charges = lockCharges.getCharges();
         dataManager.set(LOCK_MAX, ModConfig.lockOnEnabled ? ModConfig.lockOnCharges : 0);
         dataManager.set(LOCK_CHARGES, charges);
+        dataManager.set(LOCK_RELOAD_LENGTH, reloadTicks);
         dataManager.set(LOCK_READY_TICK, charges >= ModConfig.lockOnCharges ? 0
-                : paused ? -1 : (int) world.getTotalWorldTime() + reloadTicks - lockCharges.getReload());
+                : paused ? -1 - lockCharges.getReload() : (int) world.getTotalWorldTime() + reloadTicks - lockCharges.getReload());
     }
 
     /** Server: uses a lock-on charge; false when there's none left. */
@@ -895,7 +899,17 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder {
     /** Ticks until the next lock-on charge is back: 0 when none is reloading, -1 while the reload is on hold. */
     public int getLockReloadLeft() {
         int ready = dataManager.get(LOCK_READY_TICK);
-        return ready <= 0 ? ready : Math.max(0, ready - (int) world.getTotalWorldTime());
+        return ready < 0 ? -1 : ready == 0 ? 0 : Math.max(0, ready - (int) world.getTotalWorldTime());
+    }
+
+    /** How far the next lock-on charge has reloaded, 0..1 (0 when none is reloading; held where it was while on hold). */
+    public float getLockReloadFraction() {
+        int ready = dataManager.get(LOCK_READY_TICK);
+        float length = Math.max(1, dataManager.get(LOCK_RELOAD_LENGTH));
+        if (ready < 0) {
+            return Math.min(1, (-1 - ready) / length);
+        }
+        return ready == 0 ? 0 : Math.max(0, Math.min(1, 1 - (ready - world.getTotalWorldTime()) / length));
     }
 
     @Override

@@ -11,6 +11,7 @@ import net.minecraft.client.renderer.Tessellator;
 import net.minecraft.client.renderer.entity.RenderManager;
 import net.minecraft.client.renderer.vertex.DefaultVertexFormats;
 import net.minecraft.entity.Entity;
+import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.math.BlockPos;
 import net.minecraftforge.client.event.RenderWorldLastEvent;
 import net.minecraftforge.fml.common.Mod;
@@ -35,6 +36,7 @@ public final class MarkerRenderer {
     /** Size of a target without a client-side entity to measure (a player). */
     private static final double DEFAULT_WIDTH = 0.6;
     private static final double DEFAULT_HEIGHT = 1.8;
+    private static final ResourceLocation DOT_TEXTURE = new ResourceLocation(CombatDrones.MOD_ID, "textures/misc/tracking_dot.png");
 
     private MarkerRenderer() {
     }
@@ -78,20 +80,26 @@ public final class MarkerRenderer {
         }
         tessellator.draw();
         GlStateManager.glLineWidth(1.0F);
+        GlStateManager.enableTexture2D();
+        // Billboards face the camera we're really looking through (a remote or FPV camera isn't the body's view)
+        boolean custom = CameraHandler.isCustomView();
+        float viewYaw = custom ? CameraHandler.getViewYaw() : renderManager.playerViewY;
+        float viewPitch = custom ? CameraHandler.getViewPitch() : renderManager.playerViewX;
+        boolean frontal = !custom && minecraft.gameSettings.thirdPersonView == 2;
+        minecraft.getTextureManager().bindTexture(DOT_TEXTURE);
         for (int index = 0; index < marks.size(); index++) {
             if (!marks.get(index).locked) {
                 double[] place = places.get(index);
-                dot(tessellator, renderManager, place[0], place[1] + place[4], place[2], colorOf(marks.get(index)));
+                dot(tessellator, place[0], place[1] + place[4], place[2], viewYaw, frontal ? -viewPitch : viewPitch, colorOf(marks.get(index)));
             }
         }
-        GlStateManager.enableTexture2D();
         // Names of locked-on targets, as nameplates facing the camera
         for (int index = 0; index < marks.size(); index++) {
             if (marks.get(index).locked) {
                 double[] place = places.get(index);
                 float above = (float) ((place[4] + 0.1) * scaleFor(place[0], place[1], place[2])) + 0.5F;
                 EntityRenderer.drawNameplate(minecraft.fontRenderer, marks.get(index).name, (float) place[0], (float) place[1] + above,
-                        (float) place[2], 0, renderManager.playerViewY, renderManager.playerViewX, false, false);
+                        (float) place[2], 0, viewYaw, viewPitch, frontal, false);
             }
         }
         GlStateManager.disableBlend();
@@ -149,20 +157,20 @@ public final class MarkerRenderer {
         }
     }
 
-    /** Tracking dot: a diamond facing the camera, floating over the camera-relative head position, about the same size on screen at any range. */
-    private static void dot(Tessellator tessellator, RenderManager renderManager, double x, double headY, double z, float[] color) {
+    /** Tracking dot: a round lamp facing the camera, floating over the camera-relative head position, about the same size on screen at any range. */
+    private static void dot(Tessellator tessellator, double x, double headY, double z, float viewYaw, float viewPitch, float[] color) {
         double distance = Math.sqrt(x * x + headY * headY + z * z);
         double size = Math.max(0.15, distance * 0.012);
         GlStateManager.pushMatrix();
         GlStateManager.translate(x, headY + 0.4 + size * 1.5, z);
-        GlStateManager.rotate(-renderManager.playerViewY, 0, 1, 0);
-        GlStateManager.rotate(renderManager.playerViewX, 1, 0, 0);
+        GlStateManager.rotate(-viewYaw, 0, 1, 0);
+        GlStateManager.rotate(viewPitch, 1, 0, 0);
         BufferBuilder buffer = tessellator.getBuffer();
-        buffer.begin(GL11.GL_QUADS, DefaultVertexFormats.POSITION_COLOR);
-        buffer.pos(0, size, 0).color(color[0], color[1], color[2], 0.9F).endVertex();
-        buffer.pos(-size, 0, 0).color(color[0], color[1], color[2], 0.9F).endVertex();
-        buffer.pos(0, -size, 0).color(color[0], color[1], color[2], 0.9F).endVertex();
-        buffer.pos(size, 0, 0).color(color[0], color[1], color[2], 0.9F).endVertex();
+        buffer.begin(GL11.GL_QUADS, DefaultVertexFormats.POSITION_TEX_COLOR);
+        buffer.pos(-size, size, 0).tex(0, 0).color(color[0], color[1], color[2], 0.95F).endVertex();
+        buffer.pos(-size, -size, 0).tex(0, 1).color(color[0], color[1], color[2], 0.95F).endVertex();
+        buffer.pos(size, -size, 0).tex(1, 1).color(color[0], color[1], color[2], 0.95F).endVertex();
+        buffer.pos(size, size, 0).tex(1, 0).color(color[0], color[1], color[2], 0.95F).endVertex();
         tessellator.draw();
         GlStateManager.popMatrix();
     }

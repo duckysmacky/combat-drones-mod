@@ -3,6 +3,7 @@ package io.github.duckysmacky.combatdrones.client.hud;
 import io.github.duckysmacky.combatdrones.client.ClientIntel;
 import io.github.duckysmacky.combatdrones.entity.EntityRampUnit;
 import io.github.duckysmacky.combatdrones.entity.Raytrace;
+import io.github.duckysmacky.combatdrones.network.IntelPacket;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.client.renderer.BufferBuilder;
@@ -26,6 +27,8 @@ public final class Widgets {
     private static final double ALTIMETER_RANGE = 256;
     /** Weapons that reload faster than this (ticks) get no reload bar: it would only flicker. */
     private static final int MIN_RELOAD_BAR_TICKS = 10;
+    /** Most running lock-ons listed on the recon feed. */
+    private static final int MAX_LISTED_LOCK_ONS = 4;
     public static final double LOW = 0.2;
     /** Speed and altitude ladder scales: pixels per unit, tick spacing. */
     public static final double SPEED_PIXELS = 1.5;
@@ -196,8 +199,11 @@ public final class Widgets {
         return true;
     }
 
-    /** Recon lock-on charges left, with the time to the next one (or HOLD while a lock-on keeps the reload waiting). */
-    public static void lockCharges(EntityRampUnit unit, int right, int y) {
+    /**
+     * Recon lock-on charges left, with the time to the next one (or HOLD while a lock-on keeps the reload waiting) and a
+     * reload bar under it. Returns the y for the next line.
+     */
+    public static int lockCharges(EntityRampUnit unit, int right, int y) {
         int charges = unit.getLockCharges();
         int max = unit.getLockMaxCharges();
         int reload = unit.getLockReloadLeft();
@@ -205,6 +211,31 @@ public final class Widgets {
                 : reload > 0 ? I18n.format("hud.combat_drones.lock_reload", charges, max, (reload + 19) / 20)
                 : I18n.format("hud.combat_drones.lock_charges", charges, max);
         Ui.labelledRight(OsdFont.Icon.LOCK, text, right, y, charges > 0 ? Ui.TEXT : Ui.DANGER);
+        if (charges < max) {
+            int width = Ui.width(text);
+            Ui.bar(right - width, y + 9, width, 1, unit.getLockReloadFraction(), reload < 0 ? Ui.DIM : Ui.WARN);
+            return y + Ui.LINE + 2;
+        }
+        return y + Ui.LINE;
+    }
+
+    /** A thin bar under the reticle while the next lock-on charge reloads, like a weapon's. */
+    public static void lockReload(EntityRampUnit unit, int x, int y, int width) {
+        if (unit.getLockCharges() < unit.getLockMaxCharges()) {
+            Ui.bar(x, y, width, 1, unit.getLockReloadFraction(), unit.getLockReloadLeft() < 0 ? Ui.DIM : Ui.WARN);
+        }
+    }
+
+    /** Running lock-ons (yours and your team's): each target's name and the time it stays boxed, from {@code y} down. */
+    public static void lockOns(int right, int y) {
+        int shown = 0;
+        for (IntelPacket.Entry mark : ClientIntel.getMarks()) {
+            if (mark.locked && shown++ < MAX_LISTED_LOCK_ONS) {
+                String text = I18n.format("hud.combat_drones.lock_on_time", mark.name, clock(ClientIntel.millisLeft(mark)));
+                Ui.textRight(text, right, y, mark.player ? Ui.DANGER : Ui.WARN);
+                y += Ui.LINE;
+            }
+        }
     }
 
     /** Players the team's recon has spotted, as a count ending at {@code right}. */

@@ -205,6 +205,7 @@ hud.combat_drones.locked=LOCKED
 hud.combat_drones.lock_charges=%s/%s
 hud.combat_drones.lock_reload=%s/%s %ss
 hud.combat_drones.lock_hold=%s/%s HOLD
+hud.combat_drones.lock_on_time=%s %s
 hud.combat_drones.ammo.rocket_pod.light=RKT %s/%s
 hud.combat_drones.ammo.rocket_pod.heavy=HVY RKT %s/%s
 hud.combat_drones.ammo.gun_mount=GUN %s/%s
