@@ -5,6 +5,7 @@ import io.github.duckysmacky.combatdrones.ModContent;
 import io.github.duckysmacky.combatdrones.config.ModConfig;
 import io.github.duckysmacky.combatdrones.item.ItemMissileTablet;
 import io.github.duckysmacky.combatdrones.network.LockProgressPacket;
+import io.github.duckysmacky.combatdrones.network.LockWarningPacket;
 import io.github.duckysmacky.combatdrones.network.ModNetwork;
 import io.github.duckysmacky.combatdrones.network.RemoteSessionPacket;
 import io.github.duckysmacky.combatdrones.physics.CameraView;
@@ -79,6 +80,9 @@ public final class RemoteSessions {
         long lookTick;
         /** After an attempt ends (or is refused), LMB has to be let go before the next one. */
         boolean needsRelease;
+        /** The player told that this attempt is after them, or null. */
+        @Nullable
+        EntityPlayerMP warned;
         /** Ticks the HUD keeps showing LOCKED after a lock-on. */
         int lockedShowTicks;
         float sentProgress;
@@ -99,6 +103,8 @@ public final class RemoteSessions {
     /** Ticks a lock-on forgives the target slipping off the crosshair (camera reports arrive over the network). */
     private static final int LOCK_ON_GRACE_TICKS = 4;
     private static final int LOCKED_SHOW_TICKS = 30;
+    /** How often a target being locked on hears about it, in ticks. */
+    private static final int WARNING_INTERVAL_TICKS = 4;
     /** Bounds for the client's reported half field of view, in degrees. */
     private static final float MIN_HALF_VIEW = 1;
     private static final float MAX_HALF_VIEW = 60;
@@ -495,6 +501,7 @@ public final class RemoteSessions {
                 }
             }
         }
+        warnTarget(session, unit);
         float progress;
         if (session.lockedShowTicks > 0) {
             session.lockedShowTicks--;
@@ -516,6 +523,25 @@ public final class RemoteSessions {
             session.lockOn.start(LockOnAttempt.NONE);
             ((EntityRampUnit) session.vehicle).spendLockCharge();
         }
+        if (session.vehicle instanceof EntityRampUnit) {
+            warnTarget(session, (EntityRampUnit) session.vehicle);
+        }
+    }
+
+    /**
+     * Keeps the player a running attempt is after (with lockOnWarning) told how far it is, every few ticks, and tells
+     * them when it stops.
+     */
+    private static void warnTarget(Session session, EntityRampUnit unit) {
+        Entity target = session.lockOn.isRunning() && ModConfig.lockOnWarning ? unit.world.getEntityByID(session.lockOn.getTarget()) : null;
+        EntityPlayerMP warned = target == null ? null : ReconIntel.warneeOf(target);
+        if (session.warned != null && session.warned != warned && !session.warned.hasDisconnected()) {
+            ModNetwork.CHANNEL.sendTo(new LockWarningPacket(false, 0), session.warned);
+        }
+        if (warned != null && (warned != session.warned || unit.ticksExisted % WARNING_INTERVAL_TICKS == 0)) {
+            ModNetwork.CHANNEL.sendTo(new LockWarningPacket(false, Math.max(0.01F, (float) session.lockOn.getProgress())), warned);
+        }
+        session.warned = warned;
     }
 
     /** The enemy closest to the crosshair that a lock-on could start on (not one this owner already has), or null. */

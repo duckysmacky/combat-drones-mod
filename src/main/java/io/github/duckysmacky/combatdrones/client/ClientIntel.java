@@ -29,6 +29,14 @@ public final class ClientIntel {
     /** Lock-on beeps speed up from this many ticks apart to MIN_BEEP_TICKS as the lock builds. */
     private static final int MAX_BEEP_TICKS = 10;
     private static final int MIN_BEEP_TICKS = 2;
+    /** This player is being locked on: progress, and until when the warning stays up without news (ms). */
+    private static float warningProgress;
+    private static long warningUntil;
+    private static int warningBeepDelay;
+    /** How long a "being locked" warning outlives its last update, in case the end never arrives. */
+    private static final long WARNING_TIMEOUT_MILLIS = 600;
+    /** When the lock-on on this player runs out (ms), or 0. */
+    private static long lockedUntil;
 
     private ClientIntel() {
     }
@@ -58,6 +66,30 @@ public final class ClientIntel {
         lockProgress = progress;
     }
 
+    /** From the server: a lock-on on this player is building ({@code locked} false) or holds ({@code locked} true). */
+    static void setWarning(boolean locked, float value) {
+        long now = Minecraft.getSystemTime();
+        if (locked) {
+            if (value > 0 && now >= lockedUntil) {
+                Minecraft.getMinecraft().getSoundHandler().playSound(PositionedSoundRecord.getMasterRecord(ModSounds.DRONE_BEEP, 0.6F));
+            }
+            lockedUntil = value > 0 ? now + (long) (value * 1000) : 0;
+        } else {
+            warningProgress = value;
+            warningUntil = value > 0 ? now + WARNING_TIMEOUT_MILLIS : 0;
+        }
+    }
+
+    /** Progress of a lock-on building on this player, or 0 when none is. */
+    public static float getWarningProgress() {
+        return Minecraft.getSystemTime() < warningUntil ? warningProgress : 0;
+    }
+
+    /** Milliseconds left on the lock-on on this player, or 0. */
+    public static long getLockedMillisLeft() {
+        return Math.max(0, lockedUntil - Minecraft.getSystemTime());
+    }
+
     /** A new camera session: no attempt carried over from the last one. */
     static void resetLock() {
         lockProgress = 0;
@@ -66,16 +98,30 @@ public final class ClientIntel {
     /** While a lock-on builds: ticks that climb in pitch and come faster and faster. */
     @SubscribeEvent
     public static void onClientTick(TickEvent.ClientTickEvent event) {
-        if (event.phase != TickEvent.Phase.END || getLockProgress() <= 0 || lockProgress >= 1 || --beepDelay > 0) {
+        if (event.phase != TickEvent.Phase.END) {
             return;
         }
-        UiSounds.play(UiSounds.LOCK_TICK, 0.8F + lockProgress * 0.6F);
-        beepDelay = Math.round(MAX_BEEP_TICKS - (MAX_BEEP_TICKS - MIN_BEEP_TICKS) * lockProgress);
+        if (getLockProgress() > 0 && lockProgress < 1 && --beepDelay <= 0) {
+            UiSounds.play(UiSounds.LOCK_TICK, 0.8F + lockProgress * 0.6F);
+            beepDelay = beepTicks(lockProgress);
+        }
+        // Being locked on: lower, harsher ticks, the same quickening
+        float warning = getWarningProgress();
+        if (warning > 0 && --warningBeepDelay <= 0) {
+            UiSounds.play(UiSounds.DENY, 0.7F + warning * 0.4F);
+            warningBeepDelay = beepTicks(warning);
+        }
+    }
+
+    private static int beepTicks(float progress) {
+        return Math.round(MAX_BEEP_TICKS - (MAX_BEEP_TICKS - MIN_BEEP_TICKS) * progress);
     }
 
     @SubscribeEvent
     public static void onDisconnect(FMLNetworkEvent.ClientDisconnectionFromServerEvent event) {
         marks = Collections.emptyList();
         lockProgress = 0;
+        warningUntil = 0;
+        lockedUntil = 0;
     }
 }

@@ -101,8 +101,36 @@ public final class HudOverlay {
             Widgets.hitFlash(resolution, drone.hitFlashTicks);
             FpvFeed.draw(resolution, drone, drone.getDroneType(), feed, flown, event.getPartialTicks());
         }
+        int top = 4;
         if (Minecraft.getSystemTime() < strikeAlertUntil) {
             drawStrikeAlert(resolution);
+            top += 38;
+        }
+        drawLockAlert(resolution, top);
+    }
+
+    /**
+     * A recon UAV is after this player: a blinking LOCK-ON WARNING with a filling bar while a lock-on builds, then a
+     * steady TRACKED banner with the time left while it holds.
+     */
+    private static void drawLockAlert(ScaledResolution resolution, int top) {
+        float building = ClientIntel.getWarningProgress();
+        long lockedMillis = ClientIntel.getLockedMillisLeft();
+        if (building <= 0 && lockedMillis <= 0) {
+            return;
+        }
+        int centerX = resolution.getScaledWidth() / 2;
+        boolean bright = Ui.blink(building > 0 ? 4 : 1);
+        String title = I18n.format(building > 0 ? "hud.combat_drones.lock_warning" : "hud.combat_drones.lock_tracked");
+        String sub = building > 0 ? I18n.format("hud.combat_drones.lock_warning.sub")
+                : I18n.format("hud.combat_drones.lock_tracked.sub", Widgets.clock(lockedMillis));
+        int halfWidth = Math.max(Ui.width(title), Ui.width(sub) / 2) + 14;
+        Ui.rect(centerX - halfWidth, top, centerX + halfWidth, top + 34, bright ? 0xF08A1F20 : 0xF05E1418);
+        Ui.frame(centerX - halfWidth, top, halfWidth * 2, 34);
+        Ui.textScaled(title, centerX, top + 5, 2, bright ? Ui.TEXT : 0xFFEE7A5E);
+        Ui.textCentered(sub, centerX, top + 23, Ui.TEXT);
+        if (building > 0) {
+            Ui.bar(centerX - halfWidth + 3, top + 31, halfWidth * 2 - 6, 2, building, Ui.WARN);
         }
     }
 

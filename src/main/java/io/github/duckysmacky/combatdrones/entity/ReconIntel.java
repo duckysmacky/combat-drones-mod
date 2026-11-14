@@ -4,6 +4,7 @@ import com.mojang.authlib.GameProfile;
 import io.github.duckysmacky.combatdrones.CombatDrones;
 import io.github.duckysmacky.combatdrones.config.ModConfig;
 import io.github.duckysmacky.combatdrones.network.IntelPacket;
+import io.github.duckysmacky.combatdrones.network.LockWarningPacket;
 import io.github.duckysmacky.combatdrones.network.ModNetwork;
 import io.github.duckysmacky.combatdrones.type.DroneType;
 import net.minecraft.entity.Entity;
@@ -54,16 +55,20 @@ public final class ReconIntel {
         final int entityId;
         final String name;
         final boolean player;
+        /** The player told about a lock-on on this target (the target, or a stand-in body's pilot), or null. */
+        @Nullable
+        final UUID warnee;
         int dimension;
         double x;
         double y;
         double z;
 
-        Mark(UUID targetId, int entityId, String name, boolean player, int dimension, double x, double y, double z) {
+        Mark(UUID targetId, int entityId, String name, boolean player, @Nullable UUID warnee, int dimension, double x, double y, double z) {
             this.targetId = targetId;
             this.entityId = entityId;
             this.name = name;
             this.player = player;
+            this.warnee = warnee;
             this.dimension = dimension;
             this.x = x;
             this.y = y;
@@ -71,8 +76,9 @@ public final class ReconIntel {
         }
 
         static Mark of(Entity target) {
-            return new Mark(target.getUniqueID(), target.getEntityId(), target.getName(), target instanceof EntityPlayer || target instanceof EntityPilotBody,
-                    target.dimension, target.posX, target.posY, target.posZ);
+            UUID warnee = target instanceof EntityPlayer ? target.getUniqueID() : target instanceof EntityPilotBody ? ((EntityPilotBody) target).getOwner() : null;
+            return new Mark(target.getUniqueID(), target.getEntityId(), target.getName(), warnee != null, warnee, target.dimension,
+                    target.posX, target.posY, target.posZ);
         }
     }
 
@@ -109,6 +115,8 @@ public final class ReconIntel {
     private static final Map<UUID, Dots> DOTS = new HashMap<>();
     /** By owner, then target. */
     private static final Map<UUID, Map<UUID, LockOn>> LOCK_ONS = new HashMap<>();
+    /** Locked-on players and the server tick their banner was last told to run until. */
+    private static final Map<UUID, Long> WARNED_UNTIL = new HashMap<>();
     /** Players whose client currently shows marks, so they get one last (empty) update when the marks run out. */
     private static final Set<UUID> SHOWING = new HashSet<>();
 
@@ -261,16 +269,42 @@ public final class ReconIntel {
         return count;
     }
 
-    /** Ticks left on the longest lock-on anyone has on {@code target}, or 0. */
-    static long lockedTicksLeft(UUID target, long now) {
+    /** Ticks left on the longest lock-on anyone has on {@code player} (or their stand-in body), or 0. */
+    private static long lockedTicksLeft(UUID player, long now) {
         long left = 0;
         for (Map<UUID, LockOn> owned : LOCK_ONS.values()) {
-            LockOn lockOn = owned.get(target);
-            if (lockOn != null) {
-                left = Math.max(left, lockOn.until - now);
+            for (LockOn lockOn : owned.values()) {
+                if (player.equals(lockOn.mark.warnee)) {
+                    left = Math.max(left, lockOn.until - now);
+                }
             }
         }
         return left;
+    }
+
+    /** The player to warn about a lock-on building on {@code target}: the target itself, or a stand-in body's pilot. */
+    @Nullable
+    static EntityPlayerMP warneeOf(Entity target) {
+        if (target instanceof EntityPlayerMP) {
+            return (EntityPlayerMP) target;
+        }
+        MinecraftServer server = FMLCommonHandler.instance().getMinecraftServerInstance();
+        UUID pilot = target instanceof EntityPilotBody ? ((EntityPilotBody) target).getOwner() : null;
+        return server == null || pilot == null ? null : server.getPlayerList().getPlayerByUUID(pilot);
+    }
+
+    /** Tells each locked-on player how long it has left, when that changes (a new lock-on, or the last one ending). */
+    private static void warnLocked(EntityPlayerMP player, long now) {
+        long until = ModConfig.lockedWarning ? now + lockedTicksLeft(player.getUniqueID(), now) : now;
+        Long told = WARNED_UNTIL.get(player.getUniqueID());
+        if (until > now ? told == null || told != until : told != null) {
+            if (until > now) {
+                WARNED_UNTIL.put(player.getUniqueID(), until);
+            } else {
+                WARNED_UNTIL.remove(player.getUniqueID());
+            }
+            ModNetwork.CHANNEL.sendTo(new LockWarningPacket(true, (until - now) / 20.0F), player);
+        }
     }
 
     private static long clock() {
@@ -297,8 +331,10 @@ public final class ReconIntel {
             }
         }
         boolean live = ModConfig.trackingIntervalSeconds <= 0;
+        WARNED_UNTIL.keySet().removeIf(id -> server.getPlayerList().getPlayerByUUID(id) == null);
         for (EntityPlayerMP player : server.getPlayerList().getPlayers()) {
             sync(player, now, live);
+            warnLocked(player, now);
         }
     }
 

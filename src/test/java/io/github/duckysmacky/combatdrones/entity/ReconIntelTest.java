@@ -14,7 +14,7 @@ class ReconIntelTest {
 
     private static ReconIntel.LockOn lockOn(long until, UUID source) {
         UUID target = UUID.randomUUID();
-        return new ReconIntel.LockOn(new ReconIntel.Mark(target, 1, "Enemy", true, 0, 0, 64, 0), until, source);
+        return new ReconIntel.LockOn(new ReconIntel.Mark(target, 1, "Enemy", true, target, 0, 0, 64, 0), until, source);
     }
 
     private static Map<UUID, ReconIntel.LockOn> owned(ReconIntel.LockOn... lockOns) {
