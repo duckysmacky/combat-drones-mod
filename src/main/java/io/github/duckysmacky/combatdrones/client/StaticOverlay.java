@@ -3,6 +3,8 @@ package io.github.duckysmacky.combatdrones.client;
 import io.github.duckysmacky.combatdrones.CombatDrones;
 import io.github.duckysmacky.combatdrones.client.hud.FeedShader;
 import io.github.duckysmacky.combatdrones.config.ModConfig;
+import io.github.duckysmacky.combatdrones.entity.EntityCruiseMissile;
+import io.github.duckysmacky.combatdrones.entity.EntityRampUnit;
 import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.client.renderer.BufferBuilder;
 import net.minecraft.client.renderer.GlStateManager;
@@ -39,6 +41,9 @@ public final class StaticOverlay {
     /** Link-up: how strong the burst of snow is when a feed comes up, and how long it takes to clear. */
     private static final double LINK_UP_ALPHA = 0.85;
     private static final long LINK_UP_MILLIS = 450;
+    /** Cruise missile holding over its target: how heavy the snow is, and over how many last ticks it clears. */
+    private static final double SEEKER_SNOW = 0.8;
+    private static final double SEEKER_CLEAR_TICKS = 12;
 
     private static final Random RANDOM = new Random();
     private static DynamicTexture noise;
@@ -62,6 +67,12 @@ public final class StaticOverlay {
             drawGunnerCrt(event.getResolution());
         }
         double alpha = linkUp;
+        EntityRampUnit unit = RemoteController.getUnit();
+        if (unit instanceof EntityCruiseMissile && !((EntityCruiseMissile) unit).isDiving()) {
+            // The seeker is still finding the ground: snow over the picture until just before the dive, so the
+            // pilot doesn't sit watching a missile hang in the air
+            alpha = Math.max(alpha, SEEKER_SNOW * Math.min(1, ((EntityCruiseMissile) unit).getHoldTicksLeft() / SEEKER_CLEAR_TICKS));
+        }
         if (PilotController.getPilotedDrone() != null) {
             // Quadratic: faint on a decent link, clearly building from mid-signal (70% -> 8%, 50% -> 22%, 30% -> 44%)
             alpha = Math.max(alpha, (BASE_ALPHA + Math.pow(1 - PilotController.getSignalQuality(), 2) * MAX_EXTRA_ALPHA) * ModConfig.staticIntensity);

@@ -68,6 +68,9 @@ final class Exhaust {
         Vec3d tail = new Vec3d(missile.posX, missile.posY + tailHeight, missile.posZ);
         Vec3d previous = new Vec3d(missile.prevPosX, missile.prevPosY + tailHeight, missile.prevPosZ);
         Vec3d back = new Vec3d(0, diving ? 1 : -1, 0);
+        if (stage == CruiseMissileFlight.Stage.HOLD) {
+            return; // engine out at the top of the climb: nothing to give the hover away while the warhead arms
+        }
         if (stage == CruiseMissileFlight.Stage.IGNITION) {
             for (int index = 0; index < 3; index++) {
                 double angle = random.nextDouble() * Math.PI * 2;
