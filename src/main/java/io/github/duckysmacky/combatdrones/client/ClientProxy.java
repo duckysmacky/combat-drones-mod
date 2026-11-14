@@ -1,5 +1,8 @@
 package io.github.duckysmacky.combatdrones.client;
 
+import io.github.duckysmacky.combatdrones.Fx;
+import io.github.duckysmacky.combatdrones.client.fx.FxParticle;
+import net.minecraft.world.World;
 import io.github.duckysmacky.combatdrones.CombatDrones;
 import io.github.duckysmacky.combatdrones.CommonProxy;
 import io.github.duckysmacky.combatdrones.entity.EntityBomb;
@@ -32,6 +35,13 @@ public class ClientProxy extends CommonProxy {
         RenderingRegistry.registerEntityRenderingHandler(EntityPilotBody.class, RenderPilotBody::new);
         RenderingRegistry.registerEntityRenderingHandler(EntityRocket.class, RenderProjectile::rocket);
         GeoModels.init();
+    }
+
+    @Override
+    public void fx(World world, Fx kind, double x, double y, double z, double velocityX, double velocityY, double velocityZ, float size) {
+        if (world.isRemote) {
+            FxParticle.spawn(world, kind, x, y, z, velocityX, velocityY, velocityZ, size);
+        }
     }
 
     @Override

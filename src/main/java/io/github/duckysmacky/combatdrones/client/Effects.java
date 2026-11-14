@@ -1,6 +1,9 @@
 package io.github.duckysmacky.combatdrones.client;
 
 import io.github.duckysmacky.combatdrones.CombatDrones;
+import io.github.duckysmacky.combatdrones.Fx;
+import io.github.duckysmacky.combatdrones.client.fx.FxParticle;
+import io.github.duckysmacky.combatdrones.client.fx.Impact;
 import io.github.duckysmacky.combatdrones.ModSounds;
 import io.github.duckysmacky.combatdrones.entity.EntityRampUnit;
 import io.github.duckysmacky.combatdrones.network.EffectPacket;
@@ -60,6 +63,7 @@ public final class Effects {
             case HOWITZER_SHOT:
                 gunShot(player.getPositionEyes(1), packet.getPosition(), packet.getKind() == EffectPacket.Kind.HOWITZER_SHOT, world.rand);
                 recoil(world, packet.getPosition(), packet.getKind() == EffectPacket.Kind.HOWITZER_SHOT ? "recoil_howitzer" : "recoil_cannon");
+                muzzleBlast(world, player, packet.getPosition(), packet.getKind() == EffectPacket.Kind.HOWITZER_SHOT);
                 break;
             case EXPLOSION:
             case AIR_EXPLOSION:
@@ -84,23 +88,35 @@ public final class Effects {
     private static void explosion(World world, EntityPlayer player, Vec3d at, float power, boolean airBurst) {
         double distance = player.getPositionEyes(1).distanceTo(at);
         blastSound(player.getPositionEyes(1), at, power, airBurst, 0.9F + world.rand.nextFloat() * 0.2F - Math.min(0.25F, power / 40));
+        Impact.blast(power, distance);
         if (distance > PARTICLE_DISTANCE) {
             return;
         }
         Random random = world.rand;
-        world.spawnParticle(power >= 5 ? EnumParticleTypes.EXPLOSION_HUGE : EnumParticleTypes.EXPLOSION_LARGE, true, at.x, at.y, at.z, 0, 0, 0);
         double radius = 0.4 + power * 0.25;
-        for (int index = 0; index < power * 10; index++) {
+        float size = 0.6F + power * 0.12F;
+        // A flash and a shockwave ring, a fireball, sparks thrown wide, then smoke: grey rolling out, soot climbing
+        fx(world, Fx.FLASH, at, Vec3d.ZERO, size * 1.6F);
+        fx(world, Fx.RING, at, Vec3d.ZERO, size);
+        for (int index = 0; index < power * 6; index++) {
             Vec3d out = randomDirection(random);
-            double speed = (0.1 + random.nextDouble() * 0.2) * Math.sqrt(power);
-            world.spawnParticle(EnumParticleTypes.FLAME, true, at.x + out.x * radius * 0.3, at.y + out.y * radius * 0.3, at.z + out.z * radius * 0.3,
-                    out.x * speed * 0.5, out.y * speed * 0.5, out.z * speed * 0.5);
+            double speed = (0.08 + random.nextDouble() * 0.16) * Math.sqrt(power);
+            fx(world, Fx.FIRE, at.add(out.scale(radius * 0.3)), out.scale(speed * 0.5), size);
         }
-        for (int index = 0; index < power * 8; index++) {
+        for (int index = 0; index < power * 5; index++) {
             Vec3d out = randomDirection(random);
-            world.spawnParticle(index % 3 == 0 ? EnumParticleTypes.CLOUD : EnumParticleTypes.SMOKE_LARGE, true,
-                    at.x + out.x * radius, at.y + Math.abs(out.y) * radius, at.z + out.z * radius,
-                    out.x * 0.05, 0.05 + random.nextDouble() * 0.12, out.z * 0.05);
+            double speed = (0.25 + random.nextDouble() * 0.45) * Math.sqrt(power);
+            fx(world, Fx.SPARK, at, new Vec3d(out.x * speed, Math.abs(out.y) * speed + 0.1, out.z * speed), 0.8F);
+        }
+        for (int index = 0; index < power * 6; index++) {
+            Vec3d out = randomDirection(random);
+            fx(world, Fx.SMOKE, new Vec3d(at.x + out.x * radius, at.y + Math.abs(out.y) * radius, at.z + out.z * radius),
+                    new Vec3d(out.x * 0.12, 0.03 + random.nextDouble() * 0.08, out.z * 0.12), size);
+        }
+        for (int index = 0; index < power * 3; index++) {
+            Vec3d out = randomDirection(random);
+            fx(world, Fx.DARK_SMOKE, new Vec3d(at.x + out.x * radius * 0.6, at.y + Math.abs(out.y) * radius, at.z + out.z * radius * 0.6),
+                    new Vec3d(out.x * 0.03, 0.06 + random.nextDouble() * 0.1, out.z * 0.03), size);
         }
         IBlockState ground = world.getBlockState(new BlockPos(at).down());
         if (ground.getMaterial().isSolid()) {
@@ -110,9 +126,12 @@ public final class Effects {
                 world.spawnParticle(EnumParticleTypes.BLOCK_DUST, true, at.x, at.y + 0.2, at.z,
                         out.x * 0.4, 0.3 + random.nextDouble() * 0.5, out.z * 0.4, state);
             }
-        }
-        for (int index = 0; index < 3 + power; index++) {
-            world.spawnParticle(EnumParticleTypes.LAVA, true, at.x, at.y, at.z, 0, 0, 0);
+            // Chunks thrown up and a skirt of dust along the ground
+            for (int index = 0; index < power * 3; index++) {
+                Vec3d out = randomDirection(random);
+                fx(world, Fx.DEBRIS, at.add(0, 0.2, 0), new Vec3d(out.x * 0.35, 0.35 + random.nextDouble() * 0.5, out.z * 0.35), 1.0F);
+                fx(world, Fx.DUST, at.add(out.x * radius, 0.15, out.z * radius), new Vec3d(out.x * 0.2, 0.02, out.z * 0.2), size);
+            }
         }
     }
 
@@ -133,16 +152,35 @@ public final class Effects {
         if (distance > PARTICLE_DISTANCE) {
             return;
         }
+        Impact.blast(4, distance);
         Random random = world.rand;
-        for (int index = 0; index < 80; index++) {
+        fx(world, Fx.FLASH, pad.add(0, 0.5, 0), Vec3d.ZERO, 2.0F);
+        for (int index = 0; index < 70; index++) {
             double angle = random.nextDouble() * Math.PI * 2;
             double speed = 0.25 + random.nextDouble() * 0.35;
-            world.spawnParticle(index % 4 == 0 ? EnumParticleTypes.EXPLOSION_LARGE : EnumParticleTypes.CLOUD, true,
-                    pad.x, pad.y + 0.3, pad.z, Math.cos(angle) * speed, 0.02 + random.nextDouble() * 0.05, Math.sin(angle) * speed);
+            fx(world, index % 3 == 0 ? Fx.DARK_SMOKE : Fx.SMOKE, pad.add(0, 0.3, 0),
+                    new Vec3d(Math.cos(angle) * speed, 0.02 + random.nextDouble() * 0.05, Math.sin(angle) * speed), 1.6F);
         }
-        for (int index = 0; index < 20; index++) {
-            world.spawnParticle(EnumParticleTypes.FLAME, true, pad.x + (random.nextDouble() - 0.5), pad.y + 0.2, pad.z + (random.nextDouble() - 0.5),
-                    (random.nextDouble() - 0.5) * 0.3, 0.02, (random.nextDouble() - 0.5) * 0.3);
+        for (int index = 0; index < 24; index++) {
+            fx(world, Fx.FIRE, pad.add(random.nextDouble() - 0.5, 0.2, random.nextDouble() - 0.5),
+                    new Vec3d((random.nextDouble() - 0.5) * 0.3, 0.02, (random.nextDouble() - 0.5) * 0.3), 1.2F);
+        }
+    }
+
+    private static void fx(World world, Fx kind, Vec3d at, Vec3d velocity, float size) {
+        FxParticle.spawn(world, kind, at.x, at.y, at.z, velocity.x, velocity.y, velocity.z, size);
+    }
+
+    /** A cannon or howitzer firing: a flash and smoke at the gun, and a jolt for the crew. */
+    private static void muzzleBlast(World world, EntityPlayer player, Vec3d at, boolean howitzer) {
+        float size = howitzer ? 1.5F : 0.9F;
+        fx(world, Fx.FLASH, at, Vec3d.ZERO, size);
+        for (int index = 0; index < (howitzer ? 8 : 4); index++) {
+            Vec3d out = randomDirection(world.rand);
+            fx(world, index % 2 == 0 ? Fx.FIRE : Fx.SMOKE, at, out.scale(0.08), size * 0.7F);
+        }
+        if (player.getPositionEyes(1).distanceTo(at) < 12) {
+            Impact.shake(howitzer ? 0.4F : 0.2F);
         }
     }
 
@@ -165,8 +203,8 @@ public final class Effects {
         for (int index = 0; index < 16; index++) {
             double along = -1.8 + random.nextDouble() * 3.6;
             Vec3d at = ramp.add(heading.scale(along)).add(0, 0.4 + (along + 1.8) * 0.27, 0);
-            world.spawnParticle(index < 6 ? EnumParticleTypes.EXPLOSION_NORMAL : EnumParticleTypes.CLOUD, at.x, at.y, at.z,
-                    -heading.x * 0.1 + (random.nextDouble() - 0.5) * 0.1, 0.03, -heading.z * 0.1 + (random.nextDouble() - 0.5) * 0.1);
+            fx(world, index < 6 ? Fx.SMOKE : Fx.DUST, at,
+                    new Vec3d(-heading.x * 0.1 + (random.nextDouble() - 0.5) * 0.1, 0.03, -heading.z * 0.1 + (random.nextDouble() - 0.5) * 0.1), 0.9F);
         }
     }
 
@@ -181,13 +219,10 @@ public final class Effects {
         Vec3d from = packet.getFrom();
         Vec3d to = packet.getTo();
         Vec3d direction = to.subtract(from).normalize();
-        world.spawnParticle(EnumParticleTypes.FLAME, from.x, from.y, from.z, direction.x * 0.1, direction.y * 0.1, direction.z * 0.1);
-        world.spawnParticle(EnumParticleTypes.SMOKE_NORMAL, from.x, from.y, from.z, direction.x * 0.05, 0.02, direction.z * 0.05);
+        fx(world, Fx.FLASH, from, Vec3d.ZERO, 0.5F);
+        fx(world, Fx.SMOKE, from, new Vec3d(direction.x * 0.05, 0.02, direction.z * 0.05), 0.4F);
         double length = from.distanceTo(to);
-        for (double along = 2; along < length; along += 2) {
-            world.spawnParticle(EnumParticleTypes.FIREWORKS_SPARK, from.x + direction.x * along, from.y + direction.y * along,
-                    from.z + direction.z * along, 0, 0, 0);
-        }
+        Impact.tracer(from, to);
         if (packet.isImpact()) {
             IBlockState state = world.getBlockState(new BlockPos(to.add(direction.scale(0.1))));
             for (int index = 0; index < 6; index++) {
@@ -195,16 +230,20 @@ public final class Effects {
                     world.spawnParticle(EnumParticleTypes.BLOCK_DUST, to.x, to.y, to.z, (random.nextDouble() - 0.5) * 0.2,
                             0.1 + random.nextDouble() * 0.2, (random.nextDouble() - 0.5) * 0.2, Block.getStateId(state));
                 }
-                world.spawnParticle(EnumParticleTypes.CRIT, to.x, to.y, to.z, (random.nextDouble() - 0.5) * 0.4,
-                        random.nextDouble() * 0.3, (random.nextDouble() - 0.5) * 0.4);
+                if (index < 3) {
+                    fx(world, Fx.SPARK, to, new Vec3d((random.nextDouble() - 0.5) * 0.4, random.nextDouble() * 0.3, (random.nextDouble() - 0.5) * 0.4), 0.5F);
+                }
             }
-            world.spawnParticle(EnumParticleTypes.SMOKE_NORMAL, to.x, to.y, to.z, 0, 0.05, 0);
+            fx(world, Fx.DUST, to, new Vec3d(0, 0.04, 0), 0.5F);
             play(new PositionedSoundRecord(ModSounds.BULLET_IMPACT, SoundCategory.NEUTRAL, 1.5F, 0.85F + random.nextFloat() * 0.3F,
                     (float) to.x, (float) to.y, (float) to.z), 0);
         }
         Entity shooter = world.getEntityByID(packet.getShooter());
         if (shooter != null) {
             RenderRampUnit.kick(shooter, "recoil_gun");
+            if (player.getRidingEntity() == shooter) {
+                Impact.shake(0.12F);
+            }
         }
         if (shooter == null || player.getRidingEntity() != shooter) {
             Vec3d ear = player.getPositionEyes(1);

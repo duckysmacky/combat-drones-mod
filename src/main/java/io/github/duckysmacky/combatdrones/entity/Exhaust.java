@@ -1,5 +1,7 @@
 package io.github.duckysmacky.combatdrones.entity;
 
+import io.github.duckysmacky.combatdrones.Fx;
+import io.github.duckysmacky.combatdrones.CombatDrones;
 import io.github.duckysmacky.combatdrones.ModSounds;
 import io.github.duckysmacky.combatdrones.physics.CruiseMissileFlight;
 import io.github.duckysmacky.combatdrones.type.DroneType;
@@ -12,8 +14,8 @@ import net.minecraft.world.World;
 import java.util.Random;
 
 /**
- * Client-side trails, called from entity ticks on the client only. Uses the common {@code World} particle and sound
- * calls (no-ops on a server world), so nothing here touches client-only classes.
+ * Client-side trails, called from entity ticks on the client only. Particles go through the proxy and sounds through
+ * the common {@code World} call (both no-ops on a server), so nothing here touches client-only classes.
  */
 final class Exhaust {
     private Exhaust() {
@@ -80,7 +82,9 @@ final class Exhaust {
         for (int index = 0; index < puffs; index++) {
             Vec3d at = interpolate(previous, tail, index / (double) puffs);
             spawn(world, EnumParticleTypes.CLOUD, at, back.scale(0.02), random, 0.5);
-            spawn(world, EnumParticleTypes.SMOKE_LARGE, at, back.scale(0.04), random, 0.4);
+            // The column: soot that hangs long enough to mark where it went up
+            CombatDrones.proxy.fx(world, Fx.DARK_SMOKE, at.x + (random.nextDouble() - 0.5) * 0.4, at.y, at.z + (random.nextDouble() - 0.5) * 0.4,
+                    back.x * 0.04, back.y * 0.04, back.z * 0.04, 1.3F);
         }
         spawn(world, EnumParticleTypes.FLAME, tail, back.scale(0.2), random, 0.2);
         spawn(world, EnumParticleTypes.FLAME, interpolate(previous, tail, 0.5), back.scale(0.15), random, 0.2);
@@ -131,8 +135,36 @@ final class Exhaust {
         return from.add(to.subtract(from).scale(fraction));
     }
 
+    /**
+     * Callers still say which vanilla particle they mean; each maps to one of the mod's own, drawn in its style:
+     * smoke by weight, flame, and sparks for tracers.
+     */
     private static void spawn(World world, EnumParticleTypes type, Vec3d at, Vec3d velocity, Random random, double jitter) {
-        world.spawnParticle(type, true, at.x + (random.nextDouble() - 0.5) * jitter, at.y + (random.nextDouble() - 0.5) * jitter,
-                at.z + (random.nextDouble() - 0.5) * jitter, velocity.x, velocity.y, velocity.z);
+        Fx kind;
+        float size;
+        switch (type) {
+            case FLAME:
+                kind = Fx.FIRE;
+                size = 0.6F;
+                break;
+            case FIREWORKS_SPARK:
+                kind = Fx.SPARK;
+                size = 0.7F;
+                break;
+            case SMOKE_LARGE:
+                kind = Fx.SMOKE;
+                size = 0.9F;
+                break;
+            case SMOKE_NORMAL:
+                kind = Fx.SMOKE;
+                size = 0.45F;
+                break;
+            default:
+                kind = Fx.SMOKE;
+                size = 1.0F;
+                break;
+        }
+        CombatDrones.proxy.fx(world, kind, at.x + (random.nextDouble() - 0.5) * jitter, at.y + (random.nextDouble() - 0.5) * jitter,
+                at.z + (random.nextDouble() - 0.5) * jitter, velocity.x, velocity.y, velocity.z, size);
     }
 }

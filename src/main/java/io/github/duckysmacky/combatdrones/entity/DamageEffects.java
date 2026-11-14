@@ -1,5 +1,7 @@
 package io.github.duckysmacky.combatdrones.entity;
 
+import io.github.duckysmacky.combatdrones.Fx;
+import io.github.duckysmacky.combatdrones.CombatDrones;
 import io.github.duckysmacky.combatdrones.ModSounds;
 import net.minecraft.entity.Entity;
 import net.minecraft.util.EnumParticleTypes;
@@ -36,12 +38,12 @@ final class DamageEffects {
         if (healthFraction >= 0.5F || drone.world.rand.nextFloat() > (healthFraction < 0.25F ? 0.8F : 0.35F)) {
             return;
         }
-        EnumParticleTypes smoke = healthFraction < 0.25F ? EnumParticleTypes.SMOKE_LARGE : EnumParticleTypes.SMOKE_NORMAL;
         double x = drone.posX + (drone.world.rand.nextDouble() - 0.5) * drone.width;
         double z = drone.posZ + (drone.world.rand.nextDouble() - 0.5) * drone.width;
-        drone.world.spawnParticle(smoke, x, drone.posY + drone.height / 2, z, 0, 0.02, 0);
-        if (healthFraction < 0.25F) {
-            drone.world.spawnParticle(EnumParticleTypes.FLAME, x, drone.posY + drone.height / 2, z, 0, 0.01, 0); // on fire
+        boolean burning = healthFraction < 0.25F;
+        CombatDrones.proxy.fx(drone.world, burning ? Fx.DARK_SMOKE : Fx.SMOKE, x, drone.posY + drone.height / 2, z, 0, 0.02, 0, burning ? 0.6F : 0.45F);
+        if (burning) {
+            CombatDrones.proxy.fx(drone.world, Fx.FIRE, x, drone.posY + drone.height / 2, z, 0, 0.01, 0, 0.4F); // on fire
         }
     }
 }
