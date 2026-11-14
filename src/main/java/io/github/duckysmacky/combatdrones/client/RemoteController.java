@@ -425,13 +425,17 @@ public final class RemoteController {
     }
 
     /**
-     * Picks what's under the crosshair to hold on to: an entity, else the block it hits, else (aiming below the horizon
-     * at terrain this client hasn't loaded) the point where the line meets the ground level under the unit, else
-     * nothing (the sky).
+     * Picks what's under the crosshair to hold on to: an entity (not for a recon camera), else the block it hits, else
+     * (aiming below the horizon at terrain this client hasn't loaded) the point where the line meets the ground level
+     * under the unit, else nothing (the sky).
      */
     private static void reanchor(Vec3d eye) {
         Vec3d direction = Vec3d.fromPitchYaw(cameraPitch, cameraYaw);
-        RayTraceResult hit = Raytrace.firstResult(unit.world, eye, eye.add(direction.scale(ANCHOR_RANGE)), unit);
+        Vec3d end = eye.add(direction.scale(ANCHOR_RANGE));
+        // A recon camera holds the ground, never a person: keeping a target in view is the pilot's job
+        DroneType type = unit.getDroneType();
+        RayTraceResult hit = type != null && type.isSensor()
+                ? Raytrace.blocks(unit.world, eye, end) : Raytrace.firstResult(unit.world, eye, end, unit);
         anchorEntity = hit != null ? hit.entityHit : null;
         anchorPoint = hit != null ? (hit.entityHit == null ? hit.hitVec : null) : groundPoint(eye, direction);
     }
