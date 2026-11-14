@@ -38,7 +38,7 @@ public final class MarkerRenderer {
         // Through a camera every mark shows; on foot only locks flagged for the world
         boolean inCamera = unit != null || PilotController.getPilotedDrone() != null;
         List<IntelPacket.Entry> marks = new ArrayList<>();
-        for (IntelPacket.Entry mark : marks) {
+        for (IntelPacket.Entry mark : ClientIntel.getMarks()) {
             if (inCamera || mark.inWorld) {
                 marks.add(mark);
             }

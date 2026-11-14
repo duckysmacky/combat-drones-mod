@@ -315,7 +315,7 @@ public final class HudOverlay {
         double cone = Math.max(1, ModConfig.steerConeDegrees); // synced from the server
         int dotX = gaugeX + (int) Math.round(missile.getTiltRight() / cone * radius);
         int dotY = gaugeY - (int) Math.round(missile.getTiltForward() / cone * radius);
-        Gui.drawRect(dotX - 1, dotY - 1, dotX + 2, dotY + 2, WARNING);
+        Gui.drawRect(dotX - 1, dotY - 1, dotX + 2, dotY + 2, 0xFF000000 | WARNING);
         drawCrosshair(centerX, centerY);
     }
 
