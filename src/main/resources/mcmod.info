@@ -6,6 +6,7 @@
   "version": "${version}",
   "mcversion": "${mcversion}",
   "authorList": ["DuckySmacky"],
+  "logoFile": "logo.png",
   "dependencies": []
 }
 ]

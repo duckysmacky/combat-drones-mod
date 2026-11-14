@@ -1,6 +1,8 @@
 {
-  "parent": "block/cube_all",
+  "parent": "block/cube_bottom_top",
   "textures": {
-    "all": "combat_drones:blocks/rearm_station"
+    "top": "combat_drones:blocks/rearm_station_top",
+    "bottom": "combat_drones:blocks/rearm_station_bottom",
+    "side": "combat_drones:blocks/rearm_station"
   }
 }
