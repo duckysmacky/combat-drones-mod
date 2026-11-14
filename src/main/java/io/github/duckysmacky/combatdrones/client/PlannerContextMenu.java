@@ -1,5 +1,6 @@
 package io.github.duckysmacky.combatdrones.client;
 
+import io.github.duckysmacky.combatdrones.client.hud.Ui;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.Gui;
 
@@ -88,8 +89,7 @@ final class PlannerContextMenu {
     void draw(FontRenderer font, int screenWidth, int screenHeight, int mouseX, int mouseY) {
         int left = left(font, screenWidth);
         int top = top(screenHeight);
-        Gui.drawRect(left, top, left + width(font), top + rows.size() * ROW + PADDING * 2, 0xE0101010);
-        Gui.drawRect(left, top, left + width(font), top + 1, 0xFF888888);
+        Ui.panel(left, top, width(font), rows.size() * ROW + PADDING * 2);
         for (int index = 0; index < rows.size(); index++) {
             int segmentX = left + PADDING;
             int rowY = top + PADDING + index * ROW;
@@ -98,7 +98,10 @@ final class PlannerContextMenu {
                 int textWidth = font.getStringWidth(text);
                 boolean hovered = segment.action != null && mouseX >= segmentX && mouseX < segmentX + textWidth
                         && mouseY >= rowY - 1 && mouseY < rowY + ROW - 1;
-                int color = segment.action == null ? 0xAAAAAA : hovered ? 0xFFFF55 : segment.highlighted.getAsBoolean() ? 0x55FF55 : 0xFFFFFF;
+                int color = segment.action == null ? Ui.DIM : hovered ? Ui.SELECT : segment.highlighted.getAsBoolean() ? Ui.OK : Ui.TEXT;
+                if (hovered) {
+                    Ui.rect(segmentX - 2, rowY - 1, segmentX + textWidth + 2, rowY + ROW - 1, 0x50FBE678);
+                }
                 font.drawStringWithShadow(text, segmentX, rowY + 1, color);
                 segmentX += textWidth + GAP;
             }

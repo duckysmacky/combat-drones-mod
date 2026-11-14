@@ -1,5 +1,7 @@
 package io.github.duckysmacky.combatdrones.client;
 
+import io.github.duckysmacky.combatdrones.client.hud.Ui;
+import io.github.duckysmacky.combatdrones.client.hud.UiButton;
 import io.github.duckysmacky.combatdrones.item.ItemDrone;
 import io.github.duckysmacky.combatdrones.type.Loadout;
 import io.github.duckysmacky.combatdrones.entity.EntityRampUnit;
@@ -48,11 +50,15 @@ public class GuiMissionPlanner extends GuiScreen {
     private static final int MARGIN = 8;
     private static final int ROW = 11;
     private static final int GRID_COLOR = 0x30FFFFFF;
-    private static final int ROUTE_COLOR = 0xFFFFCC33;
-    private static final int UNIT_COLOR = 0xFF55FF55;
+    private static final int ROUTE_COLOR = Ui.WARN;
+    private static final int ROUTE_FAINT = 0x80F2CC3C;
+    private static final int UNIT_COLOR = Ui.OK;
+    /** Scale bar: the round number of blocks whose bar comes closest to this many pixels. */
+    private static final int SCALE_BAR_PIXELS = 60;
+    private static final int[] SCALE_BAR_BLOCKS = {5, 10, 20, 50, 100, 200, 500, 1000, 2000};
     /** Map icon size of an airborne unit, GUI pixels along its longest side. */
     private static final float UNIT_ICON_SIZE = 18;
-    private static final int WARNING = 0xFF5555;
+    private static final int WARNING = Ui.DANGER;
     private static final double MIN_SCALE = 0.1;
     private static final double MAX_SCALE = 8;
     private static final double PICK_RADIUS_PX = 6;
@@ -73,9 +79,9 @@ public class GuiMissionPlanner extends GuiScreen {
     private static final int BUTTON_CONTROL = 11;
     private static final int BUTTON_MARK = 12;
     private static final int BUTTON_LAUNCH_FLY = 13;
-    private static final int TARGET_COLOR = 0xFFFF4040;
-    private static final int LOCKED_COLOR = 0xFFFF2020;
-    private static final int BORDER_COLOR = 0xC0FF5050;
+    private static final int TARGET_COLOR = Ui.DANGER;
+    private static final int LOCKED_COLOR = Ui.DANGER;
+    private static final int BORDER_COLOR = 0xC0D94F3C;
 
     private PlannerOpenPacket view;
     /** Index into view.units of the unit being edited. */
@@ -204,30 +210,28 @@ public class GuiMissionPlanner extends GuiScreen {
         mapLeft = PANEL_WIDTH + MARGIN * 2;
         mapTop = 28;
         mapRight = width - MARGIN;
-        mapBottom = height - 52;
+        mapBottom = height - 44;
         int y = height - 26;
         int x = mapLeft;
-        terminalButton = addButton(new GuiButton(BUTTON_TERMINAL, x, y, 120, 20, ""));
-        x += 124;
-        addButton(new GuiButton(BUTTON_CLEAR, x, y, 50, 20, I18n.format("gui.combat_drones.planner.clear")));
+        addButton(new UiButton(BUTTON_CLEAR, x, y, 50, 20, I18n.format("gui.combat_drones.planner.clear")));
         x += 54;
-        addButton(new GuiButton(BUTTON_SEND, x, y, 60, 20, I18n.format("gui.combat_drones.planner.apply")));
+        addButton(new UiButton(BUTTON_SEND, x, y, 60, 20, I18n.format("gui.combat_drones.planner.apply")));
         x += 64;
         // Same slot, swapped by refreshButtons: Launch / Launch & Fly for a grounded unit, View / Take control in flight
-        launchButton = addButton(new GuiButton(BUTTON_LAUNCH, x, y, 60, 20, I18n.format("gui.combat_drones.planner.launch")));
-        launchFlyButton = addButton(new GuiButton(BUTTON_LAUNCH_FLY, x + 64, y, 80, 20, I18n.format("gui.combat_drones.planner.launch_fly")));
-        viewButton = addButton(new GuiButton(BUTTON_VIEW, x, y, 50, 20, I18n.format("gui.combat_drones.planner.view")));
-        controlButton = addButton(new GuiButton(BUTTON_CONTROL, x + 54, y, 80, 20, I18n.format("gui.combat_drones.planner.take_control")));
-        x += 148;
-        addButton(new GuiButton(BUTTON_CLOSE, Math.max(x, width - MARGIN - 50), y, 50, 20, I18n.format("gui.done")));
+        launchButton = addButton(new UiButton(BUTTON_LAUNCH, x, y, 60, 20, I18n.format("gui.combat_drones.planner.launch")));
+        launchFlyButton = addButton(new UiButton(BUTTON_LAUNCH_FLY, x + 64, y, 80, 20, I18n.format("gui.combat_drones.planner.launch_fly")));
+        viewButton = addButton(new UiButton(BUTTON_VIEW, x, y, 50, 20, I18n.format("gui.combat_drones.planner.view")));
+        controlButton = addButton(new UiButton(BUTTON_CONTROL, x + 54, y, 80, 20, I18n.format("gui.combat_drones.planner.take_control")));
+        addButton(new UiButton(BUTTON_CLOSE, width - MARGIN - 50, 5, 50, 18, I18n.format("gui.done")));
 
-        int panelY = height - 50;
-        addButton(new GuiButton(BUTTON_UP, MARGIN, panelY, 20, 20, "▲"));
-        addButton(new GuiButton(BUTTON_DOWN, MARGIN + 22, panelY, 20, 20, "▼"));
-        addButton(new GuiButton(BUTTON_ALT_DOWN, MARGIN + 46, panelY, 26, 20, "-5"));
-        addButton(new GuiButton(BUTTON_ALT_UP, MARGIN + 74, panelY, 26, 20, "+5"));
-        addButton(new GuiButton(BUTTON_DELETE, MARGIN + 104, panelY, 36, 20, I18n.format("gui.combat_drones.planner.delete")));
-        markButton = addButton(new GuiButton(BUTTON_MARK, MARGIN, panelY - 22, PANEL_WIDTH, 20, I18n.format("gui.combat_drones.planner.mark")));
+        int panelY = height - 26;
+        addButton(new UiButton(BUTTON_UP, MARGIN, panelY, 20, 20, "▲"));
+        addButton(new UiButton(BUTTON_DOWN, MARGIN + 22, panelY, 20, 20, "▼"));
+        addButton(new UiButton(BUTTON_ALT_DOWN, MARGIN + 46, panelY, 26, 20, "-5"));
+        addButton(new UiButton(BUTTON_ALT_UP, MARGIN + 74, panelY, 26, 20, "+5"));
+        addButton(new UiButton(BUTTON_DELETE, MARGIN + 104, panelY, 36, 20, I18n.format("gui.combat_drones.planner.delete")));
+        markButton = addButton(new UiButton(BUTTON_MARK, MARGIN, panelY - 22, PANEL_WIDTH, 20, I18n.format("gui.combat_drones.planner.mark")));
+        terminalButton = addButton(new UiButton(BUTTON_TERMINAL, MARGIN, panelY - 44, PANEL_WIDTH, 20, ""));
         refreshButtons();
     }
 
@@ -290,14 +294,18 @@ public class GuiMissionPlanner extends GuiScreen {
         followTrackedUnits(partialTicks);
         cursorX = mouseX;
         cursorY = mouseY;
-        drawCenteredString(fontRenderer, title(), width / 2, 10, 0xFFFFFF);
+        // Ground-station frame: a title bar, the unit and route panel down the left, the map in its own frame
+        Ui.panel(MARGIN - 4, 3, width - MARGIN * 2 + 8, 22);
+        fontRenderer.drawStringWithShadow(title(), MARGIN + 2, 10, Ui.TEXT);
+        String summary = I18n.format("gui.combat_drones.planner.units") + " " + view.units.size();
+        fontRenderer.drawStringWithShadow(summary, MARGIN + 10 + fontRenderer.getStringWidth(title()), 10, Ui.FAINT);
         drawPanel(mouseX, mouseY);
         drawMap(mouseX, mouseY);
         drawStats();
         super.drawScreen(mouseX, mouseY, partialTicks);
         if (editingRadius && !waypoints.isEmpty()) {
             drawCenteredString(fontRenderer, I18n.format("gui.combat_drones.planner.radius_hint", Math.round(previewRadius(mouseX, mouseY))),
-                    (mapLeft + mapRight) / 2, mapTop + 4, 0xFFFF55);
+                    (mapLeft + mapRight) / 2, mapTop + 14, Ui.SELECT);
         }
         if (menu != null) {
             menu.draw(fontRenderer, width, height, mouseX, mouseY);
@@ -313,12 +321,12 @@ public class GuiMissionPlanner extends GuiScreen {
     }
 
     private void drawPanel(int mouseX, int mouseY) {
-        Gui.drawRect(MARGIN - 2, mapTop - 2, MARGIN + PANEL_WIDTH + 2, height - 54, 0x80000000);
+        Ui.panel(MARGIN - 4, mapTop - 3, PANEL_WIDTH + 8, height - 3 - (mapTop - 3));
         int y = mapTop;
-        fontRenderer.drawString(I18n.format("gui.combat_drones.planner.units"), MARGIN, y, 0xAAAAAA);
+        fontRenderer.drawStringWithShadow(I18n.format("gui.combat_drones.planner.units"), MARGIN, y, Ui.DIM);
         y += ROW;
         if (view.units.isEmpty()) {
-            fontRenderer.drawString(I18n.format("gui.combat_drones.planner.no_units"), MARGIN, y, 0x777777);
+            fontRenderer.drawStringWithShadow(I18n.format("gui.combat_drones.planner.no_units"), MARGIN, y, Ui.FAINT);
             y += ROW;
         }
         for (int index = 0; index < view.units.size(); index++) {
@@ -326,8 +334,14 @@ public class GuiMissionPlanner extends GuiScreen {
             String tag = unit.isGrounded() ? I18n.format("gui.combat_drones.planner.on_ramp") + " " : "";
             String line = tag + fontRenderer.trimStringToWidth(unitName(unit), PANEL_WIDTH - 34 - fontRenderer.getStringWidth(tag)) + " "
                     + percent(unit.fuelFraction) + "%";
-            int color = index == selectedUnit ? 0xFFFF55 : unit.isGrounded() ? 0x88CCFF : 0xFFFFFF;
-            fontRenderer.drawString(line, MARGIN, y, color);
+            int color = index == selectedUnit ? Ui.SELECT : unit.isGrounded() ? Ui.FRIENDLY : Ui.TEXT;
+            if (index == selectedUnit) {
+                Ui.rect(MARGIN - 3, y - 2, MARGIN + PANEL_WIDTH + 3, y + ROW - 2, 0x50FBE678);
+            }
+            // Fuel as a bar under the row, so the list reads at a glance
+            Ui.rect(MARGIN, y + 8, MARGIN + (int) Math.round(PANEL_WIDTH * Math.max(0, Math.min(1, unit.fuelFraction))), y + 9,
+                    unit.fuelFraction < view.minLaunchFuel ? Ui.DANGER : Ui.alpha(Ui.OK, 0.6F));
+            fontRenderer.drawStringWithShadow(line, MARGIN, y - 1, color);
             y += ROW;
         }
         y += 4;
@@ -337,26 +351,30 @@ public class GuiMissionPlanner extends GuiScreen {
         for (int station = 0; selectedType != null && station < Loadout.STATIONS; station++) {
             if (selectedType.getWeapon(station) != DroneType.WeaponType.NONE) {
                 int ammo = selected.loadout.getAmmo(station);
-                fontRenderer.drawString(I18n.format("hud.combat_drones.ammo." + ItemDrone.ammoKey(selectedType, station, selected.loadout), ammo,
-                        selected.loadout.capacity(selectedType, station)), MARGIN, y, ammo == 0 ? WARNING : 0xFFFFFF);
+                fontRenderer.drawStringWithShadow(I18n.format("hud.combat_drones.ammo." + ItemDrone.ammoKey(selectedType, station, selected.loadout), ammo,
+                        selected.loadout.capacity(selectedType, station)), MARGIN, y, ammo == 0 ? WARNING : Ui.TEXT);
                 y += ROW;
             }
         }
-        fontRenderer.drawString(I18n.format("gui.combat_drones.planner.waypoints", waypoints.size(), view.maxWaypoints), MARGIN, y, 0xAAAAAA);
+        fontRenderer.drawStringWithShadow(I18n.format("gui.combat_drones.planner.waypoints", waypoints.size(), view.maxWaypoints), MARGIN, y, Ui.DIM);
         y += ROW;
-        for (int index = 0; index < waypoints.size() && y < height - 64; index++) {
+        for (int index = 0; index < waypoints.size() && y < height - 84; index++) {
             Route.Waypoint waypoint = waypoints.get(index);
             String line = String.format(Locale.ROOT, "#%d  %d, %d  ↑%d %s", index + 1, Math.round(waypoint.x), Math.round(waypoint.z),
                     Math.round(waypoint.altitude), waypoint.speed.name().charAt(0));
             boolean badAltitude = waypoint.altitude < RouteValidator.MIN_ALTITUDE || waypoint.altitude > view.maxAltitude;
-            int color = index == selectedWaypoint ? 0xFFFF55 : badAltitude ? WARNING : 0xFFFFFF;
-            fontRenderer.drawString(line, MARGIN, y, color);
+            int color = index == selectedWaypoint ? Ui.SELECT : badAltitude ? WARNING : Ui.TEXT;
+            if (index == selectedWaypoint) {
+                Ui.rect(MARGIN - 3, y - 2, MARGIN + PANEL_WIDTH + 3, y + ROW - 2, 0x50FBE678);
+            }
+            fontRenderer.drawStringWithShadow(line, MARGIN, y - 1, color);
             y += ROW;
         }
     }
 
     private void drawMap(int mouseX, int mouseY) {
-        Gui.drawRect(mapLeft, mapTop, mapRight, mapBottom, 0xC0101810);
+        Ui.rect(mapLeft, mapTop, mapRight, mapBottom, Ui.SCREEN);
+        Ui.frame(mapLeft - 1, mapTop - 1, mapRight - mapLeft + 2, mapBottom - mapTop + 2);
         if (terrain == null) {
             terrain = new PlannerTerrainMap();
         }
@@ -389,7 +407,7 @@ public class GuiMissionPlanner extends GuiScreen {
         // Markers and labels
         for (PlannerOpenPacket.UnitView other : view.units) {
             if (other.isGrounded()) {
-                drawMarker(other.x, other.z, other == unit ? 0xFFFFFF55 : 0xFF55AAFF, 3);
+                drawMarker(other.x, other.z, other == unit ? Ui.SELECT : Ui.FRIENDLY, 3);
             }
         }
         for (int index = 0; index < waypoints.size(); index++) {
@@ -397,18 +415,35 @@ public class GuiMissionPlanner extends GuiScreen {
             int screenX = toScreenX(waypoint.x);
             int screenY = toScreenY(waypoint.z);
             if (insideMap(screenX, screenY)) {
-                drawMarker(waypoint.x, waypoint.z, index == selectedWaypoint ? 0xFFFFFF55 : ROUTE_COLOR, 3);
-                fontRenderer.drawStringWithShadow(String.valueOf(index + 1), screenX + 5, screenY - 4, 0xFFFFFF);
+                drawMarker(waypoint.x, waypoint.z, index == selectedWaypoint ? Ui.SELECT : ROUTE_COLOR, 3);
+                fontRenderer.drawStringWithShadow(String.valueOf(index + 1), screenX + 5, screenY - 4, Ui.TEXT);
             }
         }
         if (mc.player != null) {
-            drawMarker(mc.player.posX, mc.player.posZ, 0xFFFFFFFF, 2);
+            drawMarker(mc.player.posX, mc.player.posZ, Ui.TEXT, 2);
         }
         drawIntel();
-        fontRenderer.drawStringWithShadow("N", (mapLeft + mapRight) / 2.0F - 2, mapTop + 3, 0xFFFFFF);
+        // North mark, the scale bar, and the cursor's coordinates
+        int north = (mapLeft + mapRight) / 2;
+        Ui.block(north, mapTop + 3, north + 1, mapTop + 4, Ui.TEXT);
+        Ui.block(north - 1, mapTop + 4, north + 2, mapTop + 5, Ui.TEXT);
+        Ui.textCentered(I18n.format("hud.combat_drones.compass.n"), north + 1, mapTop + 8, Ui.TEXT);
+        int blocks = SCALE_BAR_BLOCKS[0];
+        for (int candidate : SCALE_BAR_BLOCKS) {
+            if (Math.abs(candidate * scale - SCALE_BAR_PIXELS) < Math.abs(blocks * scale - SCALE_BAR_PIXELS)) {
+                blocks = candidate;
+            }
+        }
+        int barWidth = (int) Math.round(blocks * scale);
+        if (barWidth < mapRight - mapLeft - 12) {
+            Ui.hline(mapRight - 6 - barWidth, mapRight - 6, mapBottom - 6, Ui.TEXT);
+            Ui.vline(mapRight - 6 - barWidth, mapBottom - 9, mapBottom - 5, Ui.TEXT);
+            Ui.vline(mapRight - 7, mapBottom - 9, mapBottom - 5, Ui.TEXT);
+            Ui.textRight(I18n.format("hud.combat_drones.metres", blocks), mapRight - 6, mapBottom - 17, Ui.TEXT);
+        }
         if (insideMap(mouseX, mouseY)) {
-            fontRenderer.drawStringWithShadow(String.format(Locale.ROOT, "X %d  Z %d", Math.round(toWorldX(mouseX)), Math.round(toWorldZ(mouseY))),
-                    mapLeft + 4, mapBottom - 11, 0xCCCCCC);
+            Ui.text(I18n.format("hud.combat_drones.position", Math.round(toWorldX(mouseX)), Math.round(toWorldZ(mouseY))), mapLeft + 4, mapBottom - 10,
+                    Ui.DIM);
         }
     }
 
@@ -428,10 +463,10 @@ public class GuiMissionPlanner extends GuiScreen {
                     int half = 4 - Math.abs(row);
                     Gui.drawRect(screenX - half, screenY + row, screenX + half + 1, screenY + row + 1, LOCKED_COLOR);
                 }
-                fontRenderer.drawStringWithShadow(mark.name, screenX + 6, screenY - 4, 0xFF6060);
+                fontRenderer.drawStringWithShadow(mark.name, screenX + 6, screenY - 4, Ui.DANGER);
             } else {
                 int alpha = 0x40 + (int) (Math.max(0, Math.min(1, mark.freshness)) * 0xBF);
-                Gui.drawRect(screenX - 2, screenY - 2, screenX + 3, screenY + 3, alpha << 24 | 0xE02020);
+                Gui.drawRect(screenX - 2, screenY - 2, screenX + 3, screenY + 3, alpha << 24 | Ui.DANGER & 0xFFFFFF);
             }
         }
     }
@@ -471,7 +506,7 @@ public class GuiMissionPlanner extends GuiScreen {
         clippedLine(buffer, target.x - arm, target.z + arm, target.x + arm, target.z - arm, TARGET_COLOR);
         if (terminal == Route.TerminalAction.DESTROY && !waypoints.isEmpty()) {
             Route.Waypoint last = waypoints.get(waypoints.size() - 1);
-            clippedLine(buffer, last.x, last.z, target.x, target.z, 0x80FF4040);
+            clippedLine(buffer, last.x, last.z, target.x, target.z, 0x80D94F3C);
         }
     }
 
@@ -487,7 +522,7 @@ public class GuiMissionPlanner extends GuiScreen {
             for (int index = 0; index < waypoints.size() && waypoints.size() > 1; index++) {
                 Route.Waypoint from = waypoints.get(index);
                 Route.Waypoint to = waypoints.get((index + 1) % waypoints.size());
-                clippedLine(buffer, from.x, from.z, to.x, to.z, index == waypoints.size() - 1 ? 0x80FFCC33 : ROUTE_COLOR);
+                clippedLine(buffer, from.x, from.z, to.x, to.z, index == waypoints.size() - 1 ? ROUTE_FAINT : ROUTE_COLOR);
             }
             return;
         }
@@ -508,7 +543,7 @@ public class GuiMissionPlanner extends GuiScreen {
                 double angle = step * Math.PI * 2 / 32;
                 double pointX = last.x + Math.cos(angle) * radius;
                 double pointZ = last.z + Math.sin(angle) * radius;
-                clippedLine(buffer, previousX, previousZ, pointX, pointZ, 0x80FFCC33);
+                clippedLine(buffer, previousX, previousZ, pointX, pointZ, ROUTE_FAINT);
                 previousX = pointX;
                 previousZ = pointZ;
             }
@@ -548,7 +583,7 @@ public class GuiMissionPlanner extends GuiScreen {
         double leftZ = unit.z + Math.cos(radians + 0.45) * 10 / scale;
         double rightX = unit.x - Math.sin(radians - 0.45) * 10 / scale;
         double rightZ = unit.z + Math.cos(radians - 0.45) * 10 / scale;
-        int color = view.units.indexOf(unit) == selectedUnit ? 0xFFFFFF55 : UNIT_COLOR;
+        int color = view.units.indexOf(unit) == selectedUnit ? Ui.SELECT : UNIT_COLOR;
         clippedLine(buffer, leftX, leftZ, noseX, noseZ, color);
         clippedLine(buffer, noseX, noseZ, rightX, rightZ, color);
         clippedLine(buffer, rightX, rightZ, leftX, leftZ, color);
@@ -606,10 +641,11 @@ public class GuiMissionPlanner extends GuiScreen {
         } else {
             text = I18n.format("gui.combat_drones.planner.length", Math.round(length));
         }
-        fontRenderer.drawString(text, mapLeft, mapBottom + 4, tooLong || waypoints.size() > view.maxWaypoints ? WARNING : 0xCCCCCC);
+        fontRenderer.drawStringWithShadow(fontRenderer.trimStringToWidth(text, mapRight - mapLeft), mapLeft, mapBottom + 5,
+                tooLong || waypoints.size() > view.maxWaypoints ? WARNING : Ui.DIM);
         if (!ClientIntel.getMarks().isEmpty()) {
             String spotted = I18n.format("gui.combat_drones.planner.spotted", ClientIntel.getMarks().size());
-            fontRenderer.drawString(spotted, mapRight - fontRenderer.getStringWidth(spotted), mapBottom + 4, 0xFF6060);
+            fontRenderer.drawStringWithShadow(spotted, mapRight - fontRenderer.getStringWidth(spotted) - 4, mapTop + 4, Ui.DANGER);
         }
     }
 

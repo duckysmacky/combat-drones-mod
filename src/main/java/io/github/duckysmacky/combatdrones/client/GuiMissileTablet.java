@@ -1,5 +1,6 @@
 package io.github.duckysmacky.combatdrones.client;
 
+import io.github.duckysmacky.combatdrones.client.hud.Ui;
 import io.github.duckysmacky.combatdrones.ModSounds;
 import io.github.duckysmacky.combatdrones.network.ModNetwork;
 import io.github.duckysmacky.combatdrones.network.TabletActionPacket;
@@ -47,18 +48,20 @@ public class GuiMissileTablet extends GuiScreen {
     private static final double MAX_SCALE = 8;
     private static final double LOW_FUEL = 0.2;
 
-    private static final int BEZEL_COLOR = 0xFF2A2C2E;
-    private static final int BEZEL_EDGE = 0xFF45484C;
+    private static final int BEZEL_COLOR = 0xFF333942;
+    /** The tablet's own green-tinted screen; everything else is the shared palette. */
     private static final int SCREEN_BACKGROUND = 0xFF0E140E;
     private static final int TEXT = 0xFFD8E8D0;
     private static final int DIM = 0xFF8A9A84;
-    private static final int GOOD = 0xFF55FF55;
-    private static final int WARNING = 0xFFFF5555;
-    private static final int AMBER = 0xFFFFAA00;
-    private static final int RANGE_COLOR = 0xC0FFAA00;
-    private static final int HITMARKER = 0xFFFF3030;
-    private static final int HITMARKER_INVALID = 0xFF909090;
-    private static final int PAD_COLOR = 0xFF55AAFF;
+    private static final int GOOD = Ui.OK;
+    private static final int WARNING = Ui.DANGER;
+    private static final int AMBER = Ui.WARN;
+    private static final int RANGE_COLOR = 0xC0F2CC3C;
+    private static final int HITMARKER = Ui.DANGER;
+    private static final int HITMARKER_INVALID = Ui.DIM;
+    private static final int PAD_COLOR = Ui.FRIENDLY;
+    /** Launch stages shown as a row of lamps while the missile climbs. */
+    private static final int STAGE_LAMPS = 4;
 
     /** A transparent 1x1 cursor, to hide the pointer over the target map; null if the system can't do it. */
     @Nullable
@@ -148,9 +151,19 @@ public class GuiMissileTablet extends GuiScreen {
 
     /** A rugged tablet: thick dark bezel with a lighter edge and a camera dot, the screen inside. */
     private void drawBezel() {
-        drawRect(0, 0, width, height, BEZEL_EDGE);
-        drawRect(2, 2, width - 2, height - 2, BEZEL_COLOR);
-        drawRect(width / 2 - 2, 4, width / 2 + 2, 7, 0xFF101214);
+        drawRect(0, 0, width, height, BEZEL_COLOR);
+        Ui.frame(0, 0, width, height);
+        Ui.frame(1, 1, width - 2, height - 2);
+        // Corner screws, the camera, and a power lamp that breathes
+        for (int corner = 0; corner < 4; corner++) {
+            int x = corner % 2 == 0 ? 4 : width - 7;
+            int y = corner < 2 ? 4 : height - 7;
+            drawRect(x, y, x + 3, y + 3, Ui.FRAME_DARK);
+            drawRect(x, y, x + 1, y + 1, Ui.FRAME_LIGHT);
+        }
+        drawRect(width / 2 - 2, 4, width / 2 + 2, 7, Ui.SCREEN);
+        drawRect(width / 2 + 8, 5, width / 2 + 10, 7, Ui.blink(1) ? Ui.OK : Ui.alpha(Ui.OK, 0.5F));
+        drawRect(screenLeft - 1, screenTop - 1, screenRight + 1, screenBottom + 1, Ui.FRAME_DARK);
         drawRect(screenLeft, screenTop, screenRight, screenBottom, SCREEN_BACKGROUND);
     }
 
@@ -182,6 +195,14 @@ public class GuiMissileTablet extends GuiScreen {
         y += 4;
         switch (status.state) {
             case LAUNCHING:
+                // Stage lamps: done green, the running one blinking amber, the rest dark
+                for (int lamp = 0; lamp < STAGE_LAMPS; lamp++) {
+                    int lampX = centerX - STAGE_LAMPS * 9 + lamp * 18 + 4;
+                    int lampColor = lamp < status.stage ? GOOD : lamp == status.stage ? (Ui.blink(2) ? AMBER : Ui.alpha(AMBER, 0.4F)) : Ui.FAINT;
+                    drawRect(lampX - 1, y - 1, lampX + 11, y + 7, Ui.FRAME_DARK);
+                    drawRect(lampX, y, lampX + 10, y + 6, lampColor);
+                }
+                y += LINE;
                 if (status.stage >= 0 && status.stage < CruiseMissileFlight.Stage.values().length) {
                     String stage = CruiseMissileFlight.Stage.values()[status.stage].name().toLowerCase(Locale.ROOT);
                     drawCenteredString(fontRenderer, I18n.format("gui.combat_drones.tablet.stage." + stage) + "   "
@@ -264,10 +285,24 @@ public class GuiMissileTablet extends GuiScreen {
         boolean enabled = buttonEnabled();
         boolean hover = enabled && overButton(mouseX, mouseY);
         boolean strike = status.state == TabletStatusPacket.State.STANDBY;
-        int fill = !enabled ? 0xFF2A2E2A : strike ? (hover ? 0xFFD03030 : 0xFFA02020) : (hover ? 0xFF3A9A3A : 0xFF2A7A2A);
-        drawRect(buttonLeft - 2, buttonTop - 2, buttonLeft + BUTTON_WIDTH + 2, buttonTop + BUTTON_HEIGHT + 2, enabled ? 0xFFE0E0E0 : 0xFF505450);
+        int fill = !enabled ? 0xFF212428 : strike ? (hover ? 0xFFB8302A : 0xFF8A1F20) : (hover ? 0xFF2C7A38 : 0xFF1C5A2A);
+        // A guarded key: hazard stripes round it while it can fire, a plain dark rim when it can't
+        for (int along = -3; along < BUTTON_WIDTH + 3; along += 4) {
+            int stripe = !enabled ? Ui.FRAME_DARK : (along / 4 + (hover ? ticks / 3 : 0)) % 2 == 0 ? Ui.WARN : Ui.SCREEN;
+            int x0 = buttonLeft + along;
+            int x1 = Math.min(x0 + 4, buttonLeft + BUTTON_WIDTH + 3);
+            drawRect(x0, buttonTop - 3, x1, buttonTop, stripe);
+            drawRect(x0, buttonTop + BUTTON_HEIGHT, x1, buttonTop + BUTTON_HEIGHT + 3, stripe);
+        }
+        for (int along = 0; along < BUTTON_HEIGHT; along += 4) {
+            int stripe = !enabled ? Ui.FRAME_DARK : (along / 4 + (hover ? ticks / 3 : 0)) % 2 == 0 ? Ui.SCREEN : Ui.WARN;
+            int y1 = Math.min(buttonTop + along + 4, buttonTop + BUTTON_HEIGHT);
+            drawRect(buttonLeft - 3, buttonTop + along, buttonLeft, y1, stripe);
+            drawRect(buttonLeft + BUTTON_WIDTH, buttonTop + along, buttonLeft + BUTTON_WIDTH + 3, y1, stripe);
+        }
         drawRect(buttonLeft, buttonTop, buttonLeft + BUTTON_WIDTH, buttonTop + BUTTON_HEIGHT, fill);
-        drawScaledCentered(buttonLabel(), buttonLeft + BUTTON_WIDTH / 2, buttonTop + BUTTON_HEIGHT / 2 - 7, 2, enabled ? 0xFFFFFF : 0x808880);
+        Ui.frame(buttonLeft, buttonTop, BUTTON_WIDTH, BUTTON_HEIGHT);
+        drawScaledCentered(buttonLabel(), buttonLeft + BUTTON_WIDTH / 2, buttonTop + BUTTON_HEIGHT / 2 - 7, 2, enabled ? Ui.TEXT : Ui.FAINT);
     }
 
     private void pressBigButton() {
@@ -300,6 +335,7 @@ public class GuiMissileTablet extends GuiScreen {
     private void drawTargetView(int mouseX, int mouseY) {
         drawMap();
         drawRect(screenLeft, screenTop, screenRight, mapTop, 0xE0141C14);
+        drawRect(screenLeft, mapTop - 1, screenRight, mapTop, Ui.FRAME_DARK);
         fontRenderer.drawStringWithShadow(I18n.format("gui.combat_drones.tablet.target_title"), screenLeft + 6, screenTop + 3, WARNING);
         String fuel = I18n.format("gui.combat_drones.tablet.fuel", Math.round(status.fuelFraction * 100), seconds(ticksLeft()));
         fontRenderer.drawStringWithShadow(fuel, screenRight - 6 - fontRenderer.getStringWidth(fuel), screenTop + 3,
@@ -327,10 +363,10 @@ public class GuiMissileTablet extends GuiScreen {
         endLines();
         marker(status.padX + 0.5, status.padZ + 0.5, PAD_COLOR, 3);
         if (mc.player != null) {
-            marker(mc.player.posX, mc.player.posZ, 0xFFFFFFFF, 2);
+            marker(mc.player.posX, mc.player.posZ, Ui.TEXT, 2);
         }
         GL11.glDisable(GL11.GL_SCISSOR_TEST);
-        fontRenderer.drawStringWithShadow("N", width / 2.0F - 2, mapTop + 3, 0xFFFFFF);
+        Ui.textCentered(I18n.format("hud.combat_drones.compass.n"), width / 2.0F + 1, mapTop + 4, Ui.TEXT);
     }
 
     /** Red crosshair at the mouse with the circle the dive can still be steered within; grey when out of range. */
