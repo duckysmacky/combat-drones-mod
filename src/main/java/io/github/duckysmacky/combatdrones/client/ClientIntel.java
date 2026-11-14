@@ -8,6 +8,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.audio.PositionedSoundRecord;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import net.minecraftforge.fml.common.gameevent.TickEvent;
 import net.minecraftforge.fml.common.network.FMLNetworkEvent;
 import net.minecraftforge.fml.relauncher.Side;
 
@@ -15,16 +16,19 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * What this player's (or, with reconIntelForAllies, their team's) recon has spotted, as last sent by the server: for
- * the planner map and the camera / FPV markers.
+ * What this player's (or their team's) recon UAVs track, as last sent by the server: tracking dots and lock-ons for the
+ * planner map and the in-world markers, plus the lock-on progress in the UAV camera.
  */
 @Mod.EventBusSubscriber(modid = CombatDrones.MOD_ID, value = Side.CLIENT)
 public final class ClientIntel {
     private static List<IntelPacket.Entry> marks = Collections.emptyList();
-    /** Lock progress on whatever is under the recon camera's crosshair, 0..1 (1 = locked). */
+    /** Lock-on progress from the UAV camera, 0..1 (0 = no attempt, 1 = just locked on). */
     private static float lockProgress;
-    /** How many ticks sound while a lock builds from nothing to locked. */
-    private static final int LOCK_TICKS = 6;
+    /** Ticks to the next lock-on beep. */
+    private static int beepDelay;
+    /** Lock-on beeps speed up from this many ticks apart to MIN_BEEP_TICKS as the lock builds. */
+    private static final int MAX_BEEP_TICKS = 10;
+    private static final int MIN_BEEP_TICKS = 2;
 
     private ClientIntel() {
     }
@@ -42,15 +46,31 @@ public final class ClientIntel {
     }
 
     static void setLockProgress(float progress) {
+        boolean inCamera = RemoteController.getUnit() != null;
         if (progress >= 1 && lockProgress < 1) {
             Minecraft.getMinecraft().getSoundHandler().playSound(PositionedSoundRecord.getMasterRecord(ModSounds.DRONE_BEEP, 1.8F));
-        } else if (progress < 1 && (int) (progress * LOCK_TICKS) > (int) (lockProgress * LOCK_TICKS)) {
-            // The lock building: ticks that climb in pitch
-            UiSounds.play(UiSounds.LOCK_TICK, 0.8F + progress * 0.6F);
-        } else if (progress <= 0 && lockProgress > 0 && RemoteController.getUnit() != null) {
+        } else if (progress <= 0 && lockProgress > 0 && lockProgress < 1 && inCamera) {
+            // An attempt that ended without locking on
             UiSounds.play(UiSounds.LOCK_LOST);
+        } else if (progress > 0 && lockProgress <= 0) {
+            beepDelay = 0;
         }
         lockProgress = progress;
+    }
+
+    /** A new camera session: no attempt carried over from the last one. */
+    static void resetLock() {
+        lockProgress = 0;
+    }
+
+    /** While a lock-on builds: ticks that climb in pitch and come faster and faster. */
+    @SubscribeEvent
+    public static void onClientTick(TickEvent.ClientTickEvent event) {
+        if (event.phase != TickEvent.Phase.END || getLockProgress() <= 0 || lockProgress >= 1 || --beepDelay > 0) {
+            return;
+        }
+        UiSounds.play(UiSounds.LOCK_TICK, 0.8F + lockProgress * 0.6F);
+        beepDelay = Math.round(MAX_BEEP_TICKS - (MAX_BEEP_TICKS - MIN_BEEP_TICKS) * lockProgress);
     }
 
     @SubscribeEvent

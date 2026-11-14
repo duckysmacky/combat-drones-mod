@@ -181,6 +181,7 @@ public final class RemoteController {
         control = underControl;
         anchorEntity = null;
         anchorPoint = null;
+        ClientIntel.resetLock();
         zoom = 1;
         gunnerStation = 0;
         triggerReleased = false;
@@ -236,8 +237,11 @@ public final class RemoteController {
         if (unit != null && !control && unit.ticksExisted % 2 == 0) {
             DroneType type = unit.getDroneType();
             if (type != null && type.isSensor()) {
-                // Where the camera points; the server works out what's under the crosshair for the lock
-                ModNetwork.CHANNEL.sendToServer(new ReconLookPacket(unitId, Vec3d.fromPitchYaw(cameraPitch, cameraYaw)));
+                // Where the camera points and what fits on screen; the server works out what's under the crosshair
+                double halfHeight = Math.atan(Math.tan(Math.toRadians(minecraft.gameSettings.fovSetting / 2)) / zoom);
+                double halfWidth = Math.atan(Math.tan(halfHeight) * minecraft.displayWidth / Math.max(1, minecraft.displayHeight));
+                ModNetwork.CHANNEL.sendToServer(new ReconLookPacket(unitId, cameraYaw, cameraPitch, (float) Math.toDegrees(halfWidth),
+                        (float) Math.toDegrees(halfHeight), isTriggerHeld(minecraft)));
             }
         }
         if (unit != null && isMissile()) {

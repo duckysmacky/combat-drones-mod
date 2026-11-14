@@ -196,6 +196,17 @@ public final class Widgets {
         return true;
     }
 
+    /** Recon lock-on charges left, with the time to the next one (or HOLD while a lock-on keeps the reload waiting). */
+    public static void lockCharges(EntityRampUnit unit, int right, int y) {
+        int charges = unit.getLockCharges();
+        int max = unit.getLockMaxCharges();
+        int reload = unit.getLockReloadLeft();
+        String text = reload < 0 ? I18n.format("hud.combat_drones.lock_hold", charges, max)
+                : reload > 0 ? I18n.format("hud.combat_drones.lock_reload", charges, max, (reload + 19) / 20)
+                : I18n.format("hud.combat_drones.lock_charges", charges, max);
+        Ui.labelledRight(OsdFont.Icon.LOCK, text, right, y, charges > 0 ? Ui.TEXT : Ui.DANGER);
+    }
+
     /** Players the team's recon has spotted, as a count ending at {@code right}. */
     public static void marks(int right, int y) {
         if (!ClientIntel.getMarks().isEmpty()) {

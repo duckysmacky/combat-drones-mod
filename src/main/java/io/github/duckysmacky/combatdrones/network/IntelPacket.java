@@ -13,31 +13,36 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * Server to a player: everything their own (or their teammates') recon has spotted that they may see. Replaces the
- * previous list.
+ * Server to a player: every tracking dot and lock-on from their own (or their teammates') recon UAVs that they may
+ * see. Replaces the previous list.
  */
 public class IntelPacket implements IMessage {
     private static final int MAX_ENTRIES = 64;
 
     public static final class Entry {
+        /** Where the target is (feet), as the server last knew it. */
         public final double x;
         public final double y;
         public final double z;
+        /** The target's entity id, so a client that tracks it can draw it where it really is. */
+        public final int entityId;
         public final String name;
+        /** A lock-on (ESP box) rather than a tracking dot. */
         public final boolean locked;
-        /** 1 = fresh (or locked), falling to 0 as a passive sighting goes stale. */
-        public final float freshness;
-        /** A lock shown in the world even outside a camera (the owner is watching through the UAV, or alwaysShowActiveLock). */
-        public final boolean inWorld;
+        /** A player (or a player's stand-in body): red; anything else yellow. */
+        public final boolean player;
+        /** Follow the entity live on the client; otherwise stay at the server's snapshot until the next update. */
+        public final boolean live;
 
-        public Entry(double x, double y, double z, String name, boolean locked, float freshness, boolean inWorld) {
+        public Entry(double x, double y, double z, int entityId, String name, boolean locked, boolean player, boolean live) {
             this.x = x;
             this.y = y;
             this.z = z;
+            this.entityId = entityId;
             this.name = name;
             this.locked = locked;
-            this.freshness = freshness;
-            this.inWorld = inWorld;
+            this.player = player;
+            this.live = live;
         }
     }
 
@@ -59,8 +64,8 @@ public class IntelPacket implements IMessage {
         int count = Math.min(buf.readUnsignedByte(), MAX_ENTRIES);
         entries = new ArrayList<>(count);
         for (int index = 0; index < count; index++) {
-            entries.add(new Entry(buf.readDouble(), buf.readDouble(), buf.readDouble(), ByteBufUtils.readUTF8String(buf), buf.readBoolean(), buf.readFloat(),
-                    buf.readBoolean()));
+            entries.add(new Entry(buf.readDouble(), buf.readDouble(), buf.readDouble(), buf.readInt(), ByteBufUtils.readUTF8String(buf),
+                    buf.readBoolean(), buf.readBoolean(), buf.readBoolean()));
         }
     }
 
@@ -72,10 +77,11 @@ public class IntelPacket implements IMessage {
             buf.writeDouble(entry.x);
             buf.writeDouble(entry.y);
             buf.writeDouble(entry.z);
+            buf.writeInt(entry.entityId);
             ByteBufUtils.writeUTF8String(buf, entry.name);
             buf.writeBoolean(entry.locked);
-            buf.writeFloat(entry.freshness);
-            buf.writeBoolean(entry.inWorld);
+            buf.writeBoolean(entry.player);
+            buf.writeBoolean(entry.live);
         }
     }
 

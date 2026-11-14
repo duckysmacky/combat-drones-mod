@@ -223,6 +223,9 @@ public final class UnitFeed {
         Ui.labelled(OsdFont.Icon.FUEL, fuelText, left, bottom - 4, fuelColor);
         Ui.labelledRight(OsdFont.Icon.HEALTH, healthText, right, bottom - 4, healthColor);
         Widgets.marks(right, top);
+        if (unit.getLockMaxCharges() > 0) {
+            Widgets.lockCharges(unit, right, top + Ui.LINE);
+        }
 
         Ui.hline(centerX - 11, centerX - 3, centerY, Ui.TEXT);
         Ui.hline(centerX + 4, centerX + 12, centerY, Ui.TEXT);

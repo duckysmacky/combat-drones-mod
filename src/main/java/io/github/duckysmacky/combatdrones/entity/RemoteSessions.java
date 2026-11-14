@@ -6,8 +6,9 @@ import io.github.duckysmacky.combatdrones.config.ModConfig;
 import io.github.duckysmacky.combatdrones.item.ItemMissileTablet;
 import io.github.duckysmacky.combatdrones.network.LockProgressPacket;
 import io.github.duckysmacky.combatdrones.network.ModNetwork;
-import io.github.duckysmacky.combatdrones.physics.LockTracker;
 import io.github.duckysmacky.combatdrones.network.RemoteSessionPacket;
+import io.github.duckysmacky.combatdrones.physics.CameraView;
+import io.github.duckysmacky.combatdrones.physics.LockOnAttempt;
 import io.github.duckysmacky.combatdrones.type.DroneType;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLiving;
@@ -18,6 +19,7 @@ import net.minecraft.network.play.server.SPacketSetPassengers;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.util.DamageSource;
 import net.minecraft.util.EnumHand;
+import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.util.text.TextComponentTranslation;
 import net.minecraftforge.event.entity.living.LivingAttackEvent;
@@ -40,7 +42,6 @@ import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -67,11 +68,19 @@ public final class RemoteSessions {
         final boolean control;
         final EntityPilotBody body;
         final boolean wasInvisible;
-        // Active lock (sensor units): latest camera direction from the client and the lock in progress
-        final LockTracker lock = new LockTracker(ModConfig.activeLockHoldTicks);
-        @Nullable
-        Vec3d lookDirection;
+        // Sensor units: the latest camera report from the client and the lock-on in progress
+        final LockOnAttempt lockOn = new LockOnAttempt((int) Math.round(ModConfig.lockOnHoldSeconds * 20), LOCK_ON_GRACE_TICKS);
+        boolean looking;
+        float lookYaw;
+        float lookPitch;
+        float halfWidth;
+        float halfHeight;
+        boolean trigger;
         long lookTick;
+        /** After an attempt ends (or is refused), LMB has to be let go before the next one. */
+        boolean needsRelease;
+        /** Ticks the HUD keeps showing LOCKED after a lock-on. */
+        int lockedShowTicks;
         float sentProgress;
 
         Session(EntityPlayerMP player, Entity vehicle, boolean drone, boolean control, EntityPilotBody body, boolean wasInvisible) {
@@ -87,8 +96,12 @@ public final class RemoteSessions {
     private static final Map<UUID, Session> SESSIONS = new HashMap<>();
     /** Camera directions older than this (ticks) no longer count toward a lock. */
     private static final int LOOK_STALE_TICKS = 5;
-    /** Blocks added around a target's hitbox when checking whether the recon camera is on it. */
-    private static final double LOCK_BOX_MARGIN = 1.5;
+    /** Ticks a lock-on forgives the target slipping off the crosshair (camera reports arrive over the network). */
+    private static final int LOCK_ON_GRACE_TICKS = 4;
+    private static final int LOCKED_SHOW_TICKS = 30;
+    /** Bounds for the client's reported half field of view, in degrees. */
+    private static final float MIN_HALF_VIEW = 1;
+    private static final float MAX_HALF_VIEW = 60;
     /** How long after a session teleport newly sent chunks still get their entities re-checked for the player. */
     private static final int RETRACK_WINDOW_TICKS = 200;
     /** Players a session recently teleported, until when (server tick). */
@@ -128,6 +141,7 @@ public final class RemoteSessions {
                 end(player, null);
             } else {
                 // Switching units: hop straight across, keeping the body and the saved home
+                abandonLockOn(current);
                 current.player.dismountRidingEntity();
                 SESSIONS.remove(player.getUniqueID());
                 mount(new Session(player, unit, false, control, current.body, current.wasInvisible));
@@ -227,6 +241,7 @@ public final class RemoteSessions {
         if (session == null) {
             return;
         }
+        abandonLockOn(session);
         if (player.getRidingEntity() == session.vehicle) {
             player.dismountRidingEntity();
             // Tell the client about the dismount before the teleport, or it would apply the teleport while still
@@ -397,38 +412,97 @@ public final class RemoteSessions {
         }
     }
 
-    /** Server: a viewer's camera direction (sensor units only; anything else is ignored). */
-    public static void onReconLook(EntityPlayerMP player, int unitId, Vec3d direction) {
+    /** Server: a viewer's camera report (sensor units only; anything else is ignored). */
+    public static void onReconLook(EntityPlayerMP player, int unitId, float yaw, float pitch, float halfWidth, float halfHeight, boolean trigger) {
         Session session = SESSIONS.get(player.getUniqueID());
         DroneType type = session == null || !(session.vehicle instanceof EntityRampUnit) ? null : ((EntityRampUnit) session.vehicle).getDroneType();
-        if (type == null || !type.isSensor() || session.vehicle.getEntityId() != unitId
-                || !Double.isFinite(direction.lengthSquared()) || direction.lengthSquared() < 1e-6) {
+        if (type == null || !type.isSensor() || session.vehicle.getEntityId() != unitId || !Float.isFinite(yaw) || !Float.isFinite(pitch)
+                || !Float.isFinite(halfWidth) || !Float.isFinite(halfHeight)) {
             return;
         }
-        session.lookDirection = direction.normalize();
+        session.looking = true;
+        session.lookYaw = yaw;
+        session.lookPitch = Math.max(-90, Math.min(90, pitch));
+        session.halfWidth = Math.max(MIN_HALF_VIEW, Math.min(MAX_HALF_VIEW, halfWidth));
+        session.halfHeight = Math.max(MIN_HALF_VIEW, Math.min(MAX_HALF_VIEW, halfHeight));
+        session.trigger = trigger;
         session.lookTick = player.world.getTotalWorldTime();
     }
 
+    /** The viewer's camera report is recent enough to act on. */
+    private static boolean hasFreshLook(Session session) {
+        return session.looking && session.player.world.getTotalWorldTime() - session.lookTick <= LOOK_STALE_TICKS;
+    }
+
+    /** Whether someone is watching through {@code unit}'s camera right now. */
+    static boolean isWatched(EntityRampUnit unit) {
+        Session session = sessionOf(unit);
+        return session != null && hasFreshLook(session);
+    }
+
+    /** Whether {@code target} is on the screen of whoever watches through {@code unit} (seen from {@code eye}). */
+    static boolean isOnScreen(EntityRampUnit unit, Vec3d eye, Entity target) {
+        Session session = sessionOf(unit);
+        return session != null && hasFreshLook(session) && CameraView.contains(session.lookYaw, session.lookPitch, target.posX - eye.x,
+                target.posY + target.height / 2 - eye.y, target.posZ - eye.z, session.halfWidth, session.halfHeight);
+    }
+
     /**
-     * Runs the active lock for a recon viewer: the enemy closest to the camera's line (within lockConeDegrees, in
-     * range and line of sight) is the candidate; holding it for activeLockHoldTicks locks it.
+     * Runs the lock-on for a recon viewer. Pressing LMB with an enemy under the crosshair starts an attempt on them
+     * (if the UAV has a charge and room for another lock-on); holding the crosshair on them with LMB down for
+     * lockOnHoldSeconds locks on. Letting go or losing them fails it. Either way the attempt uses a charge.
      */
     private static void updateLock(Session session) {
         if (!(session.vehicle instanceof EntityRampUnit)) {
             return;
         }
-        DroneType type = ((EntityRampUnit) session.vehicle).getDroneType();
-        UUID owner = ((EntityRampUnit) session.vehicle).getOwner();
+        EntityRampUnit unit = (EntityRampUnit) session.vehicle;
+        DroneType type = unit.getDroneType();
+        UUID owner = unit.getOwner();
         if (type == null || !type.isSensor() || owner == null) {
             return;
         }
-        boolean fresh = session.lookDirection != null && session.player.world.getTotalWorldTime() - session.lookTick <= LOOK_STALE_TICKS;
-        Entity candidate = fresh ? lockCandidate(session, owner) : null;
-        if (session.lock.update(candidate == null ? LockTracker.NONE : candidate.getEntityId())) {
-            ReconIntel.lock(owner, candidate);
-            session.player.sendStatusMessage(new TextComponentTranslation("message.combat_drones.recon.locked", candidate.getName()), true);
+        boolean fresh = hasFreshLook(session);
+        if (!session.trigger) {
+            session.needsRelease = false;
         }
-        float progress = (float) session.lock.getProgress();
+        if (session.lockOn.isRunning()) {
+            Entity target = unit.world.getEntityByID(session.lockOn.getTarget());
+            boolean onTarget = fresh && target != null && ReconIntel.isEnemy(owner, target) && aimAngle(session, unit, target) >= 0;
+            LockOnAttempt.Result result = session.lockOn.tick(onTarget, session.trigger);
+            if (result == LockOnAttempt.Result.LOCKED) {
+                unit.spendLockCharge();
+                ReconIntel.lock(owner, target, unit.getUniqueID());
+                session.lockedShowTicks = LOCKED_SHOW_TICKS;
+                session.needsRelease = true;
+                session.player.sendStatusMessage(new TextComponentTranslation("message.combat_drones.recon.locked", target.getName()), true);
+            } else if (result == LockOnAttempt.Result.FAILED) {
+                unit.spendLockCharge();
+                session.needsRelease = true;
+                session.player.sendStatusMessage(new TextComponentTranslation("message.combat_drones.recon.lock_failed"), true);
+            }
+        } else if (fresh && session.trigger && !session.needsRelease && ModConfig.lockOnEnabled) {
+            Entity candidate = lockCandidate(session, unit, owner);
+            if (candidate != null) {
+                String refused = unit.getLockCharges() <= 0 ? "message.combat_drones.recon.no_charges"
+                        : ModConfig.maxActiveLockOns > 0 && ReconIntel.activeLockOns(unit.getUniqueID()) >= ModConfig.maxActiveLockOns
+                        ? "message.combat_drones.recon.lock_limit" : null;
+                if (refused == null) {
+                    session.lockOn.start(candidate.getEntityId());
+                } else {
+                    session.needsRelease = true;
+                    session.player.sendStatusMessage(new TextComponentTranslation(refused), true);
+                }
+            }
+        }
+        float progress;
+        if (session.lockedShowTicks > 0) {
+            session.lockedShowTicks--;
+            progress = 1;
+        } else {
+            // Just started reads as a sliver, so the client knows an attempt is on
+            progress = session.lockOn.isRunning() ? Math.max(0.01F, (float) session.lockOn.getProgress()) : 0;
+        }
         // Only on change, in 5% steps
         if (Math.abs(progress - session.sentProgress) >= 0.05F || (progress == 0) != (session.sentProgress == 0) || (progress >= 1) != (session.sentProgress >= 1)) {
             session.sentProgress = progress;
@@ -436,36 +510,50 @@ public final class RemoteSessions {
         }
     }
 
-    @Nullable
-    private static Entity lockCandidate(Session session, UUID owner) {
-        EntityRampUnit unit = (EntityRampUnit) session.vehicle;
-        Vec3d eye = ReconIntel.sensorPosition(unit);
-        double range = ModConfig.activeLockRange;
-        List<Entity> targets = new ArrayList<>(unit.world.playerEntities);
-        for (Session other : SESSIONS.values()) {
-            if (other.body.world == unit.world) {
-                targets.add(other.body); // stand-in bodies only exist during sessions
-            }
+    /** Leaving the camera (or the unit going down) mid-attempt counts as a failed one. */
+    private static void abandonLockOn(Session session) {
+        if (session.lockOn.isRunning() && session.vehicle instanceof EntityRampUnit) {
+            session.lockOn.start(LockOnAttempt.NONE);
+            ((EntityRampUnit) session.vehicle).spendLockCharge();
         }
+    }
+
+    /** The enemy closest to the crosshair that a lock-on could start on (not one this owner already has), or null. */
+    @Nullable
+    private static Entity lockCandidate(Session session, EntityRampUnit unit, UUID owner) {
+        Vec3d eye = ReconIntel.sensorPosition(unit);
+        AxisAlignedBB area = new AxisAlignedBB(eye.x, eye.y, eye.z, eye.x, eye.y, eye.z).grow(ModConfig.lockOnRange);
         Entity best = null;
         double bestAngle = Double.MAX_VALUE;
-        Vec3d rayEnd = eye.add(session.lookDirection.scale(range));
-        for (Entity target : targets) {
-            if (!ReconIntel.isEnemy(owner, target) || target.getDistanceSq(eye.x, eye.y, eye.z) > range * range) {
+        for (Entity target : unit.world.getEntitiesWithinAABB(Entity.class, area, entity -> ReconIntel.isEnemy(owner, entity))) {
+            if (ReconIntel.isLockedBy(owner, target.getUniqueID())) {
                 continue;
             }
-            Vec3d toTarget = new Vec3d(target.posX - eye.x, target.posY + target.height / 2 - eye.y, target.posZ - eye.z);
-            double angle = LockTracker.angleBetween(session.lookDirection.x, session.lookDirection.y, session.lookDirection.z,
-                    toTarget.x, toTarget.y, toTarget.z);
-            // Under the crosshair: within the cone, or the camera line passes through the target's (generously grown) box
-            boolean aimed = angle <= ModConfig.lockConeDegrees
-                    || target.getEntityBoundingBox().grow(LOCK_BOX_MARGIN).calculateIntercept(eye, rayEnd) != null;
-            if (aimed && angle < bestAngle && ReconIntel.hasLineOfSight(unit.world, eye, target)) {
+            double angle = aimAngle(session, unit, target);
+            if (angle >= 0 && angle < bestAngle) {
                 best = target;
                 bestAngle = angle;
             }
         }
         return best;
+    }
+
+    /**
+     * Degrees between the camera line and {@code target} if it counts as under the crosshair (within lockOnConeDegrees,
+     * or the camera line passes through its hitbox grown by lockOnAimMargin) in range and in sight; else -1.
+     */
+    private static double aimAngle(Session session, EntityRampUnit unit, Entity target) {
+        Vec3d eye = ReconIntel.sensorPosition(unit);
+        double range = ModConfig.lockOnRange;
+        if (target.getDistanceSq(eye.x, eye.y, eye.z) > range * range) {
+            return -1;
+        }
+        Vec3d look = Vec3d.fromPitchYaw(session.lookPitch, session.lookYaw);
+        Vec3d toTarget = new Vec3d(target.posX - eye.x, target.posY + target.height / 2 - eye.y, target.posZ - eye.z);
+        double angle = LockOnAttempt.angleBetween(look.x, look.y, look.z, toTarget.x, toTarget.y, toTarget.z);
+        boolean aimed = angle <= ModConfig.lockOnConeDegrees
+                || target.getEntityBoundingBox().grow(ModConfig.lockOnAimMargin).calculateIntercept(eye, eye.add(look.scale(range))) != null;
+        return aimed && ReconIntel.hasLineOfSight(unit.world, eye, target) ? angle : -1;
     }
 
     @SubscribeEvent

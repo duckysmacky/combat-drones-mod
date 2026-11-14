@@ -81,7 +81,6 @@ public class GuiMissionPlanner extends GuiScreen {
     private static final int BUTTON_MARK = 12;
     private static final int BUTTON_LAUNCH_FLY = 13;
     private static final int TARGET_COLOR = Ui.DANGER;
-    private static final int LOCKED_COLOR = Ui.DANGER;
     private static final int BORDER_COLOR = 0xC0D94F3C;
 
     private PlannerOpenPacket view;
@@ -449,8 +448,8 @@ public class GuiMissionPlanner extends GuiScreen {
     }
 
     /**
-     * Players the recon has spotted: fading red dots at their last seen spot, or a bright red diamond with a name
-     * for a locked target (which follows them live).
+     * What the recon tracks: a dot for each tracked target, a diamond with a name for a locked-on one. Players red,
+     * anything else yellow.
      */
     private void drawIntel() {
         for (IntelPacket.Entry mark : ClientIntel.getMarks()) {
@@ -459,15 +458,15 @@ public class GuiMissionPlanner extends GuiScreen {
             if (!insideMap(screenX, screenY)) {
                 continue;
             }
+            int color = mark.player ? Ui.DANGER : Ui.WARN;
             if (mark.locked) {
                 for (int row = -4; row <= 4; row++) {
                     int half = 4 - Math.abs(row);
-                    Gui.drawRect(screenX - half, screenY + row, screenX + half + 1, screenY + row + 1, LOCKED_COLOR);
+                    Gui.drawRect(screenX - half, screenY + row, screenX + half + 1, screenY + row + 1, color);
                 }
-                fontRenderer.drawStringWithShadow(mark.name, screenX + 6, screenY - 4, Ui.DANGER);
+                fontRenderer.drawStringWithShadow(mark.name, screenX + 6, screenY - 4, color);
             } else {
-                int alpha = 0x40 + (int) (Math.max(0, Math.min(1, mark.freshness)) * 0xBF);
-                Gui.drawRect(screenX - 2, screenY - 2, screenX + 3, screenY + 3, alpha << 24 | Ui.DANGER & 0xFFFFFF);
+                Gui.drawRect(screenX - 2, screenY - 2, screenX + 3, screenY + 3, color);
             }
         }
     }

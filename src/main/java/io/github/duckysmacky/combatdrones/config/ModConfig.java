@@ -28,6 +28,7 @@ import java.util.Map;
  *
  * <ul>
  *   <li>{@code [general]}: global server balance knobs.</li>
+ *   <li>{@code [uav]}: recon UAV tracking dots and lock-ons (server).</li>
  *   <li>{@code [client]}: options for your own client only; a server ignores them. Re-read alone by
  *       {@link #reloadClient}.</li>
  *   <li>{@code [batteries.<size>]}: battery pack capacity and weight multipliers, synced to clients.</li>
@@ -41,7 +42,11 @@ public final class ModConfig {
     public static final String FILE_NAME = CombatDrones.MOD_ID + ".toml";
     /** Keys from older versions, removed from existing files so they don't look like live settings. */
     private static final String[] RETIRED_KEYS = {"general.bombBlastPower", "missiles.missilePreparingSeconds", "missiles.inboundDelaySeconds",
-            "drones.gunship_rocket", "drones.gunship_gun", "weapons.rocketBlastPower"};
+            "drones.gunship_rocket", "drones.gunship_gun", "weapons.rocketBlastPower",
+            // Recon settings moved to [uav]
+            "general.detectionSweepRadius", "general.detectionDecaySeconds", "general.activeLockRange", "general.lockConeDegrees",
+            "general.activeLockHoldTicks", "general.activeLockDurationSeconds", "general.reconIntelForAllies", "general.activeLockForAllies",
+            "general.alwaysShowActiveLock", "general.ignoredTeams"};
 
     // [general]
     public static boolean blockDamageEnabled = true;
@@ -57,21 +62,33 @@ public final class ModConfig {
     public static double lowFuelFraction = 0.15;
     public static double maxMarkDistance = 256.0;
     public static double designateRange = 512.0;
-    public static double detectionSweepRadius = 64.0;
-    public static double detectionDecaySeconds = 15.0;
-    public static double activeLockRange = 192.0;
-    public static double lockConeDegrees = 6.0;
-    public static int activeLockHoldTicks = 30;
-    public static double activeLockDurationSeconds = 60.0;
-    public static boolean reconIntelForAllies = true;
-    public static boolean activeLockForAllies = true;
-    public static boolean alwaysShowActiveLock = false;
-    public static List<String> ignoredTeams = Collections.singletonList("ffa");
     public static double boostSpeedMultiplier = 1.5;
     public static double boostFuelMultiplier = 4.0;
     public static boolean worldBorderCollision = false;
     public static boolean pilotHintEnabled = true;
     public static double pilotHintRange = 48.0;
+
+    // [uav]
+    public static boolean trackingDotsEnabled = true;
+    public static double trackingRange = 192.0;
+    public static double trackingIntervalSeconds = 3.0;
+    public static boolean trackingNeedsPilot = true;
+    public static boolean trackingDotsForAllies = true;
+    public static boolean lockOnEnabled = true;
+    public static double lockOnRange = 192.0;
+    public static double lockOnConeDegrees = 6.0;
+    public static double lockOnAimMargin = 1.5;
+    public static double lockOnHoldSeconds = 5.0;
+    public static double lockOnDurationSeconds = 60.0;
+    public static int lockOnCharges = 3;
+    public static double lockOnReloadSeconds = 30.0;
+    public static int maxActiveLockOns = 1;
+    public static boolean reloadDuringLockOn = false;
+    public static boolean lockOnForAllies = true;
+    public static boolean lockOnWarning = true;
+    public static boolean lockedWarning = true;
+    public static boolean trackNonPlayers = false;
+    public static List<String> ignoredTeams = Collections.singletonList("ffa");
 
     // [weapons]
     public static int roundsPerRifleItem = 16;
@@ -247,29 +264,6 @@ public final class ModConfig {
             designateRange = defaults.number("general.designateRange", designateRange, 16, 1024,
                     "How far a point can be clicked from a click-designate munition's camera (light munition), in blocks. Long clicks "
                             + "may load the chunks along the line on the server.");
-            detectionSweepRadius = defaults.number("general.detectionSweepRadius", detectionSweepRadius, 8, 256,
-                    "How far a recon UAV spots players in its line of sight, in blocks (half against sneaking players).");
-            detectionDecaySeconds = defaults.number("general.detectionDecaySeconds", detectionDecaySeconds, 1, 600,
-                    "How long a spotted player stays marked at their last seen position, in seconds.");
-            activeLockRange = defaults.number("general.activeLockRange", activeLockRange, 8, 512,
-                    "How far the recon camera can lock a player, in blocks.");
-            lockConeDegrees = defaults.number("general.lockConeDegrees", lockConeDegrees, 0.5, 20,
-                    "How close to the camera crosshair a player must be to start a lock, in degrees.");
-            activeLockHoldTicks = (int) defaults.number("general.activeLockHoldTicks", activeLockHoldTicks, 1, 400,
-                    "Ticks the crosshair must stay on a player to lock them (20 ticks = 1 s).");
-            activeLockDurationSeconds = defaults.number("general.activeLockDurationSeconds", activeLockDurationSeconds, 1, 600,
-                    "How long a locked player is tracked live on the owner's map and cameras, in seconds.");
-            reconIntelForAllies = defaults.get("general.reconIntelForAllies", reconIntelForAllies,
-                    "Share recon UAV sightings (spotted players, on the planner map and in their own cameras) with the owner's vanilla "
-                            + "scoreboard teammates. Off: only the owner sees them.");
-            activeLockForAllies = defaults.get("general.activeLockForAllies", activeLockForAllies,
-                    "Share active locks (players locked from the recon camera, tracked live) with the owner's teammates. They see the "
-                            + "locked player boxed in the world while the owner is in the UAV camera.");
-            alwaysShowActiveLock = defaults.get("general.alwaysShowActiveLock", alwaysShowActiveLock,
-                    "Keep locked players boxed in the world for the whole lock, even after the owner leaves the UAV camera.");
-            ignoredTeams = defaults.list("general.ignoredTeams", ignoredTeams,
-                    "Scoreboard teams (case-insensitive) whose members aren't teammates for recon: they spot and lock each other and "
-                            + "share nothing. For free-for-all games that put everyone on one team.");
             boostSpeedMultiplier = defaults.number("general.boostSpeedMultiplier", boostSpeedMultiplier, 1, 4,
                     "Top speed multiplier while a remotely controlled loitering munition boosts (Space).");
             boostFuelMultiplier = defaults.number("general.boostFuelMultiplier", boostFuelMultiplier, 1, 20,
@@ -282,6 +276,50 @@ public final class ModConfig {
                     "Pilots' stand-in bodies give off radio static and a blinking red TX light, so players can find someone flying a drone or plane.");
             pilotHintRange = defaults.number("general.pilotHintRange", pilotHintRange, 8, 64,
                     "How far away a pilot's radio static can be heard, in blocks (quieter further out).");
+
+            trackingDotsEnabled = defaults.get("uav.trackingDotsEnabled", trackingDotsEnabled,
+                    "Enemies a flying recon UAV can see get a red dot above them, visible through walls to its owner (and teammates, "
+                            + "see trackingDotsForAllies). Walking out of the UAV's sight hides the dot at the next update.");
+            trackingRange = defaults.number("uav.trackingRange", trackingRange, 8, 512,
+                    "How far a recon UAV tracks enemies with dots, in blocks (half against sneaking players).");
+            trackingIntervalSeconds = defaults.number("uav.trackingIntervalSeconds", trackingIntervalSeconds, 0, 60,
+                    "How often tracking dots update, in seconds. Between updates a dot stays where its target was. 0 = live.");
+            trackingNeedsPilot = defaults.get("uav.trackingNeedsPilot", trackingNeedsPilot,
+                    "Tracking dots only while the owner watches through the UAV camera, and only for enemies on screen. Off: any "
+                            + "enemy in the UAV's sight gets a dot, watched or not.");
+            trackingDotsForAllies = defaults.get("uav.trackingDotsForAllies", trackingDotsForAllies,
+                    "Owner's vanilla scoreboard teammates also see the tracking dots (and the planner map dots). Off: only the owner.");
+            lockOnEnabled = defaults.get("uav.lockOnEnabled", lockOnEnabled,
+                    "Lock-on from the UAV camera: hold LMB with the crosshair on an enemy for lockOnHoldSeconds to box them through "
+                            + "walls for lockOnDurationSeconds.");
+            lockOnRange = defaults.number("uav.lockOnRange", lockOnRange, 8, 512, "How far the UAV camera can lock on, in blocks.");
+            lockOnConeDegrees = defaults.number("uav.lockOnConeDegrees", lockOnConeDegrees, 0.5, 20,
+                    "How close to the crosshair a target counts as aimed at, in degrees.");
+            lockOnAimMargin = defaults.number("uav.lockOnAimMargin", lockOnAimMargin, 0, 5,
+                    "Blocks added around a target's hitbox when checking whether the crosshair is on it (aim help with a moving camera).");
+            lockOnHoldSeconds = defaults.number("uav.lockOnHoldSeconds", lockOnHoldSeconds, 0.5, 30,
+                    "How long the crosshair must stay on the target, LMB held, to lock on, in seconds.");
+            lockOnDurationSeconds = defaults.number("uav.lockOnDurationSeconds", lockOnDurationSeconds, 1, 600,
+                    "How long a lock-on lasts, in seconds. The target stays boxed even out of the UAV's sight.");
+            lockOnCharges = (int) defaults.number("uav.lockOnCharges", lockOnCharges, 1, 20,
+                    "Lock-on charges a UAV carries. Every attempt uses one, failed or not.");
+            lockOnReloadSeconds = defaults.number("uav.lockOnReloadSeconds", lockOnReloadSeconds, 1, 600,
+                    "Seconds to win back one spent charge (one at a time).");
+            maxActiveLockOns = (int) defaults.number("uav.maxActiveLockOns", maxActiveLockOns, 0, 20,
+                    "Most lock-ons one UAV may have running at once. 0 = no limit.");
+            reloadDuringLockOn = defaults.get("uav.reloadDuringLockOn", reloadDuringLockOn,
+                    "Charges reload while the UAV has a lock-on running. Off: the reload waits until it ends.");
+            lockOnForAllies = defaults.get("uav.lockOnForAllies", lockOnForAllies,
+                    "Owner's vanilla scoreboard teammates also see locked-on targets boxed. Off: only the owner.");
+            lockOnWarning = defaults.get("uav.lockOnWarning", lockOnWarning,
+                    "A player being locked on gets a blinking warning and beeps while the lock-on builds.");
+            lockedWarning = defaults.get("uav.lockedWarning", lockedWarning,
+                    "A locked-on player gets a banner at the top of the screen for as long as the lock-on lasts.");
+            trackNonPlayers = defaults.get("uav.trackNonPlayers", trackNonPlayers,
+                    "Mobs and other living non-players can be tracked and locked on too, shown in yellow. Mostly for testing.");
+            ignoredTeams = defaults.list("uav.ignoredTeams", ignoredTeams,
+                    "Scoreboard teams (case-insensitive) whose members aren't teammates for the UAV: they track and lock each other "
+                            + "and share nothing. For free-for-all games that put everyone on one team.");
 
             roundsPerRifleItem = (int) defaults.number("weapons.roundsPerRifleItem", roundsPerRifleItem, 1, 256,
                     "Gun rounds one Rifle Rounds item loads into an Attack Plane's belt.");
@@ -374,6 +412,7 @@ public final class ModConfig {
 
             // Table comments last: a comment can only attach to a table that exists
             defaults.comment("general", "Global balance settings. On a server these apply to everyone.");
+            defaults.comment("uav", "Recon UAV: tracking dots over the enemies it sees, and lock-ons from its camera.");
             defaults.comment("weapons", "Armed plane weapons, fired only under manual control.");
             defaults.comment("missiles", "Cruise Missile launch, standby and strike. Its speed, warhead, health and standby fuel are in "
                     + "[drones.cruise_missile].");

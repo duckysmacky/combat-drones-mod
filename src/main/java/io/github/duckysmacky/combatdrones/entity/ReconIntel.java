@@ -7,6 +7,8 @@ import io.github.duckysmacky.combatdrones.network.IntelPacket;
 import io.github.duckysmacky.combatdrones.network.ModNetwork;
 import io.github.duckysmacky.combatdrones.type.DroneType;
 import net.minecraft.entity.Entity;
+import net.minecraft.entity.EntityLivingBase;
+import net.minecraft.entity.item.EntityArmorStand;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.scoreboard.Team;
@@ -22,6 +24,7 @@ import net.minecraftforge.fml.common.gameevent.TickEvent;
 
 import javax.annotation.Nullable;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -31,60 +34,119 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * Server-side intel from sensor units (the recon UAV): who each owner's recon has spotted, where, and until when.
- * A passive sighting holds the last-seen position for detectionDecaySeconds; an active lock (from the recon camera)
- * follows the target live for activeLockDurationSeconds. Marks belong to the unit's owner; teammates (same vanilla
- * team, unless it's in ignoredTeams) get sightings with reconIntelForAllies and locks with activeLockForAllies.
+ * Server-side intel from sensor units (the recon UAV). Tracking dots: every update a flying UAV marks the enemies in
+ * its sight (with trackingNeedsPilot only while its owner watches, and only those on screen); a dot lasts until the
+ * next update. Lock-ons (from the camera, see {@link RemoteSessions}) follow their target live for
+ * lockOnDurationSeconds, seen or not. Owners see their own; teammates (same vanilla team, unless it's in ignoredTeams)
+ * get dots with trackingDotsForAllies and lock-ons with lockOnForAllies.
  */
 @Mod.EventBusSubscriber(modid = CombatDrones.MOD_ID)
 public final class ReconIntel {
-    private static final int SWEEP_INTERVAL_TICKS = 10;
     private static final int SYNC_INTERVAL_TICKS = 10;
-    /** Most marks sent to one owner per update. */
+    /** How often a live (interval 0) tracker looks around; in between the client follows the target itself. */
+    private static final int LIVE_SWEEP_TICKS = 10;
+    /** Most marks sent to one player per update. */
     private static final int MAX_SENT_MARKS = 64;
 
+    /** One target as the intel knows it: where it is (a snapshot for a dot, live for a lock-on). */
     static final class Mark {
         final UUID targetId;
-        String name;
+        final int entityId;
+        final String name;
+        final boolean player;
         int dimension;
-        /** Where the target is: the last sighting, or live while locked. */
         double x;
         double y;
         double z;
-        /** Where it was last actually seen: all a teammate without shared locks gets. */
-        double seenX;
-        double seenY;
-        double seenZ;
-        long expiresAt;
-        long lockedUntil;
 
-        Mark(UUID targetId) {
+        Mark(UUID targetId, int entityId, String name, boolean player, int dimension, double x, double y, double z) {
             this.targetId = targetId;
+            this.entityId = entityId;
+            this.name = name;
+            this.player = player;
+            this.dimension = dimension;
+            this.x = x;
+            this.y = y;
+            this.z = z;
+        }
+
+        static Mark of(Entity target) {
+            return new Mark(target.getUniqueID(), target.getEntityId(), target.getName(), target instanceof EntityPlayer || target instanceof EntityPilotBody,
+                    target.dimension, target.posX, target.posY, target.posZ);
         }
     }
 
-    private static final Map<UUID, Map<UUID, Mark>> MARKS = new HashMap<>();
-    /** Owners whose client currently shows marks, so they get one last (empty) update when the marks run out. */
+    /** One UAV's dots from its last update. */
+    static final class Dots {
+        final UUID owner;
+        final int dimension;
+        /** Server tick after which the dots are dropped if no update replaced them (the unit is gone). */
+        final long until;
+        final List<Mark> marks;
+
+        Dots(UUID owner, int dimension, long until, List<Mark> marks) {
+            this.owner = owner;
+            this.dimension = dimension;
+            this.until = until;
+            this.marks = marks;
+        }
+    }
+
+    static final class LockOn {
+        final Mark mark;
+        final long until;
+        /** The UAV that locked it, for its active lock-on count. */
+        final UUID source;
+
+        LockOn(Mark mark, long until, UUID source) {
+            this.mark = mark;
+            this.until = until;
+            this.source = source;
+        }
+    }
+
+    /** By UAV. */
+    private static final Map<UUID, Dots> DOTS = new HashMap<>();
+    /** By owner, then target. */
+    private static final Map<UUID, Map<UUID, LockOn>> LOCK_ONS = new HashMap<>();
+    /** Players whose client currently shows marks, so they get one last (empty) update when the marks run out. */
     private static final Set<UUID> SHOWING = new HashSet<>();
 
     private ReconIntel() {
     }
 
-    /** Server, from a flying unit's tick: a sensor unit sweeps for enemies in line of sight every half second. */
+    /** Server, from a flying unit's tick: a sensor unit updates its tracking dots. */
     static void sweep(EntityRampUnit unit, DroneType type) {
         UUID owner = unit.getOwner();
-        if (!type.isSensor() || owner == null || unit.ticksExisted % SWEEP_INTERVAL_TICKS != 0) {
+        if (!type.isSensor() || owner == null) {
             return;
         }
-        double radius = ModConfig.detectionSweepRadius;
+        // No dots without a watcher, at once rather than at the next update
+        if (!ModConfig.trackingDotsEnabled || (ModConfig.trackingNeedsPilot && !RemoteSessions.isWatched(unit))) {
+            DOTS.remove(unit.getUniqueID());
+            return;
+        }
+        int interval = sweepInterval();
+        if (unit.ticksExisted % interval != 0) {
+            return;
+        }
+        double radius = ModConfig.trackingRange;
         Vec3d eye = sensorPosition(unit);
         AxisAlignedBB area = new AxisAlignedBB(eye.x, eye.y, eye.z, eye.x, eye.y, eye.z).grow(radius);
+        List<Mark> seen = new ArrayList<>();
         for (Entity target : unit.world.getEntitiesWithinAABB(Entity.class, area, entity -> isEnemy(owner, entity))) {
             double reach = target.isSneaking() ? radius / 2 : radius;
-            if (target.getDistanceSq(eye.x, eye.y, eye.z) <= reach * reach && hasLineOfSight(unit.world, eye, target)) {
-                spot(owner, target, false);
+            if (target.getDistanceSq(eye.x, eye.y, eye.z) <= reach * reach
+                    && (!ModConfig.trackingNeedsPilot || RemoteSessions.isOnScreen(unit, eye, target))
+                    && hasLineOfSight(unit.world, eye, target)) {
+                seen.add(Mark.of(target));
             }
         }
+        DOTS.put(unit.getUniqueID(), new Dots(owner, unit.dimension, clock() + interval + SYNC_INTERVAL_TICKS, seen));
+    }
+
+    private static int sweepInterval() {
+        return ModConfig.trackingIntervalSeconds <= 0 ? LIVE_SWEEP_TICKS : Math.max(1, (int) Math.round(ModConfig.trackingIntervalSeconds * 20));
     }
 
     static Vec3d sensorPosition(EntityRampUnit unit) {
@@ -92,9 +154,9 @@ public final class ReconIntel {
     }
 
     /**
-     * Whether {@code entity} is someone a recon owned by {@code owner} reports: any visible player (not spectating)
-     * who isn't a teammate, or a non-teammate's stand-in body. Invisible players, remote pilots riding their units included,
-     * stay hidden.
+     * Whether {@code entity} is someone a recon owned by {@code owner} tracks: any visible player (not spectating)
+     * who isn't a teammate, a non-teammate's stand-in body, or with trackNonPlayers any other living thing. Invisible
+     * players, remote pilots riding their units included, stay hidden.
      */
     static boolean isEnemy(UUID owner, @Nullable Entity entity) {
         if (entity == null || !entity.isEntityAlive()) {
@@ -105,7 +167,7 @@ public final class ReconIntel {
             return !isTeammate(owner, player) && !player.isSpectator() && !player.isInvisible();
         }
         if (!(entity instanceof EntityPilotBody)) {
-            return false;
+            return ModConfig.trackNonPlayers && entity instanceof EntityLivingBase && !(entity instanceof EntityArmorStand) && !entity.isInvisible();
         }
         UUID bodyOwner = ((EntityPilotBody) entity).getOwner();
         if (bodyOwner == null || owner.equals(bodyOwner)) {
@@ -120,7 +182,7 @@ public final class ReconIntel {
     /**
      * Whether {@code player} is on {@code owner}'s side: the owner, or a player on the owner's vanilla scoreboard team,
      * unless that team is in ignoredTeams (a free-for-all game typically puts everyone on one team). Teammates are never
-     * spotted or locked; whether they get the owner's intel is up to the sharing settings.
+     * tracked or locked; whether they get the owner's intel is up to the sharing settings.
      */
     static boolean isTeammate(UUID owner, EntityPlayer player) {
         if (owner.equals(player.getUniqueID())) {
@@ -166,27 +228,49 @@ public final class ReconIntel {
         return Raytrace.blocks(world, from, eyes) == null || Raytrace.blocks(world, from, middle) == null;
     }
 
-    /** Active lock: the target is tracked live for activeLockDurationSeconds. */
-    static void lock(UUID owner, Entity target) {
-        spot(owner, target, true);
+    /** A lock-on by {@code source} (a UAV): the target is followed live for lockOnDurationSeconds. */
+    static void lock(UUID owner, Entity target, UUID source) {
+        addLockOn(owner, new LockOn(Mark.of(target), clock() + (long) (ModConfig.lockOnDurationSeconds * 20), source));
     }
 
-    private static void spot(UUID owner, Entity target, boolean lock) {
-        long now = clock();
-        Mark mark = MARKS.computeIfAbsent(owner, key -> new HashMap<>()).computeIfAbsent(target.getUniqueID(), Mark::new);
-        mark.name = target.getName();
-        mark.dimension = target.dimension;
-        mark.x = target.posX;
-        mark.y = target.posY;
-        mark.z = target.posZ;
-        mark.seenX = target.posX;
-        mark.seenY = target.posY;
-        mark.seenZ = target.posZ;
-        // A passive sighting never cuts a lock short
-        mark.expiresAt = Math.max(mark.expiresAt, now + (long) (ModConfig.detectionDecaySeconds * 20));
-        if (lock) {
-            mark.lockedUntil = now + (long) (ModConfig.activeLockDurationSeconds * 20);
+    static void addLockOn(UUID owner, LockOn lockOn) {
+        LOCK_ONS.computeIfAbsent(owner, key -> new HashMap<>()).put(lockOn.mark.targetId, lockOn);
+    }
+
+    /** Whether {@code owner} has a running lock-on on {@code target}. */
+    static boolean isLockedBy(UUID owner, UUID target) {
+        Map<UUID, LockOn> locks = LOCK_ONS.get(owner);
+        LockOn lockOn = locks == null ? null : locks.get(target);
+        return lockOn != null && clock() <= lockOn.until;
+    }
+
+    /** Running lock-ons made by one UAV. */
+    static int activeLockOns(UUID source) {
+        return countLockOns(LOCK_ONS.values(), source, clock());
+    }
+
+    static int countLockOns(Collection<Map<UUID, LockOn>> locks, UUID source, long now) {
+        int count = 0;
+        for (Map<UUID, LockOn> owned : locks) {
+            for (LockOn lockOn : owned.values()) {
+                if (now <= lockOn.until && source.equals(lockOn.source)) {
+                    count++;
+                }
+            }
         }
+        return count;
+    }
+
+    /** Ticks left on the longest lock-on anyone has on {@code target}, or 0. */
+    static long lockedTicksLeft(UUID target, long now) {
+        long left = 0;
+        for (Map<UUID, LockOn> owned : LOCK_ONS.values()) {
+            LockOn lockOn = owned.get(target);
+            if (lockOn != null) {
+                left = Math.max(left, lockOn.until - now);
+            }
+        }
+        return left;
     }
 
     private static long clock() {
@@ -201,25 +285,24 @@ public final class ReconIntel {
             return;
         }
         long now = server.getTickCounter();
-        for (Iterator<Map.Entry<UUID, Map<UUID, Mark>>> owners = MARKS.entrySet().iterator(); owners.hasNext(); ) {
-            Map.Entry<UUID, Map<UUID, Mark>> entry = owners.next();
-            Map<UUID, Mark> marks = entry.getValue();
-            marks.values().removeIf(mark -> now > mark.expiresAt && now > mark.lockedUntil);
-            for (Mark mark : marks.values()) {
-                if (now <= mark.lockedUntil) {
-                    follow(server, mark);
-                }
+        DOTS.values().removeIf(dots -> now > dots.until);
+        for (Iterator<Map<UUID, LockOn>> owners = LOCK_ONS.values().iterator(); owners.hasNext(); ) {
+            Map<UUID, LockOn> locks = owners.next();
+            locks.values().removeIf(lockOn -> now > lockOn.until);
+            for (LockOn lockOn : locks.values()) {
+                follow(server, lockOn.mark);
             }
-            if (marks.isEmpty()) {
+            if (locks.isEmpty()) {
                 owners.remove();
             }
         }
+        boolean live = ModConfig.trackingIntervalSeconds <= 0;
         for (EntityPlayerMP player : server.getPlayerList().getPlayers()) {
-            sync(player, now);
+            sync(player, now, live);
         }
     }
 
-    /** A locked mark moves with its target, wherever it goes (as long as it's loaded somewhere). */
+    /** A locked-on mark moves with its target, wherever it goes (as long as it's loaded somewhere). */
     private static void follow(MinecraftServer server, Mark mark) {
         Entity target = server.getPlayerList().getPlayerByUUID(mark.targetId);
         if (target == null) {
@@ -234,27 +317,25 @@ public final class ReconIntel {
         }
     }
 
-    /** Sends a player the marks they may see: their own recon's, and their teammates' as far as those are shared. */
-    private static void sync(EntityPlayerMP player, long now) {
-        // The same target spotted by several recons shows once: the freshest (a lock beats any sighting)
+    /** Sends a player the marks they may see: their own UAVs', and their teammates' as far as those are shared. */
+    private static void sync(EntityPlayerMP player, long now, boolean live) {
+        // The same target marked by several UAVs shows once; a lock-on beats a dot
         Map<UUID, IntelPacket.Entry> merged = new HashMap<>();
-        for (Map.Entry<UUID, Map<UUID, Mark>> owner : MARKS.entrySet()) {
-            boolean own = owner.getKey().equals(player.getUniqueID());
-            if (!own && !isTeammate(owner.getKey(), player)) {
+        for (Dots dots : DOTS.values()) {
+            if (dots.dimension == player.dimension && sees(player, dots.owner, ModConfig.trackingDotsForAllies)) {
+                for (Mark mark : dots.marks) {
+                    merged.putIfAbsent(mark.targetId, entry(mark, false, live));
+                }
+            }
+        }
+        for (Map.Entry<UUID, Map<UUID, LockOn>> owner : LOCK_ONS.entrySet()) {
+            if (!sees(player, owner.getKey(), ModConfig.lockOnForAllies)) {
                 continue;
             }
-            boolean ownerViewing = RemoteSessions.isViewingUnit(owner.getKey());
-            for (Mark mark : owner.getValue().values()) {
-                IntelPacket.Entry entry = mark.dimension == player.dimension ? viewOf(mark, now, own, ownerViewing) : null;
-                if (entry == null) {
-                    continue;
+            for (LockOn lockOn : owner.getValue().values()) {
+                if (now <= lockOn.until && lockOn.mark.dimension == player.dimension) {
+                    merged.put(lockOn.mark.targetId, entry(lockOn.mark, true, true));
                 }
-                IntelPacket.Entry known = merged.get(mark.targetId);
-                IntelPacket.Entry best = known == null || (entry.locked && !known.locked)
-                        || (entry.locked == known.locked && entry.freshness > known.freshness) ? entry : known;
-                // Shown in the world if any owner's lock on it is
-                boolean inWorld = entry.inWorld || (known != null && known.inWorld);
-                merged.put(mark.targetId, inWorld && !best.inWorld ? withInWorld(best) : best);
             }
         }
         List<IntelPacket.Entry> entries = new ArrayList<>(merged.values());
@@ -270,28 +351,12 @@ public final class ReconIntel {
         ModNetwork.CHANNEL.sendTo(new IntelPacket(entries), player);
     }
 
-    /**
-     * What one viewer gets of a mark, or null for nothing: the owner ({@code own}) sees it all; a teammate gets the
-     * lock with activeLockForAllies, else the last sighting with reconIntelForAllies while it's fresh. A lock shows in
-     * the world outside cameras while its owner watches through a UAV ({@code ownerViewing}), or always with
-     * alwaysShowActiveLock.
-     */
-    @Nullable
-    static IntelPacket.Entry viewOf(Mark mark, long now, boolean own, boolean ownerViewing) {
-        boolean locked = now <= mark.lockedUntil;
-        boolean sighted = now <= mark.expiresAt;
-        boolean inWorld = ModConfig.alwaysShowActiveLock || ownerViewing;
-        if (locked && (own || ModConfig.activeLockForAllies)) {
-            return new IntelPacket.Entry(mark.x, mark.y, mark.z, mark.name, true, 1, inWorld);
-        }
-        if (sighted && (own || ModConfig.reconIntelForAllies)) {
-            float freshness = (float) Math.max(0, (mark.expiresAt - now) / (ModConfig.detectionDecaySeconds * 20));
-            return new IntelPacket.Entry(mark.seenX, mark.seenY, mark.seenZ, mark.name, false, freshness, false);
-        }
-        return null;
+    /** The owner sees all of their intel; a teammate only what's shared with allies. */
+    private static boolean sees(EntityPlayerMP player, UUID owner, boolean sharedWithAllies) {
+        return owner.equals(player.getUniqueID()) || (sharedWithAllies && isTeammate(owner, player));
     }
 
-    private static IntelPacket.Entry withInWorld(IntelPacket.Entry entry) {
-        return new IntelPacket.Entry(entry.x, entry.y, entry.z, entry.name, entry.locked, entry.freshness, true);
+    private static IntelPacket.Entry entry(Mark mark, boolean locked, boolean live) {
+        return new IntelPacket.Entry(mark.x, mark.y, mark.z, mark.entityId, mark.name, locked, mark.player, live);
     }
 }
