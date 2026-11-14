@@ -1,6 +1,7 @@
 package io.github.duckysmacky.combatdrones.client;
 
 import io.github.duckysmacky.combatdrones.CombatDrones;
+import io.github.duckysmacky.combatdrones.client.hud.FeedShader;
 import io.github.duckysmacky.combatdrones.config.ModConfig;
 import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.client.renderer.BufferBuilder;
@@ -19,7 +20,8 @@ import java.util.Random;
 /**
  * Analog FPV goggle noise: a low-res random grey texture stretched over the screen, re-rolled every other frame.
  * Faint on a good link, heavy near the edge of signal range. The Gunship's gunner seat gets an old CRT feed instead:
- * light noise, scanlines, a slow rolling band and the odd tear line. Drawn under the HUD so the OSD stays readable.
+ * light noise, scanlines, a slow rolling band and the odd tear line. Every feed comes up through a short burst of
+ * snow. Drawn under the HUD so the OSD stays readable; the colour grade itself is {@link FeedShader}'s.
  */
 @Mod.EventBusSubscriber(modid = CombatDrones.MOD_ID, value = Side.CLIENT)
 public final class StaticOverlay {
@@ -34,6 +36,9 @@ public final class StaticOverlay {
     private static final long ROLL_PERIOD_MS = 6000;
     private static final double ROLL_BAND_SHARE = 0.18;
     private static final float TEAR_CHANCE = 0.012F;
+    /** Link-up: how strong the burst of snow is when a feed comes up, and how long it takes to clear. */
+    private static final double LINK_UP_ALPHA = 0.85;
+    private static final long LINK_UP_MILLIS = 450;
 
     private static final Random RANDOM = new Random();
     private static DynamicTexture noise;
@@ -49,15 +54,18 @@ public final class StaticOverlay {
         if (event.getType() != RenderGameOverlayEvent.ElementType.ALL) {
             return;
         }
+        // Any feed comes up through a burst of snow as the link locks on
+        long linked = HudOverlay.sessionMillis();
+        double linkUp = HudOverlay.currentFeed() == null || linked >= LINK_UP_MILLIS ? 0
+                : LINK_UP_ALPHA * (1 - linked / (double) LINK_UP_MILLIS) * Math.min(1, ModConfig.staticIntensity);
         if (RemoteController.isGunner()) {
             drawGunnerCrt(event.getResolution());
-            return;
         }
-        if (PilotController.getPilotedDrone() == null) {
-            return;
+        double alpha = linkUp;
+        if (PilotController.getPilotedDrone() != null) {
+            // Quadratic: faint on a decent link, clearly building from mid-signal (70% -> 8%, 50% -> 22%, 30% -> 44%)
+            alpha = Math.max(alpha, (BASE_ALPHA + Math.pow(1 - PilotController.getSignalQuality(), 2) * MAX_EXTRA_ALPHA) * ModConfig.staticIntensity);
         }
-        // Quadratic: faint on a decent link, clearly building from mid-signal (70% -> 8%, 50% -> 22%, 30% -> 44%)
-        double alpha = (BASE_ALPHA + Math.pow(1 - PilotController.getSignalQuality(), 2) * MAX_EXTRA_ALPHA) * ModConfig.staticIntensity;
         if (alpha <= 0.001) {
             return;
         }
@@ -101,7 +109,8 @@ public final class StaticOverlay {
         // Scanlines in real pixels, so they stay fine at any GUI scale
         double pixel = 1.0 / resolution.getScaleFactor();
         int lineAlpha = (int) Math.min(255, SCANLINE_ALPHA * intensity);
-        for (double y = 0; y < height; y += SCANLINE_SPACING_PX * pixel) {
+        // The feed shader draws its own scanlines; these are for clients without it
+        for (double y = 0; y < height && !FeedShader.isActive(); y += SCANLINE_SPACING_PX * pixel) {
             quad(buffer, 0, y, width, y + pixel, 0, lineAlpha, lineAlpha);
         }
         // A faint bright band rolling down the picture

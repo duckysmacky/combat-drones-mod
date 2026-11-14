@@ -286,6 +286,25 @@ public final class GeoModels implements IGeoRenderer<Object> {
         return count;
     }
 
+    /**
+     * Hides every top-level bone whose name doesn't start with {@code prefix}, leaving the rest as posed (the
+     * first-person view keeps only the prop hubs). Returns how many stay visible.
+     */
+    public static int showOnly(String name, String prefix) {
+        GeoModel model = get(name);
+        int count = 0;
+        if (model != null) {
+            for (GeoBone bone : model.topLevelBones) {
+                if (bone.getName().startsWith(prefix)) {
+                    count++;
+                } else {
+                    bone.setHidden(true);
+                }
+            }
+        }
+        return count;
+    }
+
     /** Lamps a running aircraft shows: steady navigation lights and a strobe that flashes about once a second. */
     public static void lights(String name, boolean on, float time) {
         show(name, "glow_nav", on);

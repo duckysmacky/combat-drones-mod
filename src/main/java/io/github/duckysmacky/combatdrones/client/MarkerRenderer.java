@@ -119,7 +119,7 @@ public final class MarkerRenderer {
     }
 
     private static void line(BufferBuilder buffer, double x1, double y1, double z1, double x2, double y2, double z2, float alpha) {
-        buffer.pos(x1, y1, z1).color(1.0F, 0.15F, 0.15F, alpha).endVertex();
-        buffer.pos(x2, y2, z2).color(1.0F, 0.15F, 0.15F, alpha).endVertex();
+        buffer.pos(x1, y1, z1).color(0.85F, 0.31F, 0.24F, alpha).endVertex();
+        buffer.pos(x2, y2, z2).color(0.85F, 0.31F, 0.24F, alpha).endVertex();
     }
 }

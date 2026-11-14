@@ -1,0 +1,27 @@
+{
+    "targets": [
+        "swap"
+    ],
+    "passes": [
+        {
+            "name": "combat_drones:feed",
+            "intarget": "minecraft:main",
+            "outtarget": "swap",
+            "uniforms": [
+                { "name": "Saturation", "values": [ 0.82 ] },
+                { "name": "Contrast", "values": [ 1.06 ] },
+                { "name": "Scanline", "values": [ 0.10 ] },
+                { "name": "Vignette", "values": [ 0.45 ] },
+                { "name": "Barrel", "values": [ 0.55 ] },
+                { "name": "Chroma", "values": [ 1.6 ] },
+                { "name": "Noise", "values": [ 0.05 ] },
+                { "name": "Tint", "values": [ 1.0, 0.98, 0.94 ] }
+            ]
+        },
+        {
+            "name": "blit",
+            "intarget": "swap",
+            "outtarget": "minecraft:main"
+        }
+    ]
+}
