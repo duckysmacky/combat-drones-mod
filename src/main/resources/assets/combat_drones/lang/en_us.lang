@@ -457,7 +457,6 @@ subtitles.combat_drones.drone.place=Drone set down
 subtitles.combat_drones.drone.pickup=Drone picked up
 subtitles.combat_drones.unit.install=Unit locked onto ramp
 subtitles.combat_drones.unit.remove=Unit taken off ramp
-subtitles.combat_drones.unit.fuel=Fuel poured
 subtitles.combat_drones.unit.ammo=Ammunition loaded
 subtitles.combat_drones.pad.load=Missile seated
 subtitles.combat_drones.ramp.place=Launcher set down

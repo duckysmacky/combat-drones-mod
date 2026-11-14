@@ -605,13 +605,6 @@
       "combat_drones:unit/remove"
     ]
   },
-  "unit.fuel": {
-    "category": "player",
-    "subtitle": "subtitles.combat_drones.unit.fuel",
-    "sounds": [
-      "combat_drones:unit/fuel"
-    ]
-  },
   "unit.ammo": {
     "category": "player",
     "subtitle": "subtitles.combat_drones.unit.ammo",

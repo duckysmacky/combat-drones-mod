@@ -25,7 +25,6 @@ public final class ModSounds {
     public static final SoundEvent DRONE_PICKUP = create("drone.pickup");
     public static final SoundEvent UNIT_INSTALL = create("unit.install");
     public static final SoundEvent UNIT_REMOVE = create("unit.remove");
-    public static final SoundEvent UNIT_FUEL = create("unit.fuel");
     public static final SoundEvent UNIT_AMMO = create("unit.ammo");
     public static final SoundEvent PAD_LOAD = create("pad.load");
     public static final SoundEvent RAMP_PLACE = create("ramp.place");
@@ -61,6 +60,6 @@ public final class ModSounds {
     public static void registerSounds(RegistryEvent.Register<SoundEvent> event) {
         event.getRegistry().registerAll(DRONE_MOTOR, DRONE_LINK, DRONE_BEEP, DRONE_BATTERY, DRONE_ATTACH, DRONE_CONNECT, DRONE_HIT, DRONE_PILOT_STATIC, UNIT_LAUNCH,
                 GUNSHIP_ROCKET, GUNSHIP_GUN, UNIT_BOOST, BOMB_RELEASE, BULLET_IMPACT, BULLET_FLYBY, MISSILE_IGNITION, MISSILE_LIFTOFF, MISSILE_SCREAM, MISSILE_ALARM,
-                DRONE_PLACE, DRONE_PICKUP, UNIT_INSTALL, UNIT_REMOVE, UNIT_FUEL, UNIT_AMMO, PAD_LOAD, RAMP_PLACE);
+                DRONE_PLACE, DRONE_PICKUP, UNIT_INSTALL, UNIT_REMOVE, UNIT_AMMO, PAD_LOAD, RAMP_PLACE);
     }
 }

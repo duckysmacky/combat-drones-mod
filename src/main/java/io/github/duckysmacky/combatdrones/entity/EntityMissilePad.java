@@ -1,5 +1,6 @@
 package io.github.duckysmacky.combatdrones.entity;
 
+import net.minecraft.init.SoundEvents;
 import io.github.duckysmacky.combatdrones.CombatDrones;
 import io.github.duckysmacky.combatdrones.ModContent;
 import io.github.duckysmacky.combatdrones.ModSounds;
@@ -169,7 +170,7 @@ public class EntityMissilePad extends Entity {
         if (!player.capabilities.isCreativeMode) {
             stack.shrink(1);
         }
-        Feedback.done(this, ModSounds.UNIT_FUEL, 0.85F);
+        Feedback.done(this, SoundEvents.ITEM_BUCKET_EMPTY, 0.75F);
         status(player, "message.combat_drones.ramp.refuelled");
     }
 
