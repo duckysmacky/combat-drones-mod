@@ -1,5 +1,6 @@
 package io.github.duckysmacky.combatdrones.client;
 
+import io.github.duckysmacky.combatdrones.client.hud.UiSounds;
 import io.github.duckysmacky.combatdrones.CombatDrones;
 import io.github.duckysmacky.combatdrones.ModSounds;
 import io.github.duckysmacky.combatdrones.config.ModConfig;
@@ -201,6 +202,7 @@ public final class PilotController {
 
     private static void stop(Minecraft minecraft, EntityPlayerSP player) {
         drone.stopLocalPiloting();
+        UiSounds.play(UiSounds.LINK_DOWN);
         if (minecraft.getRenderViewEntity() == drone) {
             minecraft.setRenderViewEntity(player);
         }

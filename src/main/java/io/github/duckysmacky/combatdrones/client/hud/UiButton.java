@@ -1,6 +1,7 @@
 package io.github.duckysmacky.combatdrones.client.hud;
 
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.audio.SoundHandler;
 import net.minecraft.client.gui.GuiButton;
 import net.minecraft.client.renderer.GlStateManager;
 
@@ -12,6 +13,11 @@ public class UiButton extends GuiButton {
 
     public UiButton(int id, int x, int y, int width, int height, String text) {
         super(id, x, y, width, height, text);
+    }
+
+    @Override
+    public void playPressSound(SoundHandler soundHandler) {
+        UiSounds.play(UiSounds.CLICK);
     }
 
     @Override

@@ -1,5 +1,6 @@
 package io.github.duckysmacky.combatdrones.client;
 
+import io.github.duckysmacky.combatdrones.client.hud.UiSounds;
 import io.github.duckysmacky.combatdrones.CombatDrones;
 import io.github.duckysmacky.combatdrones.ModSounds;
 import io.github.duckysmacky.combatdrones.entity.EntityHandFlownDrone;
@@ -186,6 +187,7 @@ public final class RemoteController {
         stickPitch = 0;
         stickRoll = 0;
         throttle = START_THROTTLE;
+        UiSounds.play(UiSounds.CONFIRM);
         if (minecraft.player != null) {
             minecraft.player.sendStatusMessage(new TextComponentTranslation(underControl ? "message.combat_drones.remote.control_started"
                     : "message.combat_drones.remote.view_started", Tooltips.keyName(DroneKeys.TOGGLE_FPV)), true);
@@ -195,6 +197,9 @@ public final class RemoteController {
     private static void stop(Minecraft minecraft) {
         if (minecraft.player != null && minecraft.getRenderViewEntity() == unit) {
             minecraft.setRenderViewEntity(minecraft.player);
+        }
+        if (unitId >= 0) {
+            UiSounds.play(UiSounds.LINK_DOWN);
         }
         unitId = -1;
         unit = null;
@@ -489,7 +494,11 @@ public final class RemoteController {
             event.setCanceled(true);
             // Wheel zooms the look camera (stick flight keeps the plain forward view)
             if (event.getDwheel() != 0 && !isStickControl()) {
-                zoom = event.getDwheel() > 0 ? Math.min(MAX_ZOOM, zoom * 2) : Math.max(1, zoom / 2);
+                int zoomed = event.getDwheel() > 0 ? Math.min(MAX_ZOOM, zoom * 2) : Math.max(1, zoom / 2);
+                if (zoomed != zoom) {
+                    UiSounds.play(UiSounds.CLICK, zoomed > zoom ? 1.2F : 0.9F);
+                }
+                zoom = zoomed;
             }
             // Click-designate: strike whatever the camera is looking at; the server traces it from the unit
             if (event.getButton() == 0 && event.isButtonstate() && control && unit != null

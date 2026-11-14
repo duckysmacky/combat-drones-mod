@@ -534,5 +534,103 @@
     "sounds": [
       "combat_drones:gunship/howitzer_far"
     ]
+  },
+  "ui.click": {
+    "category": "master",
+    "sounds": [
+      "combat_drones:ui/click"
+    ]
+  },
+  "ui.select": {
+    "category": "master",
+    "sounds": [
+      "combat_drones:ui/select"
+    ]
+  },
+  "ui.confirm": {
+    "category": "master",
+    "sounds": [
+      "combat_drones:ui/confirm"
+    ]
+  },
+  "ui.deny": {
+    "category": "master",
+    "sounds": [
+      "combat_drones:ui/deny"
+    ]
+  },
+  "ui.lock_tick": {
+    "category": "master",
+    "sounds": [
+      "combat_drones:ui/lock_tick"
+    ]
+  },
+  "ui.lock_lost": {
+    "category": "master",
+    "sounds": [
+      "combat_drones:ui/lock_lost"
+    ]
+  },
+  "ui.link_down": {
+    "category": "master",
+    "sounds": [
+      "combat_drones:ui/lock_lost"
+    ]
+  },
+  "drone.place": {
+    "category": "player",
+    "subtitle": "subtitles.combat_drones.drone.place",
+    "sounds": [
+      "combat_drones:drone/place"
+    ]
+  },
+  "drone.pickup": {
+    "category": "player",
+    "subtitle": "subtitles.combat_drones.drone.pickup",
+    "sounds": [
+      "combat_drones:drone/pickup"
+    ]
+  },
+  "unit.install": {
+    "category": "player",
+    "subtitle": "subtitles.combat_drones.unit.install",
+    "sounds": [
+      "combat_drones:unit/install"
+    ]
+  },
+  "unit.remove": {
+    "category": "player",
+    "subtitle": "subtitles.combat_drones.unit.remove",
+    "sounds": [
+      "combat_drones:unit/remove"
+    ]
+  },
+  "unit.fuel": {
+    "category": "player",
+    "subtitle": "subtitles.combat_drones.unit.fuel",
+    "sounds": [
+      "combat_drones:unit/fuel"
+    ]
+  },
+  "unit.ammo": {
+    "category": "player",
+    "subtitle": "subtitles.combat_drones.unit.ammo",
+    "sounds": [
+      "combat_drones:unit/ammo"
+    ]
+  },
+  "pad.load": {
+    "category": "player",
+    "subtitle": "subtitles.combat_drones.pad.load",
+    "sounds": [
+      "combat_drones:pad/load"
+    ]
+  },
+  "ramp.place": {
+    "category": "player",
+    "subtitle": "subtitles.combat_drones.ramp.place",
+    "sounds": [
+      "combat_drones:ramp/place"
+    ]
   }
 }

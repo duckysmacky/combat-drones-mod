@@ -1,5 +1,6 @@
 package io.github.duckysmacky.combatdrones.client;
 
+import io.github.duckysmacky.combatdrones.client.hud.UiSounds;
 import io.github.duckysmacky.combatdrones.CombatDrones;
 import io.github.duckysmacky.combatdrones.ModSounds;
 import io.github.duckysmacky.combatdrones.network.IntelPacket;
@@ -22,6 +23,8 @@ public final class ClientIntel {
     private static List<IntelPacket.Entry> marks = Collections.emptyList();
     /** Lock progress on whatever is under the recon camera's crosshair, 0..1 (1 = locked). */
     private static float lockProgress;
+    /** How many ticks sound while a lock builds from nothing to locked. */
+    private static final int LOCK_TICKS = 6;
 
     private ClientIntel() {
     }
@@ -41,6 +44,11 @@ public final class ClientIntel {
     static void setLockProgress(float progress) {
         if (progress >= 1 && lockProgress < 1) {
             Minecraft.getMinecraft().getSoundHandler().playSound(PositionedSoundRecord.getMasterRecord(ModSounds.DRONE_BEEP, 1.8F));
+        } else if (progress < 1 && (int) (progress * LOCK_TICKS) > (int) (lockProgress * LOCK_TICKS)) {
+            // The lock building: ticks that climb in pitch
+            UiSounds.play(UiSounds.LOCK_TICK, 0.8F + progress * 0.6F);
+        } else if (progress <= 0 && lockProgress > 0 && RemoteController.getUnit() != null) {
+            UiSounds.play(UiSounds.LOCK_LOST);
         }
         lockProgress = progress;
     }

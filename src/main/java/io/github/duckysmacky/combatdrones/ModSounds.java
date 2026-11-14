@@ -20,6 +20,15 @@ public final class ModSounds {
     public static final SoundEvent DRONE_ATTACH = create("drone.attach");
     public static final SoundEvent DRONE_CONNECT = create("drone.connect");
     public static final SoundEvent DRONE_HIT = create("drone.hit");
+    // Handling: one sound per job
+    public static final SoundEvent DRONE_PLACE = create("drone.place");
+    public static final SoundEvent DRONE_PICKUP = create("drone.pickup");
+    public static final SoundEvent UNIT_INSTALL = create("unit.install");
+    public static final SoundEvent UNIT_REMOVE = create("unit.remove");
+    public static final SoundEvent UNIT_FUEL = create("unit.fuel");
+    public static final SoundEvent UNIT_AMMO = create("unit.ammo");
+    public static final SoundEvent PAD_LOAD = create("pad.load");
+    public static final SoundEvent RAMP_PLACE = create("ramp.place");
     /** Radio static and telemetry chirps given off by a pilot's stand-in body, so others can find them. */
     public static final SoundEvent DRONE_PILOT_STATIC = create("drone.pilot_static");
     public static final SoundEvent UNIT_LAUNCH = create("unit.launch");
@@ -51,6 +60,7 @@ public final class ModSounds {
     @SubscribeEvent
     public static void registerSounds(RegistryEvent.Register<SoundEvent> event) {
         event.getRegistry().registerAll(DRONE_MOTOR, DRONE_LINK, DRONE_BEEP, DRONE_BATTERY, DRONE_ATTACH, DRONE_CONNECT, DRONE_HIT, DRONE_PILOT_STATIC, UNIT_LAUNCH,
-                GUNSHIP_ROCKET, GUNSHIP_GUN, UNIT_BOOST, BOMB_RELEASE, BULLET_IMPACT, BULLET_FLYBY, MISSILE_IGNITION, MISSILE_LIFTOFF, MISSILE_SCREAM, MISSILE_ALARM);
+                GUNSHIP_ROCKET, GUNSHIP_GUN, UNIT_BOOST, BOMB_RELEASE, BULLET_IMPACT, BULLET_FLYBY, MISSILE_IGNITION, MISSILE_LIFTOFF, MISSILE_SCREAM, MISSILE_ALARM,
+                DRONE_PLACE, DRONE_PICKUP, UNIT_INSTALL, UNIT_REMOVE, UNIT_FUEL, UNIT_AMMO, PAD_LOAD, RAMP_PLACE);
     }
 }

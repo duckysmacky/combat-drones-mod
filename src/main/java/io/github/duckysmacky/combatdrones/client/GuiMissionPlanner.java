@@ -1,5 +1,6 @@
 package io.github.duckysmacky.combatdrones.client;
 
+import io.github.duckysmacky.combatdrones.client.hud.UiSounds;
 import io.github.duckysmacky.combatdrones.client.hud.Ui;
 import io.github.duckysmacky.combatdrones.client.hud.UiButton;
 import io.github.duckysmacky.combatdrones.item.ItemDrone;
@@ -704,6 +705,9 @@ public class GuiMissionPlanner extends GuiScreen {
             if (!inside || menu.click(fontRenderer, width, height, mouseX, mouseY)) {
                 menu = null;
             }
+            if (inside) {
+                UiSounds.play(UiSounds.CLICK);
+            }
             refreshButtons();
             if (inside) {
                 return;
@@ -713,6 +717,7 @@ public class GuiMissionPlanner extends GuiScreen {
         if (mouseX >= MARGIN && mouseX <= MARGIN + PANEL_WIDTH) {
             int unitRow = (mouseY - mapTop - ROW) / ROW;
             if (mouseY >= mapTop + ROW && unitRow < view.units.size()) {
+                UiSounds.play(UiSounds.SELECT);
                 clickUnitList(unitRow);
             } else {
                 clickWaypointList(mouseY);
@@ -774,6 +779,7 @@ public class GuiMissionPlanner extends GuiScreen {
         Route.Waypoint previous = waypoints.isEmpty() ? null : waypoints.get(waypoints.size() - 1);
         double altitude = previous != null ? previous.altitude : defaultAltitude();
         Route.Speed speed = previous != null ? previous.speed : Route.Speed.MEDIUM;
+        UiSounds.play(UiSounds.SELECT, 1.2F);
         waypoints.add(new Route.Waypoint(Math.round(worldX), Math.round(worldZ), altitude, speed));
         selectedWaypoint = waypoints.size() - 1;
         dirty = true;
@@ -884,6 +890,7 @@ public class GuiMissionPlanner extends GuiScreen {
         int listTop = mapTop + ROW * (Math.max(1, view.units.size()) + 2) + 4 + ROW * groundedAmmoRows();
         int row = (mouseY - listTop) / ROW;
         if (mouseY >= listTop && row < waypoints.size()) {
+            UiSounds.play(UiSounds.SELECT);
             selectedWaypoint = row;
             refreshButtons();
         }

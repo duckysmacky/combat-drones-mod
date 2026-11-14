@@ -1,5 +1,6 @@
 package io.github.duckysmacky.combatdrones.client;
 
+import io.github.duckysmacky.combatdrones.client.hud.UiSounds;
 import io.github.duckysmacky.combatdrones.client.hud.Ui;
 import io.github.duckysmacky.combatdrones.ModSounds;
 import io.github.duckysmacky.combatdrones.network.ModNetwork;
@@ -306,7 +307,7 @@ public class GuiMissileTablet extends GuiScreen {
     }
 
     private void pressBigButton() {
-        beep(1.4F);
+        UiSounds.play(UiSounds.CONFIRM);
         if (status.state.canLaunch()) {
             ModNetwork.CHANNEL.sendToServer(new TabletActionPacket(TabletActionPacket.Action.LAUNCH, 0, 0));
         } else if (status.state == TabletStatusPacket.State.STANDBY) {
@@ -481,12 +482,12 @@ public class GuiMissileTablet extends GuiScreen {
             double targetX = toWorldX(mouseX);
             double targetZ = toWorldZ(mouseY);
             if (!targetValid(targetX, targetZ)) {
-                beep(0.6F);
+                UiSounds.play(UiSounds.DENY);
                 return;
             }
             strikeSent = true;
             setCursorHidden(false);
-            beep(1.8F);
+            UiSounds.play(UiSounds.CONFIRM, 1.25F);
             ModNetwork.CHANNEL.sendToServer(new TabletActionPacket(TabletActionPacket.Action.STRIKE, targetX, targetZ));
         }
     }
@@ -523,10 +524,6 @@ public class GuiMissileTablet extends GuiScreen {
             return;
         }
         super.keyTyped(typedChar, keyCode);
-    }
-
-    private void beep(float pitch) {
-        mc.getSoundHandler().playSound(PositionedSoundRecord.getMasterRecord(ModSounds.DRONE_BEEP, pitch));
     }
 
     /** Hides the OS cursor (the hitmarker replaces it); silently does nothing where the system can't. */
