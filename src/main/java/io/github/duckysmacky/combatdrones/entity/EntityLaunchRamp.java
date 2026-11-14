@@ -183,11 +183,11 @@ public class EntityLaunchRamp extends Entity implements ChunkAnchor.Holder {
     /** Server: links the ramp to {@code player}'s Mission Planner. Returns false (with a message) if they can't. */
     public boolean link(EntityPlayer player) {
         if (!isLoaded()) {
-            status(player, "message.combat_drones.ramp.empty");
+            refuse(player, "message.combat_drones.ramp.empty");
             return false;
         }
         if (!isOwnedBy(player)) {
-            status(player, "message.combat_drones.ramp.not_owner");
+            refuse(player, "message.combat_drones.ramp.not_owner");
             return false;
         }
         if (!linked) {
@@ -225,8 +225,12 @@ public class EntityLaunchRamp extends Entity implements ChunkAnchor.Holder {
     public boolean processInitialInteract(EntityPlayer player, EnumHand hand) {
         ItemStack stack = player.getHeldItem(hand);
         if (world.isRemote) {
-            return stack.getItem() instanceof ItemDrone || stack.getItem() == ModContent.fuelCan || ammoWeapon(stack) != null
+            boolean handled = stack.getItem() instanceof ItemDrone || stack.getItem() == ModContent.fuelCan || ammoWeapon(stack) != null
                     || stack.getItem() == ModContent.missionPlanner || (stack.isEmpty() && player.isSneaking());
+            if (handled) {
+                player.swingArm(hand);
+            }
+            return handled;
         }
         if (stack.getItem() instanceof ItemDrone) {
             install(player, stack);
@@ -238,9 +242,10 @@ public class EntityLaunchRamp extends Entity implements ChunkAnchor.Holder {
             PlannerServer.linkAndOpen(player, this);
         } else if (stack.isEmpty() && player.isSneaking() && isLoaded()) {
             if (!isOwnedBy(player)) {
-                status(player, "message.combat_drones.ramp.not_owner");
+                refuse(player, "message.combat_drones.ramp.not_owner");
             } else {
                 ItemHandlerHelper.giveItemToPlayer(player, takeUnit());
+                Feedback.done(this, ModSounds.UNIT_REMOVE, 1.0F);
             }
         } else {
             return false;
@@ -251,15 +256,15 @@ public class EntityLaunchRamp extends Entity implements ChunkAnchor.Holder {
     private void install(EntityPlayer player, ItemStack stack) {
         DroneType type = ((ItemDrone) stack.getItem()).getDroneType();
         if (type == null || type.getCategory() != DroneType.Category.RAMP_AUTOPILOT) {
-            status(player, "message.combat_drones.ramp.not_ramp_unit");
+            refuse(player, "message.combat_drones.ramp.not_ramp_unit");
             return;
         }
         if (Kind.forUnit(type) != getKind()) {
-            status(player, Kind.forUnit(type) == Kind.PLANE ? "message.combat_drones.ramp.needs_plane_ramp" : "message.combat_drones.ramp.needs_munition_ramp");
+            refuse(player, Kind.forUnit(type) == Kind.PLANE ? "message.combat_drones.ramp.needs_plane_ramp" : "message.combat_drones.ramp.needs_munition_ramp");
             return;
         }
         if (isLoaded()) {
-            status(player, "message.combat_drones.ramp.occupied");
+            refuse(player, "message.combat_drones.ramp.occupied");
             return;
         }
         dataManager.set(UNIT_TYPE, type.getId());
@@ -270,7 +275,7 @@ public class EntityLaunchRamp extends Entity implements ChunkAnchor.Holder {
         if (!player.capabilities.isCreativeMode) {
             stack.shrink(1);
         }
-        world.playSound(null, posX, posY, posZ, ModSounds.DRONE_BATTERY, SoundCategory.BLOCKS, 1.0F, 0.8F);
+        Feedback.done(this, ModSounds.UNIT_INSTALL, 1.0F);
         status(player, "message.combat_drones.ramp.installed");
     }
 
@@ -278,18 +283,18 @@ public class EntityLaunchRamp extends Entity implements ChunkAnchor.Holder {
     private void refuel(EntityPlayer player, ItemStack stack) {
         DroneType type = getUnitType();
         if (type == null) {
-            status(player, "message.combat_drones.ramp.empty");
+            refuse(player, "message.combat_drones.ramp.empty");
             return;
         }
         if (getFuelFraction() >= 1) {
-            status(player, "message.combat_drones.ramp.full");
+            refuse(player, "message.combat_drones.ramp.full");
             return;
         }
         setFuel(type.getBatteryOrFuelCapacity());
         if (!player.capabilities.isCreativeMode) {
             stack.shrink(1);
         }
-        world.playSound(null, posX, posY, posZ, ModSounds.DRONE_ATTACH, SoundCategory.BLOCKS, 1.0F, 0.6F);
+        Feedback.done(this, ModSounds.UNIT_FUEL, 1.0F);
         status(player, "message.combat_drones.ramp.refuelled");
     }
 
@@ -326,12 +331,12 @@ public class EntityLaunchRamp extends Entity implements ChunkAnchor.Holder {
     private void loadAmmo(EntityPlayer player, ItemStack stack) {
         DroneType type = getUnitType();
         if (type == null) {
-            status(player, "message.combat_drones.ramp.empty");
+            refuse(player, "message.combat_drones.ramp.empty");
             return;
         }
         int station = type.stationOf(ammoWeapon(stack));
         if (station < 0) {
-            status(player, "message.combat_drones.ramp.wrong_ammo");
+            refuse(player, "message.combat_drones.ramp.wrong_ammo");
             return;
         }
         RocketType kind = rocketKindOf(stack);
@@ -344,7 +349,7 @@ public class EntityLaunchRamp extends Entity implements ChunkAnchor.Holder {
         int capacity = loadout.capacity(type, station);
         int space = capacity - loadout.getAmmo(station);
         if (space <= 0) {
-            status(player, "message.combat_drones.ramp.ammo_full");
+            refuse(player, "message.combat_drones.ramp.ammo_full");
             return;
         }
         // Round up so a part-filled belt can still be topped off; the extra rounds are lost
@@ -353,7 +358,7 @@ public class EntityLaunchRamp extends Entity implements ChunkAnchor.Holder {
         if (!player.capabilities.isCreativeMode) {
             stack.shrink(items);
         }
-        world.playSound(null, posX, posY, posZ, ModSounds.DRONE_ATTACH, SoundCategory.BLOCKS, 1.0F, 1.0F);
+        Feedback.done(this, ModSounds.UNIT_AMMO, 1.0F);
         player.sendStatusMessage(new TextComponentTranslation("message.combat_drones.ramp.ammo_loaded", loadout.getAmmo(station), capacity), true);
     }
 
@@ -408,6 +413,19 @@ public class EntityLaunchRamp extends Entity implements ChunkAnchor.Holder {
         route = Route.empty(Route.TerminalAction.LOITER);
     }
 
+    /** Client: {@code ticksExisted} when it was last handled (unit, fuel, ammo), for the settle animation. */
+    public int handledAt = -100;
+
+    @Override
+    public void handleStatusUpdate(byte id) {
+        if (id == Feedback.HANDLED_STATUS) {
+            handledAt = ticksExisted;
+            Feedback.handled(this);
+        } else {
+            super.handleStatusUpdate(id);
+        }
+    }
+
     /** Knocked down: drops itself and whatever unit it held. */
     @Override
     public boolean attackEntityFrom(DamageSource source, float amount) {
@@ -420,9 +438,16 @@ public class EntityLaunchRamp extends Entity implements ChunkAnchor.Holder {
                 entityDropItem(unit, 0.5F);
             }
             entityDropItem(new ItemStack(ModContent.rampItem(getKind())), 0.5F);
+            world.playSound(null, posX, posY, posZ, ModSounds.UNIT_REMOVE, SoundCategory.PLAYERS, 1.0F, 0.75F);
             setDead();
         }
         return true;
+    }
+
+    /** A refusal: the message, and a tick only the player who tried hears. */
+    private static void refuse(EntityPlayer player, String key) {
+        status(player, key);
+        Feedback.deny(player);
     }
 
     private static void status(EntityPlayer player, String key) {

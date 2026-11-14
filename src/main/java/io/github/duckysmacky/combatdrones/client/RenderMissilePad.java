@@ -1,5 +1,6 @@
 package io.github.duckysmacky.combatdrones.client;
 
+import io.github.duckysmacky.combatdrones.entity.Feedback;
 import io.github.duckysmacky.combatdrones.entity.EntityMissilePad;
 import io.github.duckysmacky.combatdrones.physics.HandFlownFlight;
 import io.github.duckysmacky.combatdrones.type.DroneType;
@@ -33,6 +34,8 @@ public class RenderMissilePad extends Render<EntityMissilePad> {
     public void doRender(EntityMissilePad pad, double x, double y, double z, float entityYaw, float partialTicks) {
         GlStateManager.pushMatrix();
         GlStateManager.translate(x, y, z);
+        float settle = Feedback.settle(pad, pad.handledAt, partialTicks); // just loaded, fuelled or linked
+        GlStateManager.scale(1 + settle * 0.015F, 1 - settle * 0.04F, 1 + settle * 0.015F);
         GlStateManager.pushMatrix();
         GlStateManager.rotate(-pad.rotationYaw, 0, 1, 0);
         DroneType missile = pad.getMissileType();

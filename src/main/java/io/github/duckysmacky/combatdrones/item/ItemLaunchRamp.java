@@ -1,5 +1,7 @@
 package io.github.duckysmacky.combatdrones.item;
 
+import io.github.duckysmacky.combatdrones.ModSounds;
+import net.minecraft.util.SoundCategory;
 import io.github.duckysmacky.combatdrones.entity.EntityLaunchRamp;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
@@ -25,6 +27,7 @@ public class ItemLaunchRamp extends ItemWithTooltip {
         }
         if (!world.isRemote) {
             world.spawnEntity(new EntityLaunchRamp(world, kind, pos.getX() + hitX, pos.getY() + 1, pos.getZ() + hitZ, player.rotationYaw));
+            world.playSound(null, pos.getX() + hitX, pos.getY() + 1, pos.getZ() + hitZ, ModSounds.RAMP_PLACE, SoundCategory.PLAYERS, 1.0F, 1.0F);
             if (!player.capabilities.isCreativeMode) {
                 player.getHeldItem(hand).shrink(1);
             }

@@ -160,10 +160,16 @@ public class EntityHandFlownDrone extends Entity implements ChunkAnchor.Holder {
     /** Client: ticks left of the red hit flash. */
     public int hitFlashTicks;
 
+    /** Client: {@code ticksExisted} when it was last handled (battery, payload, link), for the settle animation. */
+    public int handledAt = -100;
+
     @Override
     public void handleStatusUpdate(byte id) {
         if (id == DamageEffects.HIT_STATUS) {
             hitFlashTicks = DamageEffects.HIT_FLASH_TICKS;
+        } else if (id == Feedback.HANDLED_STATUS) {
+            handledAt = ticksExisted;
+            Feedback.handled(this);
         } else {
             super.handleStatusUpdate(id);
         }
@@ -783,18 +789,23 @@ public class EntityHandFlownDrone extends Entity implements ChunkAnchor.Holder {
     public boolean processInitialInteract(EntityPlayer player, EnumHand hand) {
         ItemStack stack = player.getHeldItem(hand);
         if (world.isRemote) {
-            return stack.getItem() == ModContent.fpvRemote || stack.getItem() == ModContent.fragGrenade || stack.getItem() instanceof ItemBomb
+            boolean handled = stack.getItem() == ModContent.fpvRemote || stack.getItem() == ModContent.fragGrenade || stack.getItem() instanceof ItemBomb
                     || stack.getItem() instanceof ItemBattery || (stack.isEmpty() && player.isSneaking());
+            if (handled) {
+                player.swingArm(hand);
+            }
+            return handled;
         }
         if (owner != null && !isOwnedBy(player)) {
             player.sendStatusMessage(new TextComponentTranslation("message.combat_drones.owned_by_other"), true);
+            Feedback.deny(player);
             return true;
         }
         if (stack.getItem() == ModContent.fpvRemote) {
             owner = player.getUniqueID();
             String nameKey = getDroneItemTranslationKey();
             ItemRemote.link(stack, getUniqueID(), nameKey);
-            world.playSound(null, posX, posY, posZ, ModSounds.DRONE_LINK, SoundCategory.PLAYERS, 1.0F, 1.0F);
+            Feedback.done(this, ModSounds.DRONE_LINK, 1.0F);
             player.sendStatusMessage(new TextComponentTranslation("message.combat_drones.linked", new TextComponentTranslation(nameKey)), true);
             return true;
         }
@@ -827,7 +838,7 @@ public class EntityHandFlownDrone extends Entity implements ChunkAnchor.Holder {
         if (!removed.isEmpty()) {
             ItemHandlerHelper.giveItemToPlayer(player, removed);
         }
-        world.playSound(null, posX, posY, posZ, ModSounds.DRONE_BATTERY, SoundCategory.PLAYERS, 1.0F, 1.0F);
+        Feedback.done(this, ModSounds.DRONE_BATTERY, 1.0F);
         player.sendStatusMessage(new TextComponentTranslation("message.combat_drones.battery_installed",
                 new TextComponentTranslation(nameKey), Math.round(fraction * 100)), true);
     }
@@ -854,6 +865,7 @@ public class EntityHandFlownDrone extends Entity implements ChunkAnchor.Holder {
         DroneType.PayloadKind wanted = grenade ? DroneType.PayloadKind.GRENADE : DroneType.PayloadKind.BOMB;
         if (type == null || type.getPayloadCapacity() == 0 || type.getPayload() != wanted) {
             player.sendStatusMessage(new TextComponentTranslation("message.combat_drones.wrong_payload"), true);
+            Feedback.deny(player);
             return;
         }
         int count = getPayloadCount();
@@ -862,15 +874,17 @@ public class EntityHandFlownDrone extends Entity implements ChunkAnchor.Holder {
         if (!grenade && count > 0 && loaded != bomb) {
             player.sendStatusMessage(new TextComponentTranslation("message.combat_drones.bay_holds_other",
                     new TextComponentTranslation(ModContent.bombItem(loaded).getTranslationKey() + ".name")), true);
+            Feedback.deny(player);
             return;
         }
         int capacity = payloadCapacity(type, bomb);
         if (count >= capacity) {
             player.sendStatusMessage(new TextComponentTranslation("message.combat_drones.payload_full"), true);
+            Feedback.deny(player);
             return;
         }
         setPayload(count + 1, bomb);
-        world.playSound(null, posX, posY, posZ, ModSounds.DRONE_ATTACH, SoundCategory.PLAYERS, 1.0F, 1.0F);
+        Feedback.done(this, ModSounds.DRONE_ATTACH, 1.0F);
         if (!player.capabilities.isCreativeMode) {
             stack.shrink(1);
         }
@@ -889,6 +903,7 @@ public class EntityHandFlownDrone extends Entity implements ChunkAnchor.Holder {
     }
 
     private void pickUp(EntityPlayer player) {
+        world.playSound(null, posX, posY, posZ, ModSounds.DRONE_PICKUP, SoundCategory.PLAYERS, 1.0F, 1.0F);
         setDead();
         Item droneItem = getDroneItem();
         if (droneItem != null) {

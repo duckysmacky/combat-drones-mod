@@ -1,5 +1,7 @@
 package io.github.duckysmacky.combatdrones.item;
 
+import io.github.duckysmacky.combatdrones.ModSounds;
+import net.minecraft.util.SoundCategory;
 import io.github.duckysmacky.combatdrones.entity.EntityMissilePad;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.util.EnumActionResult;
@@ -21,6 +23,7 @@ public class ItemMissilePad extends ItemWithTooltip {
         }
         if (!world.isRemote) {
             world.spawnEntity(new EntityMissilePad(world, pos.getX() + 0.5, pos.getY() + 1, pos.getZ() + 0.5, player.rotationYaw, player.getUniqueID()));
+            world.playSound(null, pos.getX() + 0.5, pos.getY() + 1, pos.getZ() + 0.5, ModSounds.RAMP_PLACE, SoundCategory.PLAYERS, 1.0F, 0.8F);
             if (!player.capabilities.isCreativeMode) {
                 player.getHeldItem(hand).shrink(1);
             }

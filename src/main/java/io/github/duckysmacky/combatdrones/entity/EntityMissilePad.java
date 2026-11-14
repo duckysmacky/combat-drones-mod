@@ -107,7 +107,11 @@ public class EntityMissilePad extends Entity {
         ItemStack stack = player.getHeldItem(hand);
         Item item = stack.getItem();
         if (world.isRemote) {
-            return item instanceof ItemDrone || item == ModContent.fuelCan || item == ModContent.missileTablet || (stack.isEmpty() && player.isSneaking());
+            boolean used = item instanceof ItemDrone || item == ModContent.fuelCan || item == ModContent.missileTablet || (stack.isEmpty() && player.isSneaking());
+            if (used) {
+                player.swingArm(hand);
+            }
+            return used;
         }
         boolean handled = item instanceof ItemDrone || item == ModContent.fuelCan || item == ModContent.missileTablet
                 || (stack.isEmpty() && player.isSneaking() && isLoaded());
@@ -115,17 +119,18 @@ public class EntityMissilePad extends Entity {
             return false;
         }
         if (!isOwnedBy(player)) {
-            status(player, "message.combat_drones.pad.not_owner");
+            refuse(player, "message.combat_drones.pad.not_owner");
         } else if (item instanceof ItemDrone) {
             load(player, stack);
         } else if (item == ModContent.fuelCan) {
             refuel(player, stack);
         } else if (item == ModContent.missileTablet) {
             ItemMissileTablet.link(stack, this);
-            world.playSound(null, posX, posY, posZ, ModSounds.DRONE_LINK, SoundCategory.PLAYERS, 1.0F, 0.8F);
+            Feedback.done(this, ModSounds.DRONE_LINK, 0.8F);
             status(player, "message.combat_drones.pad.linked");
         } else {
             ItemHandlerHelper.giveItemToPlayer(player, takeMissile());
+            Feedback.done(this, ModSounds.UNIT_REMOVE, 0.7F);
         }
         return true;
     }
@@ -133,11 +138,11 @@ public class EntityMissilePad extends Entity {
     private void load(EntityPlayer player, ItemStack stack) {
         DroneType type = ((ItemDrone) stack.getItem()).getDroneType();
         if (type == null || type.getCategory() != DroneType.Category.VERTICAL_STRIKE) {
-            status(player, "message.combat_drones.pad.not_missile");
+            refuse(player, "message.combat_drones.pad.not_missile");
             return;
         }
         if (isLoaded()) {
-            status(player, "message.combat_drones.pad.occupied");
+            refuse(player, "message.combat_drones.pad.occupied");
             return;
         }
         dataManager.set(MISSILE_TYPE, type.getId());
@@ -145,7 +150,7 @@ public class EntityMissilePad extends Entity {
         if (!player.capabilities.isCreativeMode) {
             stack.shrink(1);
         }
-        world.playSound(null, posX, posY, posZ, ModSounds.DRONE_BATTERY, SoundCategory.BLOCKS, 1.0F, 0.6F);
+        Feedback.done(this, ModSounds.PAD_LOAD, 1.0F);
         status(player, "message.combat_drones.pad.loaded");
     }
 
@@ -153,18 +158,18 @@ public class EntityMissilePad extends Entity {
     private void refuel(EntityPlayer player, ItemStack stack) {
         DroneType type = getMissileType();
         if (type == null) {
-            status(player, "message.combat_drones.pad.empty");
+            refuse(player, "message.combat_drones.pad.empty");
             return;
         }
         if (getFuelFraction() >= 1) {
-            status(player, "message.combat_drones.ramp.full");
+            refuse(player, "message.combat_drones.ramp.full");
             return;
         }
         setFuel(type.getBatteryOrFuelCapacity());
         if (!player.capabilities.isCreativeMode) {
             stack.shrink(1);
         }
-        world.playSound(null, posX, posY, posZ, ModSounds.DRONE_ATTACH, SoundCategory.BLOCKS, 1.0F, 0.6F);
+        Feedback.done(this, ModSounds.UNIT_FUEL, 0.85F);
         status(player, "message.combat_drones.ramp.refuelled");
     }
 
@@ -194,6 +199,19 @@ public class EntityMissilePad extends Entity {
         setFuel(0);
     }
 
+    /** Client: {@code ticksExisted} when it was last handled (missile, fuel, tablet), for the settle animation. */
+    public int handledAt = -100;
+
+    @Override
+    public void handleStatusUpdate(byte id) {
+        if (id == Feedback.HANDLED_STATUS) {
+            handledAt = ticksExisted;
+            Feedback.handled(this);
+        } else {
+            super.handleStatusUpdate(id);
+        }
+    }
+
     /** Knocked down: drops itself and whatever missile it held. */
     @Override
     public boolean attackEntityFrom(DamageSource source, float amount) {
@@ -206,9 +224,16 @@ public class EntityMissilePad extends Entity {
                 entityDropItem(missile, 0.5F);
             }
             entityDropItem(new ItemStack(ModContent.missilePad), 0.5F);
+            world.playSound(null, posX, posY, posZ, ModSounds.UNIT_REMOVE, SoundCategory.PLAYERS, 1.0F, 0.6F);
             setDead();
         }
         return true;
+    }
+
+    /** A refusal: the message, and a tick only the player who tried hears. */
+    private static void refuse(EntityPlayer player, String key) {
+        status(player, key);
+        Feedback.deny(player);
     }
 
     private static void status(EntityPlayer player, String key) {

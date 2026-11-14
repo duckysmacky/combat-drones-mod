@@ -1,5 +1,6 @@
 package io.github.duckysmacky.combatdrones.client;
 
+import io.github.duckysmacky.combatdrones.entity.Feedback;
 import io.github.duckysmacky.combatdrones.entity.EntityHandFlownDrone;
 import io.github.duckysmacky.combatdrones.physics.HandFlownFlight;
 import io.github.duckysmacky.combatdrones.type.BombType;
@@ -53,6 +54,9 @@ public class RenderHandFlownDrone extends Render<EntityHandFlownDrone> {
         GlStateManager.translate(x, y + drone.height / 2, z);
         Quat4d orientation = renderOrientation(drone, partialTicks);
         GlStateManager.pushMatrix();
+        // Just handled (battery, payload, link): it dips and springs back
+        float settle = Feedback.settle(drone, drone.handledAt, partialTicks);
+        GlStateManager.scale(1 + settle * 0.08F, 1 - settle * 0.16F, 1 + settle * 0.08F);
         AxisAngle4d rotation = new AxisAngle4d();
         rotation.set(orientation);
         GlStateManager.rotate((float) Math.toDegrees(rotation.angle), (float) rotation.x, (float) rotation.y, (float) rotation.z);

@@ -1,5 +1,6 @@
 package io.github.duckysmacky.combatdrones.client;
 
+import io.github.duckysmacky.combatdrones.entity.Feedback;
 import io.github.duckysmacky.combatdrones.entity.EntityLaunchRamp;
 import io.github.duckysmacky.combatdrones.type.DroneType;
 import net.minecraft.client.renderer.GlStateManager;
@@ -46,6 +47,8 @@ public class RenderLaunchRamp extends Render<EntityLaunchRamp> {
         GlStateManager.pushMatrix();
         GlStateManager.translate(x, y, z);
         GlStateManager.rotate(-ramp.rotationYaw, 0, 1, 0); // nose (+Z) along the ramp's heading
+        float settle = Feedback.settle(ramp, ramp.handledAt, partialTicks); // just loaded, fuelled or armed
+        GlStateManager.scale(1 + settle * 0.02F, 1 - settle * 0.05F, 1 + settle * 0.02F);
         EntityLaunchRamp.Kind kind = ramp.getKind();
         DroneType unit = ramp.getUnitType();
         GeoModels.reset(kind.getName());

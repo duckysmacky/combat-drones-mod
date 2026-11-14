@@ -1,5 +1,7 @@
 package io.github.duckysmacky.combatdrones.item;
 
+import net.minecraft.util.SoundCategory;
+import io.github.duckysmacky.combatdrones.ModSounds;
 import io.github.duckysmacky.combatdrones.client.DroneKeys;
 import io.github.duckysmacky.combatdrones.client.Tooltips;
 import io.github.duckysmacky.combatdrones.entity.EntityHandFlownDrone;
@@ -201,6 +203,7 @@ public class ItemDrone extends Item {
         if (!world.isRemote) {
             BlockPos spawnPos = pos.offset(facing);
             world.spawnEntity(new EntityHandFlownDrone(world, type, spawnPos.getX() + 0.5, spawnPos.getY(), spawnPos.getZ() + 0.5, player.rotationYaw));
+            world.playSound(null, spawnPos.getX() + 0.5, spawnPos.getY(), spawnPos.getZ() + 0.5, ModSounds.DRONE_PLACE, SoundCategory.PLAYERS, 1.0F, 1.0F);
             ItemStack stack = player.getHeldItem(hand);
             if (!player.capabilities.isCreativeMode) {
                 stack.shrink(1);
