@@ -26,6 +26,9 @@ public final class RouteCodec {
             point.setDouble("Z", waypoint.z);
             point.setDouble("Alt", waypoint.altitude);
             point.setString("Speed", waypoint.speed.name());
+            if (waypoint.isDrop()) {
+                point.setDouble("Drop", waypoint.dropLength);
+            }
             points.appendTag(point);
         }
         tag.setTag("Waypoints", points);
@@ -47,7 +50,8 @@ public final class RouteCodec {
         NBTTagList points = tag.getTagList("Waypoints", Constants.NBT.TAG_COMPOUND);
         for (int index = 0; index < Math.min(points.tagCount(), MAX_READ_WAYPOINTS); index++) {
             NBTTagCompound point = points.getCompoundTagAt(index);
-            waypoints.add(new Route.Waypoint(point.getDouble("X"), point.getDouble("Z"), point.getDouble("Alt"), speedOf(point.getString("Speed"))));
+            waypoints.add(new Route.Waypoint(point.getDouble("X"), point.getDouble("Z"), point.getDouble("Alt"), speedOf(point.getString("Speed")),
+                    point.hasKey("Drop") ? point.getDouble("Drop") : Route.NO_DROP));
         }
         Route.TerminalAction terminal = fallbackTerminal;
         for (Route.TerminalAction action : Route.TerminalAction.values()) {
@@ -82,6 +86,7 @@ public final class RouteCodec {
             buf.writeDouble(waypoint.z);
             buf.writeDouble(waypoint.altitude);
             buf.writeByte(waypoint.speed.ordinal());
+            buf.writeFloat((float) waypoint.dropLength);
         }
         Route.Target target = route.getTarget();
         buf.writeBoolean(target != null);
@@ -105,7 +110,7 @@ public final class RouteCodec {
             double altitude = buf.readDouble();
             int speedIndex = buf.readUnsignedByte();
             Route.Speed[] speeds = Route.Speed.values();
-            waypoints.add(new Route.Waypoint(x, z, altitude, speedIndex < speeds.length ? speeds[speedIndex] : Route.Speed.FAST));
+            waypoints.add(new Route.Waypoint(x, z, altitude, speedIndex < speeds.length ? speeds[speedIndex] : Route.Speed.FAST, buf.readFloat()));
         }
         Route.Target target = buf.readBoolean() ? new Route.Target(buf.readDouble(), buf.readDouble(), buf.readDouble()) : null;
         return new Route(waypoints, terminal, loiterRadius, target);

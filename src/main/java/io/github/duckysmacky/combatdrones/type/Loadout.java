@@ -10,6 +10,8 @@ public final class Loadout {
 
     private final int[] ammo = new int[STATIONS];
     private RocketType rocketKind = RocketType.LIGHT;
+    /** Which bomb size a bomb bay holds (one size at a time, like a rocket pod). */
+    private AerialBombType bombKind = AerialBombType.SMALL;
 
     public int getAmmo(int station) {
         return ammo[station];
@@ -27,6 +29,14 @@ public final class Loadout {
         rocketKind = kind;
     }
 
+    public AerialBombType getBombKind() {
+        return bombKind;
+    }
+
+    public void setBombKind(AerialBombType kind) {
+        bombKind = kind;
+    }
+
     public boolean isEmpty() {
         for (int count : ammo) {
             if (count > 0) {
@@ -38,16 +48,18 @@ public final class Loadout {
 
     /** Rounds or rockets {@code station} holds when full, with the rocket size currently loaded. */
     public int capacity(DroneType type, int station) {
-        return capacity(type, station, rocketKind);
-    }
-
-    public static int capacity(DroneType type, int station, RocketType kind) {
         DroneType.WeaponType weapon = type.getWeapon(station);
         int units = type.getStationCapacity(station);
-        if (weapon == DroneType.WeaponType.NONE) {
-            return 0;
+        switch (weapon) {
+            case NONE:
+                return 0;
+            case ROCKET_POD:
+                return rocketKind.capacityIn(units);
+            case BOMB_BAY:
+                return bombKind.capacityIn(units);
+            default:
+                return units;
         }
-        return weapon == DroneType.WeaponType.ROCKET_POD ? kind.capacityIn(units) : units;
     }
 
     /** Trims every station to what fits (after a config change or a type switch). */

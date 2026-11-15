@@ -2,6 +2,7 @@ package io.github.duckysmacky.combatdrones.client;
 
 import io.github.duckysmacky.combatdrones.entity.EntityBomb;
 import io.github.duckysmacky.combatdrones.entity.EntityRocket;
+import io.github.duckysmacky.combatdrones.type.AerialBombType;
 import io.github.duckysmacky.combatdrones.type.DroneType;
 import net.minecraft.entity.Entity;
 import net.minecraft.util.math.Vec3d;
@@ -44,6 +45,11 @@ final class ProjectileVoice extends EngineVoice {
             }
         }
         if (entity instanceof EntityBomb) {
+            AerialBombType aerial = ((EntityBomb) entity).getAerialType();
+            if (aerial != null) {
+                // Dropped from high up onto people who can't see the plane: heard from much further than a drone's bomb
+                return new ProjectileVoice(entity, "projectile.aerial_bomb", 96 + 32 * aerial.ordinal(), 1.2 - 0.15 * aerial.ordinal(), true);
+            }
             switch (((EntityBomb) entity).getBombType()) {
                 case LIGHT:
                     return new ProjectileVoice(entity, "projectile.bomb", 40, 1.35, true);

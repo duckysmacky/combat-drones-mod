@@ -13,6 +13,7 @@ import io.github.duckysmacky.combatdrones.physics.Route;
 import io.github.duckysmacky.combatdrones.type.DroneType;
 import io.github.duckysmacky.combatdrones.type.DroneTypes;
 import io.github.duckysmacky.combatdrones.type.Loadout;
+import io.github.duckysmacky.combatdrones.type.AerialBombType;
 import io.github.duckysmacky.combatdrones.type.RocketType;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.player.EntityPlayer;
@@ -308,6 +309,9 @@ public class EntityLaunchRamp extends Entity implements ChunkAnchor.Holder {
         if (rocketKindOf(stack) != null) {
             return DroneType.WeaponType.ROCKET_POD;
         }
+        if (bombKindOf(stack) != null) {
+            return DroneType.WeaponType.BOMB_BAY;
+        }
         if (stack.getItem() == ModContent.cannonShell) {
             return DroneType.WeaponType.CANNON;
         }
@@ -327,10 +331,20 @@ public class EntityLaunchRamp extends Entity implements ChunkAnchor.Holder {
         return null;
     }
 
+    @Nullable
+    private static AerialBombType bombKindOf(ItemStack stack) {
+        for (AerialBombType kind : AerialBombType.values()) {
+            if (stack.getItem() == ModContent.aerialBombItem(kind)) {
+                return kind;
+            }
+        }
+        return null;
+    }
+
     /**
      * Loads as much of the held ammo as fits into the station that takes it: rockets into a rocket pod, rifle rounds
-     * onto a gun mount's belt, shells into a cannon or howitzer. A pod holds one rocket size at a time, so loading the other size hands the rockets
-     * already in it back.
+     * onto a gun mount's belt, shells into a cannon or howitzer, bombs into a bomb bay. A pod or bay holds one size at a
+     * time, so loading another size hands back what was already in it.
      */
     private void loadAmmo(EntityPlayer player, ItemStack stack) {
         DroneType type = getUnitType();
@@ -345,9 +359,15 @@ public class EntityLaunchRamp extends Entity implements ChunkAnchor.Holder {
         }
         RocketType kind = rocketKindOf(stack);
         if (kind != null && kind != loadout.getRocketKind()) {
-            returnRockets(player, loadout.getRocketKind(), loadout.getAmmo(station));
+            giveBack(player, ModContent.rocketItem(loadout.getRocketKind()), loadout.getAmmo(station));
             loadout.setAmmo(station, 0);
             loadout.setRocketKind(kind);
+        }
+        AerialBombType bombKind = bombKindOf(stack);
+        if (bombKind != null && bombKind != loadout.getBombKind()) {
+            giveBack(player, ModContent.aerialBombItem(loadout.getBombKind()), loadout.getAmmo(station));
+            loadout.setAmmo(station, 0);
+            loadout.setBombKind(bombKind);
         }
         int perItem = stack.getItem() == ModContent.rifleRounds ? ModConfig.roundsPerRifleItem : 1;
         int capacity = loadout.capacity(type, station);
@@ -366,9 +386,8 @@ public class EntityLaunchRamp extends Entity implements ChunkAnchor.Holder {
         player.sendStatusMessage(new TextComponentTranslation("message.combat_drones.ramp.ammo_loaded", loadout.getAmmo(station), capacity), true);
     }
 
-    /** Gives back rockets unloaded to make room for the other size, in whole stacks. */
-    private static void returnRockets(EntityPlayer player, RocketType kind, int count) {
-        Item item = ModContent.rocketItem(kind);
+    /** Gives back rockets or bombs unloaded to make room for another size, in whole stacks. */
+    private static void giveBack(EntityPlayer player, Item item, int count) {
         while (count > 0) {
             int stackSize = Math.min(count, item.getItemStackLimit());
             ItemHandlerHelper.giveItemToPlayer(player, new ItemStack(item, stackSize));

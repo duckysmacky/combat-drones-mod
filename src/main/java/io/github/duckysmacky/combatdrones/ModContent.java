@@ -24,6 +24,7 @@ import io.github.duckysmacky.combatdrones.item.ItemPilotDetector;
 import io.github.duckysmacky.combatdrones.item.ItemRemote;
 import io.github.duckysmacky.combatdrones.item.ItemMissileTablet;
 import io.github.duckysmacky.combatdrones.item.ItemWithTooltip;
+import io.github.duckysmacky.combatdrones.type.AerialBombType;
 import io.github.duckysmacky.combatdrones.type.BatteryPack;
 import io.github.duckysmacky.combatdrones.type.BombType;
 import io.github.duckysmacky.combatdrones.type.DroneType;
@@ -73,7 +74,7 @@ public final class ModContent {
 
     /** Hand-flown, then ramp-launched drones in this order; types not listed go last in their group. */
     private static final List<String> DRONE_TAB_ORDER = Arrays.asList("racer_micro", "racer_standard", "racer_longrange", "dji_drone",
-            "loitering_light", "loitering_heavy", "strike_plane", "attack_plane", "gunship", "recon_uav", "cruise_missile");
+            "loitering_light", "loitering_heavy", "strike_plane", "attack_plane", "gunship", "stealth_bomber", "recon_uav", "cruise_missile");
 
     /**
      * Creative tab position: FPV gear (0+), hand-flown drones (100+), batteries and payloads (200+), ramp gear (400+),
@@ -92,7 +93,7 @@ public final class ModContent {
                 Arrays.asList(fpvRemote, fpvGoggles),
                 Arrays.asList(lightBattery, standardBattery, heavyBattery, fragGrenade, bombLight, bomb, bombHeavy),
                 Arrays.asList(launchRamp, planeRamp, missionPlanner, fuelCan, missilePad, missileTablet),
-                Arrays.asList(rocket, rocketHeavy, rifleRounds, cannonShell, howitzerShell),
+                Arrays.asList(rocket, rocketHeavy, rifleRounds, cannonShell, howitzerShell, aerialBombSmall, aerialBombMedium, aerialBombLarge),
                 Arrays.asList(pilotDetector, empStation, empBlast));
         for (int group = 0; group < groups.size(); group++) {
             int index = groups.get(group).indexOf(item);
@@ -132,6 +133,9 @@ public final class ModContent {
     public static Item rifleRounds;
     public static Item cannonShell;
     public static Item howitzerShell;
+    public static Item aerialBombSmall;
+    public static Item aerialBombMedium;
+    public static Item aerialBombLarge;
     public static Item pilotDetector;
     public static Item empStation;
     public static Item empBlast;
@@ -169,6 +173,9 @@ public final class ModContent {
         rifleRounds = register(event, simpleItem("rifle_rounds"));
         cannonShell = register(event, simpleItem("cannon_shell"));
         howitzerShell = register(event, simpleItem("howitzer_shell").setMaxStackSize(16));
+        aerialBombSmall = register(event, simpleItem(AerialBombType.SMALL.itemName()));
+        aerialBombMedium = register(event, simpleItem(AerialBombType.MEDIUM.itemName()).setMaxStackSize(32));
+        aerialBombLarge = register(event, simpleItem(AerialBombType.LARGE.itemName()).setMaxStackSize(16));
         pilotDetector = register(event, named(new ItemPilotDetector(), "pilot_detector"));
         empStation = register(event, named(new ItemEmpStation(), "emp_station"));
         empBlast = register(event, named(new ItemEmpBlast(), "emp_blast"));
@@ -296,6 +303,10 @@ public final class ModContent {
 
     public static Item rocketItem(RocketType kind) {
         return kind == RocketType.HEAVY ? rocketHeavy : rocket;
+    }
+
+    public static Item aerialBombItem(AerialBombType kind) {
+        return kind == AerialBombType.LARGE ? aerialBombLarge : kind == AerialBombType.MEDIUM ? aerialBombMedium : aerialBombSmall;
     }
 
     public static Item batteryItem(BatteryPack pack) {

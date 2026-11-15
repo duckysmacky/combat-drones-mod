@@ -18,6 +18,10 @@ public enum Feed {
     NOSECAM("nosecam"),
     /** Strike and Attack Planes: a green head-up display over a clear picture. */
     FLIGHT(null),
+    /** Stealth Bomber from the cockpit: the planes' head-up display plus the bay. */
+    BOMBER(null),
+    /** Stealth Bomber's bombsight: a monochrome look straight down with a drift line and range ladder. */
+    BOMBSIGHT("seeker"),
     /** Gunship: a white-hot gunner sight with a weapon box. */
     GUNNER("flir"),
     /** Recon UAV: a surveillance feed with data bars. */
@@ -51,7 +55,7 @@ public enum Feed {
             case MISSILE:
                 return MISSILE;
             default:
-                return type.isImpactDetonates() ? NOSECAM : FLIGHT;
+                return type.isImpactDetonates() ? NOSECAM : type.stationOf(DroneType.WeaponType.BOMB_BAY) >= 0 ? BOMBER : FLIGHT;
         }
     }
 }

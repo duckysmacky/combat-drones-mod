@@ -24,7 +24,7 @@ Inspired by the [FPV Drones](https://www.curseforge.com/minecraft/mc-mods/fpvdro
   flight, watch through their cameras or take control.
 - **Recon and target locking**: the UAV spots enemies for you and your team, and a locked target stays tracked even
   out of sight.
-- **Weapons**: grenades, drop bombs, rockets, machine guns, an autocannon and a 105 mm howitzer.
+- **Weapons**: grenades, drop bombs, rockets, machine guns, an autocannon, a 105 mm howitzer and aerial bombs.
 - **Counterplay**: every vehicle can be shot down and can be heard from far away. Remote pilots leave their body
   behind, and it gives off radio static.
 - **Server-friendly**: every stat is set in one config file and can be reloaded in game. It works with vanilla
@@ -43,6 +43,7 @@ Inspired by the [FPV Drones](https://www.curseforge.com/minecraft/mc-mods/fpvdro
 | Strike Plane | Armed plane | Ground attack with rockets |
 | Attack Plane | Armed plane | Fast machine-gun plane for hunting other aircraft |
 | Gunship | Armed plane | Huge, slow and loud. Circles overhead while you man the cannon, rockets and howitzer |
+| Stealth Bomber | Armed plane | Flying wing that drops bombs through a bombsight, or by itself along a planned bombing run |
 | Recon UAV | Unarmed plane | Long-endurance scout that marks enemies on your map |
 | Cruise Missile | Vertical strike | Launched from a pad, waits out of sight, then you steer its dive onto a target |
 
@@ -73,6 +74,10 @@ You choose what a unit does at the end of its route:
 - Loitering munitions: **Loiter**, **Dive** on the last waypoint, or **Destroy** a target marked on the map or in the
   world.
 - Planes: **Loiter** or **Return** to land at the ramp.
+
+The **Stealth Bomber** can also bomb on its route without you: right-click the planner map for **Add drop point here**,
+or right-click a waypoint and set **Drop** to *Single* (one bomb) or *Carpet* (a strip of bombs of the length you
+choose). The map shows where the bombs should land.
 - Recon UAV: **Loiter**, **Loop** or **Return**.
 
 Once a unit is in the air, you can **View** through its camera or **Take control**. Planes have no warhead, but
@@ -127,6 +132,7 @@ All mod keys can be rebound under Controls -> Combat Drones.
 | LMB | Fire, or strike the point under the crosshair |
 | Space | Boost (munitions) |
 | R | Switch weapon (Gunship) |
+| B | Bombsight / flight view (Stealth Bomber) |
 | G / Esc | Return to your body |
 
 ## For server owners

@@ -71,6 +71,7 @@ public class RenderRampUnit extends Render<EntityRampUnit> {
         float time = unit.ticksExisted + partialTicks;
         GeoModels.lights(model, running, time);
         GeoModels.show(model, "glow_boost", unit.isBoosting());
+        GeoModels.show(model, "glow_exhaust", running); // jet exhausts
 
         float roll = MathHelper.clamp(MathHelper.wrapDegrees(unit.getBank() - unit.prevBank) * SURFACE_GAIN, -SURFACE_LIMIT, SURFACE_LIMIT);
         float pitch = MathHelper.clamp((unit.rotationPitch - unit.prevRotationPitch) * SURFACE_GAIN, -SURFACE_LIMIT, SURFACE_LIMIT);

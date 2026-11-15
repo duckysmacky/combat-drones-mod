@@ -57,7 +57,8 @@ public final class HudOverlay {
         EntityRampUnit unit = RemoteController.getUnit();
         if (unit != null) {
             DroneType type = unit.getDroneType();
-            return unit instanceof EntityCruiseMissile ? Feed.MISSILE : type == null ? null : Feed.of(type);
+            return unit instanceof EntityCruiseMissile ? Feed.MISSILE : type == null ? null
+                    : RemoteController.isBombSight() ? Feed.BOMBSIGHT : Feed.of(type);
         }
         EntityHandFlownDrone drone = PilotController.getPilotedDrone();
         return drone == null || drone.getDroneType() == null ? null : Feed.of(drone.getDroneType());

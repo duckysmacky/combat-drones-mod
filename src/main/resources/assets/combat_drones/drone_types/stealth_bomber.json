@@ -1,0 +1,35 @@
+{
+  // Stealth Bomber: a big flying wing that drops free-fall bombs, ramp-launched and routed like the other planes. Flown
+  // by hand it drops through a bombsight; on autopilot it releases at the route's drop points and lays carpet runs.
+  // A hard crash or being shot down sets off its fuel and bombs (blastPower).
+  "category": "RAMP_AUTOPILOT",
+  "maxSpeed": 0.72,
+  "acceleration": 0.036,
+  "batteryOrFuelCapacity": 7200,
+  "drainRatePerTick": 1.0,
+  "blastPower": 5.0,
+  // Bomb bay units: 96 small, 48 medium or 24 large bombs, one size at a time (see [aerial_bombs.*] bayUnits)
+  "payloadCapacity": 96,
+  "maxHP": 200,
+  // Collision box in blocks: the centre body and inner wing, not the wingtips
+  "hitboxWidth": 4.0,
+  "hitboxHeight": 1.5,
+  "defaultCruiseAltitude": 80,
+  // Loiter is never flown lower or tighter than this, whatever the route says
+  "minLoiterAltitude": 80,
+  "minLoiterRadius": 70,
+  "agility": 0.5,
+  "controlScheme": "STICK",
+  "weaponType": "BOMB_BAY",
+  // Quieter than the Gunship: the falling bombs' whistle is the warning
+  "motorSoundRange": 160,
+  // Engine loops by distance (fractions of motorSoundRange): close, mid, far
+  "sound": {
+    "crossfade": 0.2,
+    "bands": [
+      {"event": "engine.bomber.near", "until": 0.3},
+      {"event": "engine.bomber.mid", "until": 0.65},
+      {"event": "engine.bomber.far", "until": 1.0}
+    ]
+  }
+}

@@ -13,6 +13,7 @@ import io.github.duckysmacky.combatdrones.network.ModNetwork;
 import io.github.duckysmacky.combatdrones.network.PlaneInputPacket;
 import io.github.duckysmacky.combatdrones.network.ReconLookPacket;
 import io.github.duckysmacky.combatdrones.network.TogglePilotPacket;
+import io.github.duckysmacky.combatdrones.physics.BombBallistics;
 import io.github.duckysmacky.combatdrones.type.DroneType;
 import io.github.duckysmacky.combatdrones.type.Loadout;
 import net.minecraft.client.Minecraft;
@@ -51,6 +52,8 @@ public final class RemoteController {
     /** Camera tilt limits (vanilla pitch convention: positive = down); it pans all the way round. */
     private static final float LOOK_UP_LIMIT = -30.0F;
     private static final float LOOK_DOWN_LIMIT = 90.0F;
+    /** The bombsight only looks under the plane: no higher than this far below the horizon. */
+    private static final float SIGHT_UP_LIMIT = 30.0F;
     /** How far the camera looks for a block or entity to hold on to when you aim it. */
     private static final double ANCHOR_RANGE = 512.0;
     /** How far the camera holds on to an estimated ground point when the line finds nothing (unloaded terrain). */
@@ -96,6 +99,13 @@ public final class RemoteController {
     private static boolean freeMode;
     /** Gunner seat: the selected weapon station. */
     private static int gunnerStation;
+    /** Bomber: looking down through the bombsight instead of flying from the cockpit. */
+    private static boolean bombSight;
+    /** Bombsight: where a bomb released this tick would land and how it falls, or null. */
+    @Nullable
+    private static Vec3d bombImpact;
+    @Nullable
+    private static BombBallistics.Fall bombFall;
     /** False until LMB is up once, so the click that opened the session (e.g. on "Take control") doesn't fire. */
     private static boolean triggerReleased;
 
@@ -119,7 +129,30 @@ public final class RemoteController {
 
     /** Flying the unit by hand (stick scheme, or steering a missile's dive): the camera is fixed to the nose. */
     public static boolean isStickControl() {
-        return control && (scheme() == DroneType.ControlScheme.STICK || isMissile());
+        return control && ((scheme() == DroneType.ControlScheme.STICK && !bombSight) || isMissile());
+    }
+
+    /** At the controls of a plane with a bomb bay (in either view). */
+    public static boolean isBomber() {
+        DroneType type = unit == null ? null : unit.getDroneType();
+        return control && type != null && type.stationOf(DroneType.WeaponType.BOMB_BAY) >= 0;
+    }
+
+    /** Looking down through a bomber's bombsight: the plane holds its course, the mouse only moves the camera. */
+    public static boolean isBombSight() {
+        return bombSight && isBomber();
+    }
+
+    /** Bombsight: where a bomb released now would land, or null outside the sight. */
+    @Nullable
+    public static Vec3d getBombImpact() {
+        return isBombSight() ? bombImpact : null;
+    }
+
+    /** Bombsight: how a bomb released now would fall, or null outside the sight. */
+    @Nullable
+    public static BombBallistics.Fall getBombFall() {
+        return isBombSight() ? bombFall : null;
     }
 
     /** Steering a cruise missile's dive. */
@@ -184,6 +217,7 @@ public final class RemoteController {
         ClientIntel.resetLock();
         zoom = 1;
         gunnerStation = 0;
+        bombSight = false;
         triggerReleased = false;
         stickPitch = 0;
         stickRoll = 0;
@@ -244,7 +278,22 @@ public final class RemoteController {
                         (float) Math.toDegrees(halfHeight), isTriggerHeld(minecraft)));
             }
         }
-        if (unit != null && isMissile()) {
+        if (unit != null && isBomber() && DroneKeys.BOMB_SIGHT.isPressed()) {
+            bombSight = !bombSight;
+            zoom = 1;
+            stickPitch = 0;
+            stickRoll = 0;
+            cameraYaw = unit.rotationYaw;
+            cameraPitch = LOOK_DOWN_LIMIT;
+            UiSounds.play(UiSounds.CLICK, bombSight ? 1.2F : 0.9F);
+        }
+        if (unit != null && isBombSight()) {
+            updateBombImpact();
+            // A/D (or the roll keys) steer the held heading; the packet's roll carries that turn
+            double steer = axis(DroneKeys.ROLL_RIGHT.isKeyDown() || minecraft.gameSettings.keyBindRight.isKeyDown(),
+                    DroneKeys.ROLL_LEFT.isKeyDown() || minecraft.gameSettings.keyBindLeft.isKeyDown());
+            ModNetwork.CHANNEL.sendToServer(new PlaneInputPacket(unitId, 0, steer, throttle, isTriggerHeld(minecraft), freeMode, false, true));
+        } else if (unit != null && isMissile()) {
             sendMissileSteer(minecraft);
         } else if (unit != null && isStickControl()) {
             sendStick(minecraft);
@@ -252,8 +301,28 @@ public final class RemoteController {
             sendGunner(minecraft);
         } else if (unit != null && control) {
             // Click-designate flies itself; only boost goes up each tick
-            ModNetwork.CHANNEL.sendToServer(new PlaneInputPacket(unitId, 0, 0, 0, false, false, isBoostKeyDown(minecraft)));
+            ModNetwork.CHANNEL.sendToServer(new PlaneInputPacket(unitId, 0, 0, 0, false, false, isBoostKeyDown(minecraft), false));
         }
+    }
+
+    /**
+     * Bombsight: where a bomb let go this tick would come down, from the plane's speed and its height over the ground
+     * there (found in two passes: the ground under the plane first, then under where that lands).
+     */
+    private static void updateBombImpact() {
+        Vec3d velocity = Vec3d.fromPitchYaw(unit.rotationPitch, unit.rotationYaw).scale(unit.getSyncedSpeed());
+        double across = Math.sqrt(velocity.x * velocity.x + velocity.z * velocity.z);
+        double releaseY = unit.posY - 0.6;
+        double x = unit.posX;
+        double z = unit.posZ;
+        double groundY = 0;
+        for (int pass = 0; pass < 2; pass++) {
+            groundY = unit.world.getHeight(new BlockPos(x, 0, z)).getY();
+            bombFall = BombBallistics.fall(across, velocity.y, releaseY - groundY);
+            x = unit.posX + (across > 1e-6 ? velocity.x / across * bombFall.forward : 0);
+            z = unit.posZ + (across > 1e-6 ? velocity.z / across * bombFall.forward : 0);
+        }
+        bombImpact = new Vec3d(x, groundY, z);
     }
 
     /**
@@ -290,7 +359,7 @@ public final class RemoteController {
             throttle = Math.max(0, throttle - THROTTLE_STEP);
         }
         boolean trigger = isTriggerHeld(minecraft);
-        ModNetwork.CHANNEL.sendToServer(new PlaneInputPacket(unitId, pitch, roll, throttle, trigger, freeMode, isBoostKeyDown(minecraft)));
+        ModNetwork.CHANNEL.sendToServer(new PlaneInputPacket(unitId, pitch, roll, throttle, trigger, freeMode, isBoostKeyDown(minecraft), false));
     }
 
     /**
@@ -310,7 +379,7 @@ public final class RemoteController {
         right = clamp(right + axis(keysRight, keysLeft));
         forward = clamp(forward + axis(keysForward, keysBack));
         boolean boost = isTriggerHeld(minecraft);
-        ModNetwork.CHANNEL.sendToServer(new PlaneInputPacket(unitId, forward, right, 0, false, false, boost));
+        ModNetwork.CHANNEL.sendToServer(new PlaneInputPacket(unitId, forward, right, 0, false, false, boost, false));
     }
 
     /**
@@ -394,14 +463,15 @@ public final class RemoteController {
         if (mouseX != 0 || mouseY != 0) {
             // Finer aim when zoomed in
             cameraYaw = MathHelper.wrapDegrees(cameraYaw + mouseX / zoom);
-            cameraPitch = Math.max(LOOK_UP_LIMIT, Math.min(LOOK_DOWN_LIMIT, cameraPitch + mouseY / zoom));
+            cameraPitch = Math.max(bombSight ? SIGHT_UP_LIMIT : LOOK_UP_LIMIT, Math.min(LOOK_DOWN_LIMIT, cameraPitch + mouseY / zoom));
             // The gunner's camera holds a direction, not a target: keeping the aim on a point while orbiting is the skill
-            if (!isGunner()) {
+            // (and so does the bombsight: it looks where it's pointed while the ground slides past)
+            if (!isGunner() && !bombSight) {
                 reanchor(eye);
             }
             return;
         }
-        if (isGunner()) {
+        if (isGunner() || bombSight) {
             return;
         }
         if (anchorEntity != null && (anchorEntity.isDead || anchorEntity.world != unit.world)) {

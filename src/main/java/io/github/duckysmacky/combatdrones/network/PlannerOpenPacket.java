@@ -1,6 +1,7 @@
 package io.github.duckysmacky.combatdrones.network;
 
 import io.github.duckysmacky.combatdrones.type.Loadout;
+import io.github.duckysmacky.combatdrones.type.AerialBombType;
 import io.github.duckysmacky.combatdrones.type.RocketType;
 import io.github.duckysmacky.combatdrones.client.ClientPacketHandlers;
 import io.github.duckysmacky.combatdrones.config.ModConfig;
@@ -52,6 +53,7 @@ public class PlannerOpenPacket implements IMessage {
                 buf.writeShort(loadout.getAmmo(station));
             }
             buf.writeByte(loadout.getRocketKind().ordinal());
+            buf.writeByte(loadout.getBombKind().ordinal());
             buf.writeInt(waypointIndex);
             buf.writeDouble(originY);
             RouteCodec.write(buf, route);
@@ -85,6 +87,7 @@ public class PlannerOpenPacket implements IMessage {
                 view.loadout.setAmmo(station, buf.readUnsignedShort());
             }
             view.loadout.setRocketKind(RocketType.byIndex(buf.readUnsignedByte()));
+            view.loadout.setBombKind(AerialBombType.byIndex(buf.readUnsignedByte()));
             view.waypointIndex = buf.readInt();
             view.originY = buf.readDouble();
             view.route = RouteCodec.read(buf);
@@ -105,6 +108,7 @@ public class PlannerOpenPacket implements IMessage {
     public double maxAltitude = ModConfig.maxRouteAltitude;
     public double maxLength = ModConfig.maxRouteLength;
     public double minLaunchFuel = ModConfig.minLaunchFuel;
+    public double maxCarpetLength = ModConfig.maxCarpetLength;
 
     @Override
     public void toBytes(ByteBuf buf) {
@@ -113,6 +117,7 @@ public class PlannerOpenPacket implements IMessage {
         buf.writeDouble(maxAltitude);
         buf.writeDouble(maxLength);
         buf.writeDouble(minLaunchFuel);
+        buf.writeDouble(maxCarpetLength);
         buf.writeShort(units.size());
         for (UnitView unit : units) {
             unit.write(buf);
@@ -126,6 +131,7 @@ public class PlannerOpenPacket implements IMessage {
         maxAltitude = buf.readDouble();
         maxLength = buf.readDouble();
         minLaunchFuel = buf.readDouble();
+        maxCarpetLength = buf.readDouble();
         int count = buf.readUnsignedShort();
         for (int index = 0; index < count; index++) {
             units.add(UnitView.read(buf));

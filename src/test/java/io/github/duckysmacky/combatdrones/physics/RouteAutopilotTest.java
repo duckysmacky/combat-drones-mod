@@ -40,6 +40,18 @@ class RouteAutopilotTest {
     }
 
     @Test
+    void holdHeadingTurnsOntoTheHeadingAndKeepsItsHeight() {
+        FixedWingFlight.State state = launched();
+        state.bank = 30;
+        for (int tick = 0; tick < 400; tick++) {
+            FixedWingFlight.step(state, RouteAutopilot.holdHeading(state, 90, ORIGIN_Y + 10, 0.6, true), PLANE);
+        }
+        assertEquals(90, state.heading, 1.0);
+        assertEquals(ORIGIN_Y + 10, state.position.y, 1.5);
+        assertEquals(0, state.bank, 1.0);
+    }
+
+    @Test
     void reachesAWaypointBehindItAtTheRightAltitude() {
         FixedWingFlight.State state = launched();
         // Behind and to the side of the launch heading, 30 blocks up: needs a turn and a climb

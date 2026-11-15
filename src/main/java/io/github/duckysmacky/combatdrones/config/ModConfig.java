@@ -6,6 +6,7 @@ import com.electronwill.nightconfig.toml.TomlFormat;
 import io.github.duckysmacky.combatdrones.CombatDrones;
 import io.github.duckysmacky.combatdrones.physics.RouteValidator;
 import io.github.duckysmacky.combatdrones.type.BatteryPack;
+import io.github.duckysmacky.combatdrones.type.AerialBombType;
 import io.github.duckysmacky.combatdrones.type.BombType;
 import io.github.duckysmacky.combatdrones.type.DroneType;
 import io.github.duckysmacky.combatdrones.type.DroneTypes;
@@ -65,6 +66,7 @@ public final class ModConfig {
     public static int maxWaypointsPerRoute = 16;
     public static double maxRouteAltitude = 120.0;
     public static double maxRouteLength = 3000.0;
+    public static double maxCarpetLength = 256.0;
     public static double minLaunchFuel = 0.25;
     public static double lowFuelFraction = 0.15;
     public static double maxMarkDistance = 256.0;
@@ -297,6 +299,8 @@ public final class ModConfig {
                     "Highest waypoint altitude, in blocks above the launch ramp.");
             maxRouteLength = defaults.number("general.maxRouteLength", maxRouteLength, 100, 20000,
                     "Longest total route (from the ramp through every waypoint), in blocks.");
+            maxCarpetLength = defaults.number("general.maxCarpetLength", maxCarpetLength, 16, 2000,
+                    "Longest carpet run (blocks) a bomber's drop point may be given in the Mission Planner.");
             minLaunchFuel = defaults.number("general.minLaunchFuel", minLaunchFuel, 0, 1,
                     "Share of a full tank a ramp unit needs before it may launch.");
             lowFuelFraction = defaults.number("general.lowFuelFraction", lowFuelFraction, 0, 1,
@@ -501,6 +505,14 @@ public final class ModConfig {
                         defaults.number(table + ".blastPower", rocket.getDefaultBlastPower(), 0, 20, null));
             }
 
+            for (AerialBombType bomb : AerialBombType.values()) {
+                String table = "aerial_bombs." + bomb.key();
+                bomb.set((int) defaults.number(table + ".bayUnits", bomb.getDefaultBayUnits(), 1, 16, null),
+                        defaults.number(table + ".blastPower", bomb.getDefaultBlastPower(), 0, 20, null),
+                        defaults.number(table + ".cooldownTicks", bomb.getDefaultCooldownTicks(), 1, 1200, null),
+                        defaults.number(table + ".carpetIntervalTicks", bomb.getDefaultCarpetIntervalTicks(), 1, 1200, null));
+            }
+
             for (DroneType type : DroneTypes.all()) {
                 applyDroneTable(defaults, type);
             }
@@ -523,6 +535,9 @@ public final class ModConfig {
                     + "blastPower: vanilla scale (TNT = 4); weightPerBomb: share of top speed and acceleration lost per bomb carried.");
             defaults.comment("rockets", "Rockets for rocket pods, one size loaded at a time. bayUnits: space taken in the pod (the plane's "
                     + "payloadCapacity); blastPower: vanilla scale (TNT = 4).");
+            defaults.comment("aerial_bombs", "Bombs for the Stealth Bomber, one size loaded at a time. bayUnits: space taken in the bay (the "
+                    + "plane's payloadCapacity); blastPower: vanilla scale (TNT = 4); cooldownTicks: ticks between drops made by hand; "
+                    + "carpetIntervalTicks: ticks between bombs in a carpet run flown by the autopilot.");
             defaults.comment("drones", "Per-drone-type stats. Units: speed in blocks/tick (1 = 72 km/h), acceleration in blocks/tick², "
                     + "capacity (with a Standard pack) and drain in charge units (full-throttle flight time = capacity / drain ticks), blastPower on the vanilla "
                     + "scale (TNT = 4), maxHP like mob health, signalRange and motorSoundRange in blocks.");

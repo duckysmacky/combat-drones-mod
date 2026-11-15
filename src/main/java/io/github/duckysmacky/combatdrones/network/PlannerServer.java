@@ -152,7 +152,7 @@ public final class PlannerServer {
         if (fly && type.getControlScheme() != DroneType.ControlScheme.STICK) {
             return; // the GUI never offers it for these
         }
-        Route route = resolveTarget(player.world, packet.route).withLoiterMinimums(type.getMinLoiterAltitude(), type.getMinLoiterRadius());
+        Route route = prepare(player.world, type, packet.route);
         if (!(fly && route.size() == 0)) {
             String problem = RouteValidator.validate(route, ramp.posX, ramp.posZ, ModConfig.routeLimits(), allowedTerminals(type));
             if (problem != null) {
@@ -194,7 +194,7 @@ public final class PlannerServer {
             status(player, "message.combat_drones.emp.disabled");
             return;
         }
-        Route route = resolveTarget(player.world, packet.route).withLoiterMinimums(type.getMinLoiterAltitude(), type.getMinLoiterRadius());
+        Route route = prepare(player.world, type, packet.route);
         String problem = RouteValidator.validate(route, unit.posX, unit.posZ, ModConfig.routeLimits(), allowedTerminals(type));
         if (problem != null) {
             status(player, problem);
@@ -203,6 +203,16 @@ public final class PlannerServer {
         unit.setRoute(route);
         status(player, "message.combat_drones.planner.route_applied");
         openAll(player, -1);
+    }
+
+    /**
+     * A submitted route made fit for the unit, the way the planner shows it: target on the ground, orbit at the type's
+     * minimums, drop points only for a bomb bay and no longer than the carpet limit. Never a reason to reject.
+     */
+    private static Route prepare(World world, DroneType type, Route route) {
+        boolean bomber = type.stationOf(DroneType.WeaponType.BOMB_BAY) >= 0;
+        return resolveTarget(world, route).withLoiterMinimums(type.getMinLoiterAltitude(), type.getMinLoiterRadius())
+                .withDropLimit(bomber ? ModConfig.maxCarpetLength : Route.NO_DROP);
     }
 
     /** A target picked on the map has no height yet: put it on the ground there. */

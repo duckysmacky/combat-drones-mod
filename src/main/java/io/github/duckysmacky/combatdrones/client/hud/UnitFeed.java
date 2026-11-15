@@ -1,12 +1,15 @@
 package io.github.duckysmacky.combatdrones.client.hud;
 
+import io.github.duckysmacky.combatdrones.client.DroneKeys;
 import io.github.duckysmacky.combatdrones.client.RemoteController;
 import io.github.duckysmacky.combatdrones.entity.EntityRampUnit;
 import io.github.duckysmacky.combatdrones.item.ItemDrone;
+import io.github.duckysmacky.combatdrones.physics.BombBallistics;
 import io.github.duckysmacky.combatdrones.physics.HandFlownFlight;
 import io.github.duckysmacky.combatdrones.type.DroneType;
 import io.github.duckysmacky.combatdrones.type.Loadout;
 import net.minecraft.client.gui.ScaledResolution;
+import net.minecraft.client.settings.GameSettings;
 import net.minecraft.client.renderer.BufferBuilder;
 import net.minecraft.client.resources.I18n;
 import net.minecraft.util.math.BlockPos;
@@ -62,6 +65,10 @@ public final class UnitFeed {
             case GUNNER:
                 gunner(unit, type, centerX, centerY, left, right, top, bottom, mode, heading, altitude, speed, fuelText, fuelColor, healthText, healthColor);
                 break;
+            case BOMBSIGHT:
+                bombsight(resolution, unit, type, centerX, centerY, left, right, top, bottom, heading, altitude, speed, fuelText, fuelColor,
+                        healthText, healthColor);
+                break;
             case RECON:
                 recon(unit, centerX, centerY, left, right, top, bottom, heading, altitude, speed, fuelText, fuelColor, healthText, healthColor);
                 break;
@@ -77,6 +84,10 @@ public final class UnitFeed {
                 break;
         }
 
+        if (feed == Feed.BOMBER && RemoteController.isBomber()) {
+            Ui.textCentered(I18n.format("hud.combat_drones.bomb.sight_hint", GameSettings.getKeyDisplayString(DroneKeys.BOMB_SIGHT.getKeyCode())),
+                    centerX, bottom + 16 + Ui.LINE, Ui.alpha(Ui.HUD_GREEN, 0.7F));
+        }
         Widgets.lock(centerX, centerY);
         if (fuel <= 0) {
             Ui.textCentered(I18n.format("hud.combat_drones.warning.fuel_empty"), centerX, warningY, Ui.DANGER);
@@ -106,6 +117,8 @@ public final class UnitFeed {
                 return OsdFont.Icon.ROCKET;
             case GUN_MOUNT:
                 return OsdFont.Icon.BULLET;
+            case BOMB_BAY:
+                return OsdFont.Icon.BOMB;
             default:
                 return OsdFont.Icon.SHELL;
         }
@@ -200,6 +213,53 @@ public final class UnitFeed {
             Widgets.reload(unit, station, centerX - 14, centerY + 13, 28);
         }
         weapons(unit, type, right, bottom - 10, RemoteController.isGunner() ? station : -1, Ui.DIM);
+    }
+
+    /**
+     * Stealth Bomber's bombsight, looking down: a drift line the whole height of the picture (the ground runs along
+     * it), a range ladder across it, the bay and its reload, and the fall time and forward throw of a bomb let go now.
+     * A yellow diamond on the ground marks where that bomb would land ({@code MarkerRenderer}).
+     */
+    private static void bombsight(ScaledResolution resolution, EntityRampUnit unit, DroneType type, int centerX, int centerY, int left, int right,
+                                  int top, int bottom, double heading, double altitude, double speed, String fuelText, int fuelColor,
+                                  String healthText, int healthColor) {
+        int height = resolution.getScaledHeight();
+        Ui.vline(centerX, 16, centerY - 5, Ui.TEXT);
+        Ui.vline(centerX, centerY + 6, height - 16, Ui.TEXT);
+        Ui.hline(centerX - 96, centerX - 5, centerY, Ui.TEXT);
+        Ui.hline(centerX + 6, centerX + 97, centerY, Ui.TEXT);
+        for (int tick = 12; tick <= 96; tick += 12) {
+            int half = tick % 48 == 0 ? 5 : 2;
+            Ui.vline(centerX - tick, centerY - half, centerY + half + 1, Ui.TEXT);
+            Ui.vline(centerX + tick, centerY - half, centerY + half + 1, Ui.TEXT);
+            if (centerY - tick > 16) {
+                Ui.hline(centerX - half, centerX + half + 1, centerY - tick, Ui.TEXT);
+                Ui.hline(centerX - half, centerX + half + 1, centerY + tick, Ui.TEXT);
+            }
+        }
+        Ui.vline(centerX - 96, centerY - 30, centerY + 31, Ui.DIM);
+        Ui.vline(centerX + 96, centerY - 30, centerY + 31, Ui.DIM);
+        Ui.rect(centerX, centerY, centerX + 1, centerY + 1, Ui.TEXT);
+
+        Ui.text(I18n.format("hud.combat_drones.mode.bombsight"), left, top, Ui.TEXT);
+        Ui.text(I18n.format("hud.combat_drones.zoom", RemoteController.getZoom()), left, top + Ui.LINE, Ui.TEXT);
+        Ui.labelled(OsdFont.Icon.ALTITUDE, I18n.format("hud.combat_drones.metres", Widgets.number(altitude)), left, top + Ui.LINE * 2, Ui.DIM);
+        Ui.labelled(OsdFont.Icon.SPEED, I18n.format("hud.combat_drones.kmh", Math.round(speed)), left, top + Ui.LINE * 3, Ui.DIM);
+        Ui.text(I18n.format("hud.combat_drones.heading", Math.round(heading)), left, top + Ui.LINE * 4, Ui.DIM);
+        Ui.labelledRight(OsdFont.Icon.FUEL, fuelText, right, top, fuelColor);
+        Ui.labelledRight(OsdFont.Icon.HEALTH, healthText, right, top + Ui.LINE, healthColor);
+        Widgets.marks(right, top + Ui.LINE * 2);
+
+        BombBallistics.Fall fall = RemoteController.getBombFall();
+        if (fall != null) {
+            Ui.textRight(I18n.format("hud.combat_drones.bomb.fall", String.format(Locale.ROOT, "%.1f", fall.ticks / 20.0)), right,
+                    bottom - 10 - WEAPON_LINE - Ui.LINE, Ui.WARN);
+            Ui.textRight(I18n.format("hud.combat_drones.bomb.throw", Math.round(fall.forward)), right, bottom - 10 - WEAPON_LINE, Ui.WARN);
+        }
+        Widgets.reload(unit, 0, centerX - 14, centerY + 13, 28);
+        weapons(unit, type, right, bottom - 10, 0, Ui.DIM);
+        Ui.textCentered(I18n.format("hud.combat_drones.bomb.flight_hint", GameSettings.getKeyDisplayString(DroneKeys.BOMB_SIGHT.getKeyCode())),
+                centerX, height - 12, Ui.DIM);
     }
 
     /** Recon UAV: a surveillance picture between two data bars. */

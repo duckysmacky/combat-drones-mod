@@ -2,6 +2,7 @@ package io.github.duckysmacky.combatdrones.network;
 
 import io.github.duckysmacky.combatdrones.client.ClientPacketHandlers;
 import io.github.duckysmacky.combatdrones.config.ModConfig;
+import io.github.duckysmacky.combatdrones.type.AerialBombType;
 import io.github.duckysmacky.combatdrones.type.BatteryPack;
 import io.github.duckysmacky.combatdrones.type.BombType;
 import io.github.duckysmacky.combatdrones.type.DroneType;
@@ -30,6 +31,9 @@ public class TypeSyncPacket implements IMessage {
     private final double[] bombWeight = new double[BombType.values().length];
     private final int[] rocketBayUnits = new int[RocketType.values().length];
     private final double[] rocketBlast = new double[RocketType.values().length];
+    private final int[] aerialBayUnits = new int[AerialBombType.values().length];
+    /** Per size: blast power, hand-drop cooldown, carpet interval. */
+    private final double[][] aerialStats = new double[AerialBombType.values().length][3];
     private boolean worldBorderCollision;
     private double steerConeDegrees;
 
@@ -53,6 +57,10 @@ public class TypeSyncPacket implements IMessage {
             rocketBayUnits[rocket.ordinal()] = rocket.getBayUnits();
             rocketBlast[rocket.ordinal()] = rocket.getBlastPower();
         }
+        for (AerialBombType bomb : AerialBombType.values()) {
+            aerialBayUnits[bomb.ordinal()] = bomb.getBayUnits();
+            aerialStats[bomb.ordinal()] = new double[]{bomb.getBlastPower(), bomb.getCooldownTicks(), bomb.getCarpetIntervalTicks()};
+        }
         worldBorderCollision = ModConfig.worldBorderCollision;
         steerConeDegrees = ModConfig.steerConeDegrees;
     }
@@ -67,6 +75,10 @@ public class TypeSyncPacket implements IMessage {
         }
         for (RocketType rocket : RocketType.values()) {
             rocket.set(rocketBayUnits[rocket.ordinal()], rocketBlast[rocket.ordinal()]);
+        }
+        for (AerialBombType bomb : AerialBombType.values()) {
+            double[] stats = aerialStats[bomb.ordinal()];
+            bomb.set(aerialBayUnits[bomb.ordinal()], stats[0], stats[1], stats[2]);
         }
         ModConfig.worldBorderCollision = worldBorderCollision;
         ModConfig.steerConeDegrees = steerConeDegrees;
@@ -96,6 +108,11 @@ public class TypeSyncPacket implements IMessage {
             rocketBayUnits[index] = Math.max(1, Math.min(16, buf.readInt()));
             rocketBlast[index] = Math.max(0, Math.min(20, buf.readDouble()));
         }
+        for (int index = 0; index < aerialBayUnits.length; index++) {
+            aerialBayUnits[index] = Math.max(1, Math.min(16, buf.readInt()));
+            aerialStats[index] = new double[]{Math.max(0, Math.min(20, buf.readDouble())), Math.max(1, Math.min(1200, buf.readDouble())),
+                    Math.max(1, Math.min(1200, buf.readDouble()))};
+        }
         worldBorderCollision = buf.readBoolean();
         steerConeDegrees = Math.max(0, Math.min(60, buf.readDouble()));
     }
@@ -119,6 +136,12 @@ public class TypeSyncPacket implements IMessage {
         for (int index = 0; index < rocketBayUnits.length; index++) {
             buf.writeInt(rocketBayUnits[index]);
             buf.writeDouble(rocketBlast[index]);
+        }
+        for (int index = 0; index < aerialBayUnits.length; index++) {
+            buf.writeInt(aerialBayUnits[index]);
+            for (double stat : aerialStats[index]) {
+                buf.writeDouble(stat);
+            }
         }
         buf.writeBoolean(worldBorderCollision);
         buf.writeDouble(steerConeDegrees);

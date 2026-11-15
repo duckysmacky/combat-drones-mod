@@ -331,7 +331,8 @@ public class EntityCruiseMissile extends EntityRampUnit {
 
     /** Server: the pilot's steering for the dive (stick forward/right as pitch/roll, boost). Controller only. */
     @Override
-    public void acceptManualInput(EntityPlayerMP sender, double pitch, double roll, double throttle, boolean trigger, boolean free, boolean boost) {
+    public void acceptManualInput(EntityPlayerMP sender, double pitch, double roll, double throttle, boolean trigger, boolean free, boolean boost,
+                                  boolean sight) {
         if (RemoteSessions.controllerOf(this) != sender) {
             return;
         }

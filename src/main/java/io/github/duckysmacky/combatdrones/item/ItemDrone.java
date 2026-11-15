@@ -5,6 +5,7 @@ import io.github.duckysmacky.combatdrones.ModSounds;
 import io.github.duckysmacky.combatdrones.client.DroneKeys;
 import io.github.duckysmacky.combatdrones.client.Tooltips;
 import io.github.duckysmacky.combatdrones.entity.EntityHandFlownDrone;
+import io.github.duckysmacky.combatdrones.type.AerialBombType;
 import io.github.duckysmacky.combatdrones.type.BombType;
 import io.github.duckysmacky.combatdrones.type.DroneType;
 import io.github.duckysmacky.combatdrones.type.DroneTypes;
@@ -44,6 +45,7 @@ public class ItemDrone extends Item {
     private static final String TAG_AMMO_SECONDARY = "Ammo2";
     private static final String TAG_AMMO_TERTIARY = "Ammo3";
     private static final String TAG_ROCKET_KIND = "RocketKind";
+    private static final String TAG_BOMB_KIND = "BombKind";
 
     /** Fuel stored in a ramp-launched unit's item (kept when it's taken off a ramp or lands). */
     public static double getFuel(ItemStack stack) {
@@ -83,6 +85,7 @@ public class ItemDrone extends Item {
         loadout.setAmmo(2, tag.getInteger(TAG_AMMO_TERTIARY));
         // Missing (older saves, from before rocket sizes) reads as 0: light rockets
         loadout.setRocketKind(RocketType.byIndex(tag.getInteger(TAG_ROCKET_KIND)));
+        loadout.setBombKind(AerialBombType.byIndex(tag.getInteger(TAG_BOMB_KIND)));
         return loadout;
     }
 
@@ -91,13 +94,15 @@ public class ItemDrone extends Item {
         tag.setInteger(TAG_AMMO_SECONDARY, loadout.getAmmo(1));
         tag.setInteger(TAG_AMMO_TERTIARY, loadout.getAmmo(2));
         tag.setInteger(TAG_ROCKET_KIND, loadout.getRocketKind().ordinal());
+        tag.setInteger(TAG_BOMB_KIND, loadout.getBombKind().ordinal());
     }
 
     /** Translation key naming the ammo {@code station} takes, by weapon (and rocket size for a pod). */
     public static String ammoKey(DroneType type, int station, Loadout loadout) {
         DroneType.WeaponType weapon = type.getWeapon(station);
         String key = weapon.name().toLowerCase(Locale.ROOT);
-        return weapon == DroneType.WeaponType.ROCKET_POD ? key + "." + loadout.getRocketKind().key() : key;
+        return weapon == DroneType.WeaponType.ROCKET_POD ? key + "." + loadout.getRocketKind().key()
+                : weapon == DroneType.WeaponType.BOMB_BAY ? key + "." + loadout.getBombKind().key() : key;
     }
 
     /** Looked up on use rather than cached, so server-synced type stats are always the ones applied. */
@@ -179,12 +184,13 @@ public class ItemDrone extends Item {
             Tooltips.addDetails("tooltip.combat_drones.drone.setup_ramp", tooltip);
             // How "Take control" / View works for this unit
             boolean gunner = type.getControlScheme() == DroneType.ControlScheme.GUNNER;
-            String control = type.isSensor() ? "sensor" : gunner ? "gunner"
+            String control = type.isSensor() ? "sensor" : gunner ? "gunner" : type.stationOf(DroneType.WeaponType.BOMB_BAY) >= 0 ? "bomber"
                     : type.getWeaponType() != DroneType.WeaponType.NONE ? "armed_plane"
                     : type.getControlScheme() == null ? null : type.getControlScheme().name().toLowerCase(Locale.ROOT);
             if (control != null) {
                 Tooltips.addDetails("tooltip.combat_drones.drone.control." + control, tooltip,
-                        Tooltips.keyName(gunner ? DroneKeys.SWITCH_WEAPON : DroneKeys.FLIGHT_MODE), Tooltips.keyName(DroneKeys.TOGGLE_FPV));
+                        Tooltips.keyName(gunner ? DroneKeys.SWITCH_WEAPON : DroneKeys.FLIGHT_MODE), Tooltips.keyName(DroneKeys.TOGGLE_FPV),
+                        Tooltips.keyName(DroneKeys.BOMB_SIGHT));
             }
         }
     }

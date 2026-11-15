@@ -36,6 +36,7 @@ public final class ModSounds {
     /** Booster lighting up on a munition. */
     public static final SoundEvent UNIT_BOOST = create("unit.boost");
     public static final SoundEvent BOMB_RELEASE = create("bomb.release");
+    public static final SoundEvent BOMBER_RELEASE = create("bomber.release");
     public static final SoundEvent BULLET_IMPACT = create("bullet.impact");
     /** Supersonic crack of a round passing close by. */
     public static final SoundEvent BULLET_FLYBY = create("bullet.flyby");
@@ -75,7 +76,7 @@ public final class ModSounds {
     @SubscribeEvent
     public static void registerSounds(RegistryEvent.Register<SoundEvent> event) {
         event.getRegistry().registerAll(DRONE_MOTOR, DRONE_LINK, DRONE_BEEP, DRONE_BATTERY, DRONE_ATTACH, DRONE_CONNECT, DRONE_HIT, DRONE_PILOT_STATIC, UNIT_LAUNCH,
-                GUNSHIP_ROCKET, GUNSHIP_GUN, UNIT_BOOST, BOMB_RELEASE, BULLET_IMPACT, BULLET_FLYBY, MISSILE_IGNITION, MISSILE_LIFTOFF, MISSILE_SCREAM, MISSILE_ALARM,
+                GUNSHIP_ROCKET, GUNSHIP_GUN, UNIT_BOOST, BOMB_RELEASE, BOMBER_RELEASE, BULLET_IMPACT, BULLET_FLYBY, MISSILE_IGNITION, MISSILE_LIFTOFF, MISSILE_SCREAM, MISSILE_ALARM,
                 DRONE_PLACE, DRONE_PICKUP, UNIT_INSTALL, UNIT_REMOVE, UNIT_AMMO, PAD_LOAD, RAMP_PLACE,
                 DETECTOR_PING, DETECTOR_CONTACT, EMP_STATION_ON, EMP_STATION_OFF, EMP_HUM, EMP_ZAP, EMP_CHARGE, EMP_BLAST);
     }

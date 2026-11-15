@@ -13,8 +13,11 @@ import io.github.duckysmacky.combatdrones.network.PlannerOpenPacket;
 import io.github.duckysmacky.combatdrones.network.PlannerRequestPacket;
 import io.github.duckysmacky.combatdrones.network.PlannerSubmitPacket;
 import io.github.duckysmacky.combatdrones.network.RemoteRequestPacket;
+import io.github.duckysmacky.combatdrones.physics.BombBallistics;
 import io.github.duckysmacky.combatdrones.physics.Route;
+import io.github.duckysmacky.combatdrones.physics.RouteAutopilot;
 import io.github.duckysmacky.combatdrones.physics.RouteValidator;
+import io.github.duckysmacky.combatdrones.type.AerialBombType;
 import io.github.duckysmacky.combatdrones.type.DroneType;
 import io.github.duckysmacky.combatdrones.type.DroneTypes;
 import net.minecraft.client.Minecraft;
@@ -27,6 +30,7 @@ import net.minecraft.client.renderer.Tessellator;
 import net.minecraft.client.renderer.vertex.DefaultVertexFormats;
 import net.minecraft.client.resources.I18n;
 import net.minecraft.entity.Entity;
+import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.border.WorldBorder;
 import org.lwjgl.input.Keyboard;
 import org.lwjgl.input.Mouse;
@@ -82,6 +86,12 @@ public class GuiMissionPlanner extends GuiScreen {
     private static final int BUTTON_LAUNCH_FLY = 13;
     private static final int TARGET_COLOR = Ui.DANGER;
     private static final int BORDER_COLOR = 0xC0D94F3C;
+    private static final int DROP_FAINT = 0x90D94F3C;
+    /** Carpet run length a drop point starts with, and the step the menu changes it by. */
+    private static final double DEFAULT_CARPET = 64;
+    private static final double CARPET_STEP = 16;
+    /** A carpet's strip on the map is this many blocks wide per point of blast power, each side of the line. */
+    private static final double BLAST_REACH = 1.5;
 
     private PlannerOpenPacket view;
     /** Index into view.units of the unit being edited. */
@@ -114,6 +124,8 @@ public class GuiMissionPlanner extends GuiScreen {
     private PlannerTerrainMap terrain;
     /** While true the loiter radius follows the cursor's distance from the last waypoint. */
     private boolean editingRadius;
+    /** Bombs the route on screen drops in all (counted while its drop points are drawn). */
+    private int bombsNeeded;
 
     private GuiButton terminalButton;
     private GuiButton launchButton;
@@ -361,7 +373,8 @@ public class GuiMissionPlanner extends GuiScreen {
         for (int index = 0; index < waypoints.size() && y < height - 84; index++) {
             Route.Waypoint waypoint = waypoints.get(index);
             String line = String.format(Locale.ROOT, "#%d  %d, %d  ↑%d %s", index + 1, Math.round(waypoint.x), Math.round(waypoint.z),
-                    Math.round(waypoint.altitude), waypoint.speed.name().charAt(0));
+                    Math.round(waypoint.altitude), waypoint.speed.name().charAt(0))
+                    + (waypoint.dropLength > 0 ? " C" + Math.round(waypoint.dropLength) : waypoint.isDrop() ? " B" : "");
             boolean badAltitude = waypoint.altitude < RouteValidator.MIN_ALTITUDE || waypoint.altitude > view.maxAltitude;
             int color = index == selectedWaypoint ? Ui.SELECT : badAltitude ? WARNING : Ui.TEXT;
             if (index == selectedWaypoint) {
@@ -393,6 +406,7 @@ public class GuiMissionPlanner extends GuiScreen {
         drawWorldBorder(buffer);
         if (unit != null) {
             drawRoute(buffer, unit);
+            drawDrops(buffer, unit);
             drawTarget(buffer);
         }
         for (PlannerOpenPacket.UnitView other : view.units) {
@@ -415,7 +429,7 @@ public class GuiMissionPlanner extends GuiScreen {
             int screenX = toScreenX(waypoint.x);
             int screenY = toScreenY(waypoint.z);
             if (insideMap(screenX, screenY)) {
-                drawMarker(waypoint.x, waypoint.z, index == selectedWaypoint ? Ui.SELECT : ROUTE_COLOR, 3);
+                drawMarker(waypoint.x, waypoint.z, index == selectedWaypoint ? Ui.SELECT : waypoint.isDrop() ? TARGET_COLOR : ROUTE_COLOR, 3);
                 fontRenderer.drawStringWithShadow(String.valueOf(index + 1), screenX + 5, screenY - 4, Ui.TEXT);
             }
         }
@@ -423,6 +437,11 @@ public class GuiMissionPlanner extends GuiScreen {
             drawMarker(mc.player.posX, mc.player.posZ, Ui.TEXT, 2);
         }
         drawIntel();
+        int bay = unit == null || currentType() == null ? -1 : currentType().stationOf(DroneType.WeaponType.BOMB_BAY);
+        if (bay >= 0 && bombsNeeded > 0) {
+            int loaded = unit.loadout.getAmmo(bay);
+            Ui.text(I18n.format("gui.combat_drones.planner.bombs", bombsNeeded, loaded), mapLeft + 4, mapTop + 4, bombsNeeded > loaded ? WARNING : Ui.TEXT);
+        }
         // North mark, the scale bar, and the cursor's coordinates
         int north = (mapLeft + mapRight) / 2;
         Ui.block(north, mapTop + 3, north + 1, mapTop + 4, Ui.TEXT);
@@ -508,6 +527,76 @@ public class GuiMissionPlanner extends GuiScreen {
             Route.Waypoint last = waypoints.get(waypoints.size() - 1);
             clippedLine(buffer, last.x, last.z, target.x, target.z, 0x80D94F3C);
         }
+    }
+
+    /**
+     * A bomber's drop points: a line from each to a cross where its bomb should land (released as the waypoint is
+     * passed, thrown on by the leg's speed from the waypoint's height over the ground there), and for a carpet run the
+     * strip it covers from that point on, as wide as the blasts reach, with a tick per bomb.
+     */
+    private void drawDrops(BufferBuilder buffer, PlannerOpenPacket.UnitView unit) {
+        bombsNeeded = 0;
+        DroneType type = currentType();
+        if (type == null || type.stationOf(DroneType.WeaponType.BOMB_BAY) < 0) {
+            return;
+        }
+        AerialBombType kind = unit.loadout.getBombKind();
+        double fromX = unit.x;
+        double fromZ = unit.z;
+        for (int index = dirty || unit.isGrounded() ? 0 : Math.min(unit.waypointIndex, waypoints.size()); index < waypoints.size(); index++) {
+            Route.Waypoint waypoint = waypoints.get(index);
+            double leg = Math.hypot(waypoint.x - fromX, waypoint.z - fromZ);
+            double alongX = leg < 1e-3 ? 0 : (waypoint.x - fromX) / leg;
+            double alongZ = leg < 1e-3 ? 0 : (waypoint.z - fromZ) / leg;
+            fromX = waypoint.x;
+            fromZ = waypoint.z;
+            if (!waypoint.isDrop() || leg < 1e-3) {
+                continue;
+            }
+            double speed = type.getMaxSpeed() * waypoint.speed.fraction;
+            // The autopilot counts a waypoint as passed a little before it
+            double early = Math.min(leg, RouteAutopilot.acceptRadius(speed));
+            double releaseX = waypoint.x - alongX * early;
+            double releaseZ = waypoint.z - alongZ * early;
+            double landX = releaseX;
+            double landZ = releaseZ;
+            for (int pass = 0; pass < 2; pass++) {
+                double height = unit.originY + waypoint.altitude - groundAt(landX, landZ, unit.originY - 1);
+                double thrown = BombBallistics.fall(speed, 0, height).forward;
+                landX = releaseX + alongX * thrown;
+                landZ = releaseZ + alongZ * thrown;
+            }
+            clippedLine(buffer, waypoint.x, waypoint.z, landX, landZ, DROP_FAINT);
+            double arm = 4 / scale;
+            clippedLine(buffer, landX - arm, landZ - arm, landX + arm, landZ + arm, TARGET_COLOR);
+            clippedLine(buffer, landX - arm, landZ + arm, landX + arm, landZ - arm, TARGET_COLOR);
+            if (waypoint.dropLength <= 0) {
+                bombsNeeded++;
+                continue;
+            }
+            double spacing = Math.max(0.05, speed * kind.getCarpetIntervalTicks());
+            int bombs = (int) (waypoint.dropLength / spacing) + 1;
+            bombsNeeded += bombs;
+            double sideX = -alongZ * kind.getBlastPower() * BLAST_REACH;
+            double sideZ = alongX * kind.getBlastPower() * BLAST_REACH;
+            double endX = landX + alongX * waypoint.dropLength;
+            double endZ = landZ + alongZ * waypoint.dropLength;
+            clippedLine(buffer, landX - sideX, landZ - sideZ, endX - sideX, endZ - sideZ, TARGET_COLOR);
+            clippedLine(buffer, landX + sideX, landZ + sideZ, endX + sideX, endZ + sideZ, TARGET_COLOR);
+            clippedLine(buffer, landX - sideX, landZ - sideZ, landX + sideX, landZ + sideZ, TARGET_COLOR);
+            clippedLine(buffer, endX - sideX, endZ - sideZ, endX + sideX, endZ + sideZ, TARGET_COLOR);
+            for (int bomb = 1; bomb < Math.min(bombs, 128); bomb++) {
+                double tickX = landX + alongX * spacing * bomb;
+                double tickZ = landZ + alongZ * spacing * bomb;
+                clippedLine(buffer, tickX - sideX, tickZ - sideZ, tickX + sideX, tickZ + sideZ, DROP_FAINT);
+            }
+        }
+    }
+
+    /** Ground height at a spot the client has loaded, else {@code fallback}. */
+    private double groundAt(double x, double z, double fallback) {
+        BlockPos column = new BlockPos(x, 0, z);
+        return mc.world.isBlockLoaded(column, false) ? mc.world.getHeight(column).getY() : fallback;
     }
 
     private void drawRoute(BufferBuilder buffer, PlannerOpenPacket.UnitView unit) {
@@ -770,7 +859,29 @@ public class GuiMissionPlanner extends GuiScreen {
                 terminal = Route.TerminalAction.LOITER;
             }));
         }
+        if (isBomber()) {
+            addMenu.row(PlannerContextMenu.Segment.command(() -> I18n.format("gui.combat_drones.planner.menu.add_drop"), () -> {
+                addWaypointAt(worldX, worldZ);
+                setDrop(waypoints.size() - 1, 0);
+            }));
+        }
         return addMenu.row(PlannerContextMenu.Segment.command(() -> I18n.format("gui.combat_drones.planner.menu.add"), () -> addWaypointAt(worldX, worldZ)));
+    }
+
+    private boolean isBomber() {
+        DroneType type = currentType();
+        return type != null && type.stationOf(DroneType.WeaponType.BOMB_BAY) >= 0;
+    }
+
+    private double dropOf(int index) {
+        return index < waypoints.size() ? waypoints.get(index).dropLength : Route.NO_DROP;
+    }
+
+    private void setDrop(int index, double dropLength) {
+        if (index < waypoints.size()) {
+            waypoints.set(index, waypoints.get(index).withDrop(dropLength));
+            dirty = true;
+        }
     }
 
     /** Appends a waypoint, copying the previous one's height and speed (the first one flies at Medium). */
@@ -779,7 +890,7 @@ public class GuiMissionPlanner extends GuiScreen {
         double altitude = previous != null ? previous.altitude : defaultAltitude();
         Route.Speed speed = previous != null ? previous.speed : Route.Speed.MEDIUM;
         UiSounds.play(UiSounds.SELECT, 1.2F);
-        waypoints.add(new Route.Waypoint(Math.round(worldX), Math.round(worldZ), altitude, speed));
+        waypoints.add(new Route.Waypoint(Math.round(worldX), Math.round(worldZ), altitude, speed)); // never copies a drop
         selectedWaypoint = waypoints.size() - 1;
         dirty = true;
     }
@@ -807,6 +918,21 @@ public class GuiMissionPlanner extends GuiScreen {
                     () -> index < waypoints.size() && waypoints.get(index).speed == speed));
         }
         waypointMenu.row(speedRow.toArray(new PlannerContextMenu.Segment[0]));
+        if (isBomber()) {
+            waypointMenu.row(
+                    PlannerContextMenu.Segment.label(() -> I18n.format("gui.combat_drones.planner.menu.drop")),
+                    PlannerContextMenu.Segment.option(() -> I18n.format("gui.combat_drones.planner.drop.off"),
+                            () -> setDrop(index, Route.NO_DROP), () -> dropOf(index) < 0),
+                    PlannerContextMenu.Segment.option(() -> I18n.format("gui.combat_drones.planner.drop.single"),
+                            () -> setDrop(index, 0), () -> dropOf(index) == 0),
+                    PlannerContextMenu.Segment.option(() -> I18n.format("gui.combat_drones.planner.drop.carpet"),
+                            () -> setDrop(index, Math.max(dropOf(index), Math.min(DEFAULT_CARPET, view.maxCarpetLength))), () -> dropOf(index) > 0));
+            waypointMenu.row(
+                    PlannerContextMenu.Segment.label(() -> I18n.format("gui.combat_drones.planner.menu.carpet")),
+                    PlannerContextMenu.Segment.option(() -> "-" + Math.round(CARPET_STEP), () -> changeCarpet(index, -CARPET_STEP), () -> false),
+                    PlannerContextMenu.Segment.label(() -> dropOf(index) > 0 ? Math.round(dropOf(index)) + " m" : "-"),
+                    PlannerContextMenu.Segment.option(() -> "+" + Math.round(CARPET_STEP), () -> changeCarpet(index, CARPET_STEP), () -> false));
+        }
         if (index == waypoints.size() - 1) {
             waypointMenu.row(
                     PlannerContextMenu.Segment.label(() -> I18n.format("gui.combat_drones.planner.menu.final")),
@@ -822,6 +948,13 @@ public class GuiMissionPlanner extends GuiScreen {
             dirty = true;
         }));
         return waypointMenu;
+    }
+
+    /** Lengthens or shortens a carpet run (only once the waypoint is one). */
+    private void changeCarpet(int index, double delta) {
+        if (dropOf(index) > 0) {
+            setDrop(index, Math.max(CARPET_STEP, Math.min(view.maxCarpetLength, dropOf(index) + delta)));
+        }
     }
 
     /** Loiter radius implied by the cursor's distance from the last waypoint. */

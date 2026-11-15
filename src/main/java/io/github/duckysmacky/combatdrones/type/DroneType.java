@@ -38,7 +38,8 @@ public final class DroneType {
         }
     }
 
-    public enum WeaponType { NONE, ROCKET_POD, GUN_MOUNT, CANNON, HOWITZER }
+    /** BOMB_BAY: free-fall bombs released under the plane, by hand or by the autopilot at a route's drop points. */
+    public enum WeaponType { NONE, ROCKET_POD, GUN_MOUNT, CANNON, HOWITZER, BOMB_BAY }
 
     /** What a hand-flown drone's payload slots hold: grenades boost a racer's impact blast, bombs are dropped. */
     public enum PayloadKind { GRENADE, BOMB }

@@ -115,8 +115,7 @@ public final class RouteAutopilot {
         int index = Math.min(waypointIndex, route.size());
         if (index < route.size()) {
             Route.Waypoint next = route.get(index);
-            double acceptRadius = Math.max(6, 8 * state.speed);
-            if (Math.hypot(next.x - state.position.x, next.z - state.position.z) < acceptRadius) {
+            if (Math.hypot(next.x - state.position.x, next.z - state.position.z) < acceptRadius(state.speed)) {
                 index++;
             }
         }
@@ -262,6 +261,29 @@ public final class RouteAutopilot {
     /** No route: fly straight and level (above the floor). */
     private static FixedWingFlight.Controls hold(FixedWingFlight.State state, Situation situation, FixedWingFlight.Params params) {
         return controls(state, 0, Math.max(state.position.y, situation.minSafeY), Route.Speed.FAST.fraction, params, situation.hasFuel);
+    }
+
+    /** How close (blocks, along the ground) a unit flying at {@code speed} comes to a waypoint before it counts as passed. */
+    public static double acceptRadius(double speed) {
+        return Math.max(6, 8 * speed);
+    }
+
+    /** Carpet run: straight on along a fixed heading at a waypoint's height and speed. */
+    public static FixedWingFlight.Controls holdCourse(FixedWingFlight.State state, double heading, double targetY, double speedFraction,
+                                                      FixedWingFlight.Params params, boolean hasFuel) {
+        return controls(state, bankToward(state, heading), targetY, speedFraction, params, hasFuel);
+    }
+
+    /**
+     * Bomb run: wings toward a fixed heading and nose toward a fixed altitude, at whatever throttle the pilot left set.
+     */
+    public static FixedWingFlight.Controls holdHeading(FixedWingFlight.State state, double heading, double targetY, double throttle, boolean hasFuel) {
+        double bank = bankToward(state, heading);
+        if (!hasFuel) {
+            return new FixedWingFlight.Controls(bank, FixedWingFlight.GLIDE_PITCH_DEG, 0, false);
+        }
+        double pitch = FixedWingFlight.clamp(-(targetY - state.position.y) * PITCH_GAIN, MAX_CLIMB_PITCH);
+        return new FixedWingFlight.Controls(bank, pitch, throttle, true);
     }
 
     private static double bankToward(FixedWingFlight.State state, double desiredHeading) {

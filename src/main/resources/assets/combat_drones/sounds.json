@@ -122,6 +122,13 @@
       "combat_drones:bomb/release"
     ]
   },
+  "bomber.release": {
+    "category": "neutral",
+    "subtitle": "subtitles.combat_drones.bomb.release",
+    "sounds": [
+      "combat_drones:bomber/release"
+    ]
+  },
   "missile.ignition": {
     "category": "neutral",
     "subtitle": "subtitles.combat_drones.missile.ignition",
@@ -295,6 +302,27 @@
     "subtitle": "subtitles.combat_drones.unit.engine",
     "sounds": [
       "combat_drones:engine/gunship_far"
+    ]
+  },
+  "engine.bomber.near": {
+    "category": "neutral",
+    "subtitle": "subtitles.combat_drones.unit.engine",
+    "sounds": [
+      "combat_drones:engine/bomber_near"
+    ]
+  },
+  "engine.bomber.mid": {
+    "category": "neutral",
+    "subtitle": "subtitles.combat_drones.unit.engine",
+    "sounds": [
+      "combat_drones:engine/bomber_mid"
+    ]
+  },
+  "engine.bomber.far": {
+    "category": "neutral",
+    "subtitle": "subtitles.combat_drones.unit.engine",
+    "sounds": [
+      "combat_drones:engine/bomber_far"
     ]
   },
   "engine.recon.near": {
@@ -511,6 +539,13 @@
     "subtitle": "subtitles.combat_drones.projectile.bomb",
     "sounds": [
       "combat_drones:projectile/bomb_heavy"
+    ]
+  },
+  "projectile.aerial_bomb": {
+    "category": "neutral",
+    "subtitle": "subtitles.combat_drones.projectile.bomb",
+    "sounds": [
+      "combat_drones:projectile/aerial_bomb"
     ]
   },
   "bullet.whiz": {

@@ -23,6 +23,21 @@ class LoadoutTest {
         assertEquals(0, loadout.capacity(STRIKE_PLANE, 1), "no secondary weapon");
     }
 
+    @Test
+    void bombBayCapacityDependsOnTheLoadedSize() {
+        DroneType bomber = DroneType.parse("stealth_bomber", new StringReader("{"
+                + "\"category\": \"RAMP_AUTOPILOT\", \"maxSpeed\": 0.8, \"acceleration\": 0.04, \"batteryOrFuelCapacity\": 7200,"
+                + "\"drainRatePerTick\": 1, \"maxHP\": 200, \"defaultCruiseAltitude\": 80, \"controlScheme\": \"STICK\","
+                + "\"weaponType\": \"BOMB_BAY\", \"payloadCapacity\": 64}"));
+        Loadout loadout = new Loadout();
+        assertEquals(64, loadout.capacity(bomber, 0));
+        loadout.setBombKind(AerialBombType.MEDIUM);
+        assertEquals(32, loadout.capacity(bomber, 0));
+        loadout.setBombKind(AerialBombType.LARGE);
+        loadout.setAmmo(0, 40);
+        assertEquals(16, loadout.clampTo(bomber).getAmmo(0));
+    }
+
     private static String gunship(String secondary) {
         return "{\"category\": \"RAMP_AUTOPILOT\", \"maxSpeed\": 0.6, \"acceleration\": 0.03, \"batteryOrFuelCapacity\": 7200,"
                 + "\"drainRatePerTick\": 1, \"maxHP\": 250, \"defaultCruiseAltitude\": 80, \"controlScheme\": \"GUNNER\","

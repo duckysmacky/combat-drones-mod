@@ -67,6 +67,22 @@ class RouteValidatorTest {
     }
 
     @Test
+    void dropLimitClampsCarpetsAndStripsWhatCannotDrop() {
+        Route route = new Route(Arrays.asList(new Waypoint(0, 0, 30).withDrop(0), new Waypoint(10, 10, 30).withDrop(500),
+                new Waypoint(20, 20, 30).withDrop(Double.NaN), new Waypoint(30, 30, 30)), TerminalAction.LOITER);
+        Route limited = route.withDropLimit(256);
+        assertEquals(0, limited.get(0).dropLength, 1e-9);
+        assertEquals(256, limited.get(1).dropLength, 1e-9);
+        assertEquals(false, limited.get(2).isDrop());
+        assertEquals(false, limited.get(3).isDrop());
+        Route stripped = route.withDropLimit(Route.NO_DROP);
+        assertEquals(false, stripped.get(0).isDrop());
+        assertEquals(false, stripped.get(1).isDrop());
+        // Edits keep the drop
+        assertEquals(500, route.get(1).withAltitude(50).withSpeed(Route.Speed.SLOW).withPosition(1, 2).dropLength, 1e-9);
+    }
+
+    @Test
     void lengthIncludesTheLegFromLaunch() {
         Route route = new Route(Arrays.asList(new Waypoint(30, 40, 20), new Waypoint(30, 0, 20)), TerminalAction.LOITER);
         assertEquals(90, route.length(0, 0), 1e-9);

@@ -13,6 +13,7 @@ import net.minecraft.client.renderer.vertex.DefaultVertexFormats;
 import net.minecraft.entity.Entity;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Vec3d;
 import net.minecraftforge.client.event.RenderWorldLastEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
@@ -24,7 +25,7 @@ import java.util.List;
 
 /**
  * In-world overlays, drawn through terrain: a red cross in a square over the point your unit is diving on (in its
- * camera), and the recon intel you may see wherever you are: an ESP box around every locked-on target (with its name)
+ * camera), a yellow diamond where a bomber's bomb would land (in its bombsight), and the recon intel you may see wherever you are: an ESP box around every locked-on target (with its name)
  * and a dot above every tracked one, plus a dot over every pilot a Pilot Detector scan found. Players are red,
  * anything else yellow. Locked-on targets (and every target with live tracking) are drawn where this client sees them, when it tracks them; otherwise at the server's position.
  * Grown with distance so they stay readable from altitude.
@@ -51,7 +52,8 @@ public final class MarkerRenderer {
             marks = new ArrayList<>(marks);
             marks.addAll(detections);
         }
-        if (point == null && marks.isEmpty()) {
+        Vec3d impact = RemoteController.getBombImpact();
+        if (point == null && impact == null && marks.isEmpty()) {
             return;
         }
         Minecraft minecraft = Minecraft.getMinecraft();
@@ -76,6 +78,9 @@ public final class MarkerRenderer {
         if (point != null) {
             strikeCross(buffer, point.getX() + 0.5 - renderManager.viewerPosX, point.getY() + 0.05 - renderManager.viewerPosY,
                     point.getZ() + 0.5 - renderManager.viewerPosZ);
+        }
+        if (impact != null) {
+            impactMark(buffer, impact.x - renderManager.viewerPosX, impact.y + 0.05 - renderManager.viewerPosY, impact.z - renderManager.viewerPosZ);
         }
         for (int index = 0; index < marks.size(); index++) {
             if (marks.get(index).locked) {
@@ -145,6 +150,17 @@ public final class MarkerRenderer {
         line(buffer, x + size, y, z + size, x - size, y, z + size, PLAYER_COLOR);
         line(buffer, x - size, y, z + size, x - size, y, z - size, PLAYER_COLOR);
         line(buffer, x, y, z, x, y + size * 2, z, PLAYER_COLOR);
+    }
+
+    /** Bombsight: a yellow diamond with a centre cross on the ground where a bomb released now would land. */
+    private static void impactMark(BufferBuilder buffer, double x, double y, double z) {
+        double size = Math.max(1.0, Math.sqrt(x * x + y * y + z * z) * 0.025);
+        line(buffer, x - size, y, z, x, y, z - size, OTHER_COLOR);
+        line(buffer, x, y, z - size, x + size, y, z, OTHER_COLOR);
+        line(buffer, x + size, y, z, x, y, z + size, OTHER_COLOR);
+        line(buffer, x, y, z + size, x - size, y, z, OTHER_COLOR);
+        line(buffer, x - size * 0.3, y, z, x + size * 0.3, y, z, OTHER_COLOR);
+        line(buffer, x, y, z - size * 0.3, x, y, z + size * 0.3, OTHER_COLOR);
     }
 
     /** ESP box: the target's hitbox outline, a little loose and grown with distance, at the camera-relative feet position. */

@@ -29,6 +29,8 @@ public final class Route {
     public static final double DEFAULT_LOITER_RADIUS = 24.0;
     public static final double MIN_LOITER_RADIUS = 12.0;
     public static final double MAX_LOITER_RADIUS = 160.0;
+    /** {@link Waypoint#dropLength} of a waypoint that drops nothing. */
+    public static final double NO_DROP = -1;
 
     public static final class Waypoint {
         public final double x;
@@ -37,28 +39,46 @@ public final class Route {
         public final double altitude;
         /** Speed flown on the way to this waypoint (and while circling it, if it's the last one). */
         public final Speed speed;
+        /**
+         * Bombers: what the bomb bay does as the plane passes this waypoint. {@link #NO_DROP}: nothing; 0: one bomb;
+         * more: a carpet run, bombs released one after another while it flies straight on for this many blocks.
+         */
+        public final double dropLength;
 
         public Waypoint(double x, double z, double altitude) {
             this(x, z, altitude, Speed.FAST);
         }
 
         public Waypoint(double x, double z, double altitude, Speed speed) {
+            this(x, z, altitude, speed, NO_DROP);
+        }
+
+        public Waypoint(double x, double z, double altitude, Speed speed, double dropLength) {
             this.x = x;
             this.z = z;
             this.altitude = altitude;
             this.speed = speed;
+            this.dropLength = dropLength;
+        }
+
+        public boolean isDrop() {
+            return dropLength >= 0;
         }
 
         public Waypoint withPosition(double newX, double newZ) {
-            return new Waypoint(newX, newZ, altitude, speed);
+            return new Waypoint(newX, newZ, altitude, speed, dropLength);
         }
 
         public Waypoint withAltitude(double newAltitude) {
-            return new Waypoint(x, z, newAltitude, speed);
+            return new Waypoint(x, z, newAltitude, speed, dropLength);
         }
 
         public Waypoint withSpeed(Speed newSpeed) {
-            return new Waypoint(x, z, altitude, newSpeed);
+            return new Waypoint(x, z, altitude, newSpeed, dropLength);
+        }
+
+        public Waypoint withDrop(double newDropLength) {
+            return new Waypoint(x, z, altitude, speed, newDropLength);
         }
     }
 
@@ -124,6 +144,19 @@ public final class Route {
             raised.set(raised.size() - 1, last.withAltitude(Math.max(last.altitude, minAltitude)));
         }
         return new Route(raised, terminal, Math.max(loiterRadius, minRadius), target);
+    }
+
+    /**
+     * This route with every carpet run no longer than {@code maxCarpetLength}, and anything that isn't a real length
+     * dropping nothing. A negative limit (a unit without a bomb bay) removes every drop.
+     */
+    public Route withDropLimit(double maxCarpetLength) {
+        List<Waypoint> limited = new ArrayList<>(waypoints.size());
+        for (Waypoint waypoint : waypoints) {
+            boolean drops = maxCarpetLength >= 0 && waypoint.dropLength >= 0; // false for NaN too
+            limited.add(waypoint.withDrop(drops ? Math.min(waypoint.dropLength, maxCarpetLength) : NO_DROP));
+        }
+        return new Route(limited, terminal, loiterRadius, target);
     }
 
     public static Route empty(TerminalAction terminal) {

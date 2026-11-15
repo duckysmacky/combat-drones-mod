@@ -11,7 +11,8 @@ import net.minecraftforge.fml.common.network.simpleimpl.MessageContext;
 
 /**
  * Client to server, once per tick under "Take control": stick, throttle, trigger, stick mode (assisted: the stick
- * sets the attitude; free: it sets rotation rates) and boost for a ramp unit. Intent only.
+ * sets the attitude; free: it sets rotation rates), boost, and whether a bomber's pilot is at the bombsight (the plane
+ * then holds its heading and height) for a ramp unit. Intent only.
  */
 public class PlaneInputPacket implements IMessage {
     private int unitId;
@@ -21,11 +22,12 @@ public class PlaneInputPacket implements IMessage {
     private boolean trigger;
     private boolean free;
     private boolean boost;
+    private boolean sight;
 
     public PlaneInputPacket() {
     }
 
-    public PlaneInputPacket(int unitId, double pitch, double roll, double throttle, boolean trigger, boolean free, boolean boost) {
+    public PlaneInputPacket(int unitId, double pitch, double roll, double throttle, boolean trigger, boolean free, boolean boost, boolean sight) {
         this.unitId = unitId;
         this.pitch = pitch;
         this.roll = roll;
@@ -33,6 +35,7 @@ public class PlaneInputPacket implements IMessage {
         this.trigger = trigger;
         this.free = free;
         this.boost = boost;
+        this.sight = sight;
     }
 
     @Override
@@ -45,6 +48,7 @@ public class PlaneInputPacket implements IMessage {
         trigger = buf.readBoolean();
         free = buf.readBoolean();
         boost = buf.readBoolean();
+        sight = buf.readBoolean();
     }
 
     private static double clamp(float value, double min) {
@@ -60,6 +64,7 @@ public class PlaneInputPacket implements IMessage {
         buf.writeBoolean(trigger);
         buf.writeBoolean(free);
         buf.writeBoolean(boost);
+        buf.writeBoolean(sight);
     }
 
     public static class Handler implements IMessageHandler<PlaneInputPacket, IMessage> {
@@ -70,7 +75,8 @@ public class PlaneInputPacket implements IMessage {
                 Entity entity = player.world.getEntityByID(message.unitId);
                 if (entity instanceof EntityRampUnit) {
                     // The unit itself rejects anyone who isn't its controller
-                    ((EntityRampUnit) entity).acceptManualInput(player, message.pitch, message.roll, message.throttle, message.trigger, message.free, message.boost);
+                    ((EntityRampUnit) entity).acceptManualInput(player, message.pitch, message.roll, message.throttle, message.trigger, message.free, message.boost,
+                            message.sight);
                 }
             });
             return null;

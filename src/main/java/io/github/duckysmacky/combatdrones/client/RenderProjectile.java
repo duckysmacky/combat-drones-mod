@@ -31,7 +31,7 @@ public class RenderProjectile<T extends Entity> extends Render<T> {
     }
 
     public static RenderProjectile<EntityBomb> bomb(RenderManager renderManager) {
-        return new RenderProjectile<>(renderManager, bomb -> bomb.getBombType().itemName(), false);
+        return new RenderProjectile<>(renderManager, EntityBomb::modelName, false);
     }
 
     public static RenderProjectile<EntityRocket> rocket(RenderManager renderManager) {

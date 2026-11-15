@@ -15,6 +15,7 @@ import io.github.duckysmacky.combatdrones.physics.HandFlownFlight;
 import io.github.duckysmacky.combatdrones.physics.LockCharges;
 import io.github.duckysmacky.combatdrones.physics.Route;
 import io.github.duckysmacky.combatdrones.physics.RouteAutopilot;
+import io.github.duckysmacky.combatdrones.type.AerialBombType;
 import io.github.duckysmacky.combatdrones.type.DroneType;
 import io.github.duckysmacky.combatdrones.type.DroneTypes;
 import io.github.duckysmacky.combatdrones.type.Loadout;
@@ -105,6 +106,7 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder {
     private static final DataParameter<Integer> AMMO_SECONDARY = EntityDataManager.createKey(EntityRampUnit.class, DataSerializers.VARINT);
     private static final DataParameter<Integer> AMMO_TERTIARY = EntityDataManager.createKey(EntityRampUnit.class, DataSerializers.VARINT);
     private static final DataParameter<Integer> ROCKET_KIND = EntityDataManager.createKey(EntityRampUnit.class, DataSerializers.VARINT);
+    private static final DataParameter<Integer> BOMB_KIND = EntityDataManager.createKey(EntityRampUnit.class, DataSerializers.VARINT);
     /** Weapon station the gunner has selected (gunner scheme). */
     private static final DataParameter<Integer> STATION = EntityDataManager.createKey(EntityRampUnit.class, DataSerializers.VARINT);
     /**
@@ -149,6 +151,13 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder {
     private boolean manualTrigger;
     private boolean manualFree;
     private boolean manualBoost;
+    /** Bomber: the pilot is at the bombsight, so the plane holds the heading and height it had when they sat down. */
+    private boolean manualSight;
+    private boolean sightHolding;
+    /** Heading change per tick at full A/D while at the bombsight (the plane's own turn rate still limits it). */
+    private static final double SIGHT_STEER_DEG_PER_TICK = 1.0;
+    private double sightHeading;
+    private double sightAltitude;
     private long manualInputTick = Long.MIN_VALUE;
     // Gunner seat (gunner scheme): where the camera aims and whether the trigger is held, and when that arrived
     private Vec3d gunnerAim = Vec3d.ZERO;
@@ -170,6 +179,12 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder {
     private final double[] weaponCooldown = new double[Loadout.STATIONS];
     /** This tick the autopilot was flying Return's final landing approach. */
     private boolean landingApproach;
+    // Carpet run (bomber on autopilot): blocks still to fly straight on, the course and waypoint it is flown by, and
+    // ticks until the next bomb. shortcut: not saved, a run under way ends at a server restart; save it if that matters.
+    private double bombRun;
+    private double bombRunHeading;
+    private Route.Waypoint bombRunWaypoint;
+    private double bombRunTimer;
     /** Keeps the unit's chunk (and the next one ahead) loaded, so it keeps flying far from any player. */
     protected final ChunkAnchor anchor = new ChunkAnchor(this);
 
@@ -223,6 +238,7 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder {
         dataManager.register(AMMO_SECONDARY, 0);
         dataManager.register(AMMO_TERTIARY, 0);
         dataManager.register(ROCKET_KIND, 0);
+        dataManager.register(BOMB_KIND, 0);
         dataManager.register(STATION, 0);
         for (int station = 0; station < Loadout.STATIONS; station++) {
             dataManager.register(COOLDOWN_READY_TICK.get(station), 0);
@@ -279,6 +295,7 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder {
         loadout.setAmmo(1, dataManager.get(AMMO_SECONDARY));
         loadout.setAmmo(2, dataManager.get(AMMO_TERTIARY));
         loadout.setRocketKind(RocketType.byIndex(dataManager.get(ROCKET_KIND)));
+        loadout.setBombKind(AerialBombType.byIndex(dataManager.get(BOMB_KIND)));
         return loadout;
     }
 
@@ -292,6 +309,7 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder {
         dataManager.set(AMMO_SECONDARY, loadout.getAmmo(1));
         dataManager.set(AMMO_TERTIARY, loadout.getAmmo(2));
         dataManager.set(ROCKET_KIND, loadout.getRocketKind().ordinal());
+        dataManager.set(BOMB_KIND, loadout.getBombKind().ordinal());
     }
 
     public float getHealthFraction() {
@@ -302,6 +320,7 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder {
     public void setRoute(Route newRoute) {
         route = newRoute;
         waypointIndex = 0;
+        bombRun = 0;
         // A new plan (and target) from the planner replaces any point picked from the camera
         designatedTarget = null;
         dataManager.set(STRIKING, false);
@@ -388,6 +407,11 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder {
             controls = RouteAutopilot.pursue(flight, designatedTarget.x, designatedTarget.y, designatedTarget.z, terrainFloor(), params, fuel > 0);
             strikePoint = designatedTarget;
         }
+        if (controls != null) {
+            bombRun = 0; // hands on the controls end a carpet run
+        } else if (bombRun > 0) {
+            controls = flyBombRun(type, params);
+        }
         if (controls == null) {
             RouteAutopilot.Command command = autopilotCommand(type, params);
             controls = command.controls;
@@ -431,8 +455,60 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder {
                 fuel / type.getBatteryOrFuelCapacity(), ModConfig.lowFuelFraction, type.isArmed() && type.isImpactDetonates(),
                 strikeGroundY(), homeX, launchY - 1, homeZ);
         RouteAutopilot.Command command = RouteAutopilot.guide(flight, route, waypointIndex, situation, params);
+        if (command.waypointIndex > waypointIndex && waypointIndex < route.size()) {
+            passDropPoint(type, waypointIndex);
+        }
         waypointIndex = command.waypointIndex;
         return command;
+    }
+
+    /**
+     * The autopilot just passed waypoint {@code index}: a bomber lets one bomb go there, or starts a carpet run along
+     * the leg it arrived on (its own heading for the first waypoint).
+     */
+    private void passDropPoint(DroneType type, int index) {
+        Route.Waypoint waypoint = route.get(index);
+        if (!waypoint.isDrop() || type.stationOf(DroneType.WeaponType.BOMB_BAY) < 0) {
+            return;
+        }
+        if (waypoint.dropLength == 0) {
+            dropBomb(type);
+            return;
+        }
+        bombRun = waypoint.dropLength;
+        bombRunWaypoint = waypoint;
+        bombRunTimer = 0;
+        bombRunHeading = flight.heading;
+        if (index > 0) {
+            Route.Waypoint from = route.get(index - 1);
+            bombRunHeading = Math.toDegrees(Math.atan2(-(waypoint.x - from.x), waypoint.z - from.z));
+        }
+    }
+
+    /** One tick of a carpet run: straight on at the drop point's height and speed, a bomb every carpet interval. */
+    private FixedWingFlight.Controls flyBombRun(DroneType type, FixedWingFlight.Params params) {
+        bombRun -= flight.speed;
+        if (--bombRunTimer <= 0) {
+            if (!dropBomb(type)) {
+                bombRun = 0; // bay empty
+            }
+            bombRunTimer += getLoadout().getBombKind().getCarpetIntervalTicks();
+        }
+        return RouteAutopilot.holdCourse(flight, bombRunHeading, Math.max(launchY + bombRunWaypoint.altitude, terrainFloor()),
+                bombRunWaypoint.speed.fraction, params, fuel > 0);
+    }
+
+    /** Releases one bomb from the bay, whatever its hand-drop cooldown says; false when there's no bay or it's empty. */
+    private boolean dropBomb(DroneType type) {
+        int station = type.stationOf(DroneType.WeaponType.BOMB_BAY);
+        Loadout loadout = getLoadout();
+        if (station < 0 || loadout.getAmmo(station) <= 0) {
+            return false;
+        }
+        loadout.setAmmo(station, loadout.getAmmo(station) - 1);
+        setLoadout(loadout);
+        releaseBomb(loadout.getBombKind());
+        return true;
     }
 
     /** What an autopilot strike is aiming at: the marked target for Destroy, else the ground under the last waypoint. */
@@ -535,6 +611,7 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder {
     @Nullable
     private FixedWingFlight.Controls manualControls(DroneType type, FixedWingFlight.Params params, boolean boosting) {
         if (type.getControlScheme() != DroneType.ControlScheme.STICK || RemoteSessions.controllerOf(this) == null) {
+            sightHolding = false;
             return null;
         }
         // Input stopped arriving (lag spike): centre the stick, keep the throttle
@@ -546,6 +623,17 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder {
         if (manualTrigger) {
             fireWeapon(type, 0, Vec3d.fromPitchYaw(rotationPitch, rotationYaw), true);
         }
+        if (manualSight && type.stationOf(DroneType.WeaponType.BOMB_BAY) >= 0) {
+            if (!sightHolding) {
+                sightHolding = true;
+                sightHeading = flight.heading;
+                sightAltitude = posY;
+            }
+            // A/D at the bombsight turn the held heading (roll input: positive = right, heading grows clockwise)
+            sightHeading = MathHelper.wrapDegrees(sightHeading + manualRoll * SIGHT_STEER_DEG_PER_TICK);
+            return RouteAutopilot.holdHeading(flight, sightHeading, Math.max(sightAltitude, terrainFloor()), manualThrottle, fuel > 0);
+        }
+        sightHolding = false;
         double throttle = boosting ? 1 : manualThrottle;
         return manualFree ? FixedWingFlight.fromRates(flight, params, manualPitch, manualRoll, throttle, fuel > 0)
                 : FixedWingFlight.fromStick(manualPitch, manualRoll, throttle, fuel > 0);
@@ -585,6 +673,11 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder {
         }
         loadout.setAmmo(station, loadout.getAmmo(station) - 1);
         setLoadout(loadout);
+        if (weapon == DroneType.WeaponType.BOMB_BAY) {
+            startCooldown(station, loadout.getBombKind().getCooldownTicks());
+            releaseBomb(loadout.getBombKind());
+            return;
+        }
         Vec3d muzzle = new Vec3d(posX, posY + height / 2, posZ).add(aim.scale(Math.max(1.2, width)));
         Vec3d carried = inheritVelocity ? new Vec3d(flight.velocity.x, flight.velocity.y, flight.velocity.z) : Vec3d.ZERO;
         if (weapon == DroneType.WeaponType.ROCKET_POD) {
@@ -610,6 +703,12 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder {
             startCooldown(station, ModConfig.gunCooldownTicks);
             fireRound(muzzle, aim);
         }
+    }
+
+    /** A bomb leaves the bay: out under the belly, falling with the plane's own velocity. */
+    private void releaseBomb(AerialBombType kind) {
+        world.spawnEntity(new EntityBomb(world, kind, posX, posY - 0.6, posZ, flight.velocity.x, flight.velocity.y, flight.velocity.z, owner, this));
+        world.playSound(null, posX, posY, posZ, ModSounds.BOMBER_RELEASE, SoundCategory.NEUTRAL, 3.0F, 0.95F + rand.nextFloat() * 0.1F);
     }
 
     private void startCooldown(int station, double ticks) {
@@ -657,7 +756,8 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder {
     }
 
     /** Server: latest manual input from the network. Only the current controller's input counts; values arrive clamped. */
-    public void acceptManualInput(EntityPlayerMP sender, double pitch, double roll, double throttle, boolean trigger, boolean free, boolean boost) {
+    public void acceptManualInput(EntityPlayerMP sender, double pitch, double roll, double throttle, boolean trigger, boolean free, boolean boost,
+                                  boolean sight) {
         if (RemoteSessions.controllerOf(this) != sender) {
             return;
         }
@@ -667,6 +767,7 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder {
         manualTrigger = trigger;
         manualFree = free;
         manualBoost = boost;
+        manualSight = sight;
         manualInputTick = world.getTotalWorldTime();
     }
 
