@@ -1,0 +1,83 @@
+{
+  "version": 2,
+  "skills": {
+    "minecraft-ci-release": {
+      "source": "Jahrome907/minecraft-agent-skills",
+      "sourceType": "github",
+      "skillPath": ".agents/skills/minecraft-ci-release/SKILL.md",
+      "computedHash": "b16cf91b725af377d5796979d748274b4381b1aad185940f79b3e782d9b9fdd3"
+    },
+    "minecraft-commands-scripting": {
+      "source": "Jahrome907/minecraft-agent-skills",
+      "sourceType": "github",
+      "skillPath": ".agents/skills/minecraft-commands-scripting/SKILL.md",
+      "computedHash": "a55106e638cd4ea9d2dfb6d49d5d17af4c263f2f6fbddb683941c48c92e9d567"
+    },
+    "minecraft-datapack": {
+      "source": "Jahrome907/minecraft-agent-skills",
+      "sourceType": "github",
+      "skillPath": ".agents/skills/minecraft-datapack/SKILL.md",
+      "computedHash": "78ad3dcc8fc4770d260a23127054bc7f937061964fdb0ee6a32542979bc27ccb"
+    },
+    "minecraft-essentials-ops": {
+      "source": "Jahrome907/minecraft-agent-skills",
+      "sourceType": "github",
+      "skillPath": ".agents/skills/minecraft-essentials-ops/SKILL.md",
+      "computedHash": "23842c625c269c055e0eb8700cb65be4d54de6e999c662cd15baad6bdc8f3cb5"
+    },
+    "minecraft-imagegen": {
+      "source": "Jahrome907/minecraft-agent-skills",
+      "sourceType": "github",
+      "skillPath": ".agents/skills/minecraft-imagegen/SKILL.md",
+      "computedHash": "5684627107837c2645c908a32b6c976cabf404992cd8651748adc5b81194385d"
+    },
+    "minecraft-modding": {
+      "source": "Jahrome907/minecraft-agent-skills",
+      "sourceType": "github",
+      "skillPath": ".agents/skills/minecraft-modding/SKILL.md",
+      "computedHash": "fa3fdaa602dc27f988a67610029a7d0f4b6e8b000005165cf73303409f1dac77"
+    },
+    "minecraft-multiloader": {
+      "source": "Jahrome907/minecraft-agent-skills",
+      "sourceType": "github",
+      "skillPath": ".agents/skills/minecraft-multiloader/SKILL.md",
+      "computedHash": "4c84bc969d2bcdb0fed3bb359e2af662a8c73a03abda0cb82b6fd833de34d9a0"
+    },
+    "minecraft-plugin-dev": {
+      "source": "Jahrome907/minecraft-agent-skills",
+      "sourceType": "github",
+      "skillPath": ".agents/skills/minecraft-plugin-dev/SKILL.md",
+      "computedHash": "cad3a164665a1004b7f2f93f107802c5a5e0147255bb6c2c1d902a563becb99d"
+    },
+    "minecraft-resource-pack": {
+      "source": "Jahrome907/minecraft-agent-skills",
+      "sourceType": "github",
+      "skillPath": ".agents/skills/minecraft-resource-pack/SKILL.md",
+      "computedHash": "cff6c02668b371d122e56f65fabd160d7f039a902334583751c060da6de82ab2"
+    },
+    "minecraft-server-admin": {
+      "source": "Jahrome907/minecraft-agent-skills",
+      "sourceType": "github",
+      "skillPath": ".agents/skills/minecraft-server-admin/SKILL.md",
+      "computedHash": "aac64d124f34b4110d976885bff7259c5ec7c6234a6014a2bc3fa1e640b9f62d"
+    },
+    "minecraft-testing": {
+      "source": "Jahrome907/minecraft-agent-skills",
+      "sourceType": "github",
+      "skillPath": ".agents/skills/minecraft-testing/SKILL.md",
+      "computedHash": "aeb24c62d2e198ba3ff084136352652338ef6583825b85028f7ed47544a2304b"
+    },
+    "minecraft-world-generation": {
+      "source": "Jahrome907/minecraft-agent-skills",
+      "sourceType": "github",
+      "skillPath": ".agents/skills/minecraft-world-generation/SKILL.md",
+      "computedHash": "84880f03b42498cf4c231bee7c767422f421d00a691c25e9716b49596741713e"
+    },
+    "minecraft-worldedit-ops": {
+      "source": "Jahrome907/minecraft-agent-skills",
+      "sourceType": "github",
+      "skillPath": ".agents/skills/minecraft-worldedit-ops/SKILL.md",
+      "computedHash": "92b83cffd57a0fa2e121e8b36dae834ddcdb1852f15c9755d4f8bdba206238a4"
+    }
+  }
+}
