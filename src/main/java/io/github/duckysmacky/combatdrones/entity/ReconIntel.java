@@ -1,6 +1,5 @@
 package io.github.duckysmacky.combatdrones.entity;
 
-import com.mojang.authlib.GameProfile;
 import io.github.duckysmacky.combatdrones.CombatDrones;
 import io.github.duckysmacky.combatdrones.config.ModConfig;
 import io.github.duckysmacky.combatdrones.network.IntelPacket;
@@ -12,7 +11,6 @@ import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.item.EntityArmorStand;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.EntityPlayerMP;
-import net.minecraft.scoreboard.Team;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraft.util.math.Vec3d;
@@ -172,7 +170,7 @@ public final class ReconIntel {
         }
         if (entity instanceof EntityPlayer) {
             EntityPlayer player = (EntityPlayer) entity;
-            return !isTeammate(owner, player) && !player.isSpectator() && !player.isInvisible();
+            return !Teams.isTeammate(owner, player) && !player.isSpectator() && !player.isInvisible();
         }
         if (!(entity instanceof EntityPilotBody)) {
             return ModConfig.trackNonPlayers && entity instanceof EntityLivingBase && !(entity instanceof EntityArmorStand) && !entity.isInvisible();
@@ -184,48 +182,7 @@ public final class ReconIntel {
         // Bodies only exist while their player is online and remote, so the player can be looked up
         MinecraftServer server = FMLCommonHandler.instance().getMinecraftServerInstance();
         EntityPlayer bodyPlayer = server == null ? null : server.getPlayerList().getPlayerByUUID(bodyOwner);
-        return bodyPlayer == null || !isTeammate(owner, bodyPlayer);
-    }
-
-    /**
-     * Whether {@code player} is on {@code owner}'s side: the owner, or a player on the owner's vanilla scoreboard team,
-     * unless that team is in ignoredTeams (a free-for-all game typically puts everyone on one team). Teammates are never
-     * tracked or locked; whether they get the owner's intel is up to the sharing settings.
-     */
-    static boolean isTeammate(UUID owner, EntityPlayer player) {
-        if (owner.equals(player.getUniqueID())) {
-            return true;
-        }
-        Team team = player.getTeam();
-        if (team == null || isIgnoredTeam(team.getName())) {
-            return false;
-        }
-        String ownerName = nameOf(owner);
-        return ownerName != null && team.getMembershipCollection().contains(ownerName);
-    }
-
-    static boolean isIgnoredTeam(String teamName) {
-        for (String ignored : ModConfig.ignoredTeams) {
-            if (ignored.equalsIgnoreCase(teamName)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /** The owner's name, even while they're offline (scoreboard teams are kept by name). */
-    @Nullable
-    private static String nameOf(UUID playerId) {
-        MinecraftServer server = FMLCommonHandler.instance().getMinecraftServerInstance();
-        if (server == null) {
-            return null;
-        }
-        EntityPlayerMP online = server.getPlayerList().getPlayerByUUID(playerId);
-        if (online != null) {
-            return online.getName();
-        }
-        GameProfile profile = server.getPlayerProfileCache().getProfileByUUID(playerId);
-        return profile == null ? null : profile.getName();
+        return bodyPlayer == null || !Teams.isTeammate(owner, bodyPlayer);
     }
 
     /** Seen if either the head or the middle of the body is in view (a fence or half-wall doesn't hide them). */
@@ -391,7 +348,7 @@ public final class ReconIntel {
 
     /** The owner sees all of their intel; a teammate only what's shared with allies. */
     private static boolean sees(EntityPlayerMP player, UUID owner, boolean sharedWithAllies) {
-        return owner.equals(player.getUniqueID()) || (sharedWithAllies && isTeammate(owner, player));
+        return owner.equals(player.getUniqueID()) || (sharedWithAllies && Teams.isTeammate(owner, player));
     }
 
     private static IntelPacket.Entry entry(Mark mark, boolean locked, boolean live, int ticksLeft) {

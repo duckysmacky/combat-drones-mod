@@ -46,7 +46,11 @@ public final class ModConfig {
             // Recon settings moved to [uav]
             "general.detectionSweepRadius", "general.detectionDecaySeconds", "general.activeLockRange", "general.lockConeDegrees",
             "general.activeLockHoldTicks", "general.activeLockDurationSeconds", "general.reconIntelForAllies", "general.activeLockForAllies",
-            "general.alwaysShowActiveLock", "general.ignoredTeams"};
+            "general.alwaysShowActiveLock",
+            // Moved back to [general] (value carried over, see MOVED_KEYS)
+            "uav.ignoredTeams"};
+    /** Keys moved to another table: {old, new}. An old value is carried over unless the new key is already set. */
+    private static final String[][] MOVED_KEYS = {{"uav.ignoredTeams", "general.ignoredTeams"}};
 
     // [general]
     public static boolean blockDamageEnabled = true;
@@ -67,6 +71,7 @@ public final class ModConfig {
     public static boolean worldBorderCollision = false;
     public static boolean pilotHintEnabled = true;
     public static double pilotHintRange = 48.0;
+    public static List<String> ignoredTeams = Collections.singletonList("ffa");
 
     // [uav]
     public static boolean trackingDotsEnabled = true;
@@ -88,7 +93,6 @@ public final class ModConfig {
     public static boolean lockOnWarning = true;
     public static boolean lockedWarning = true;
     public static boolean trackNonPlayers = false;
-    public static List<String> ignoredTeams = Collections.singletonList("ffa");
 
     // [weapons]
     public static int roundsPerRifleItem = 16;
@@ -233,6 +237,13 @@ public final class ModConfig {
         try (CommentedFileConfig config = open(file)) {
             config.load();
             Defaults defaults = new Defaults(config);
+            for (String[] moved : MOVED_KEYS) {
+                if (config.contains(moved[0]) && !config.contains(moved[1])) {
+                    config.set(moved[1], config.get(moved[0]));
+                    config.setComment(moved[1], config.getComment(moved[0]));
+                    defaults.changed = true;
+                }
+            }
             // First, so retired drone tables aren't reported as unknown types
             for (String retired : RETIRED_KEYS) {
                 if (config.contains(retired)) {
@@ -276,6 +287,10 @@ public final class ModConfig {
                     "Pilots' stand-in bodies give off radio static and a blinking red TX light, so players can find someone flying a drone or plane.");
             pilotHintRange = defaults.number("general.pilotHintRange", pilotHintRange, 8, 64,
                     "How far away a pilot's radio static can be heard, in blocks (quieter further out).");
+            ignoredTeams = defaults.list("general.ignoredTeams", ignoredTeams,
+                    "Scoreboard teams (case-insensitive) whose members aren't teammates: recon UAVs track and lock them, the Pilot "
+                            + "Detector finds them, EMPs that spare teammates still hit them, and nothing is shared. For free-for-all games "
+                            + "that put everyone on one team.");
 
             trackingDotsEnabled = defaults.get("uav.trackingDotsEnabled", trackingDotsEnabled,
                     "Enemies a flying recon UAV can see get a red dot above them, visible through walls to its owner (and teammates, "
@@ -317,9 +332,6 @@ public final class ModConfig {
                     "A locked-on player gets a banner at the top of the screen for as long as the lock-on lasts.");
             trackNonPlayers = defaults.get("uav.trackNonPlayers", trackNonPlayers,
                     "Mobs and other living non-players can be tracked and locked on too, shown in yellow. Mostly for testing.");
-            ignoredTeams = defaults.list("uav.ignoredTeams", ignoredTeams,
-                    "Scoreboard teams (case-insensitive) whose members aren't teammates for the UAV: they track and lock each other "
-                            + "and share nothing. For free-for-all games that put everyone on one team.");
 
             roundsPerRifleItem = (int) defaults.number("weapons.roundsPerRifleItem", roundsPerRifleItem, 1, 256,
                     "Gun rounds one Rifle Rounds item loads into an Attack Plane's belt.");
