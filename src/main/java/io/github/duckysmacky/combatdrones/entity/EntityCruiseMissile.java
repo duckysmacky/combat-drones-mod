@@ -157,6 +157,9 @@ public class EntityCruiseMissile extends EntityRampUnit {
             setDead();
             return;
         }
+        if (empFall(type)) {
+            return;
+        }
         if (isDiving()) {
             diveTick(type);
         } else if (isStriking()) {
@@ -312,10 +315,18 @@ public class EntityCruiseMissile extends EntityRampUnit {
         return true;
     }
 
-    /** Shot down or fried: only the fuel goes up. */
+    /** An EMP only takes the steering away: the warhead still goes off in full on whatever it hits. */
     @Override
-    void shotDown() {
-        fuelBlast();
+    protected void empCrash(DroneType type) {
+        impact(type);
+    }
+
+    @Override
+    void empDestroy(float fizzlePower) {
+        if (padId != null) {
+            MissileStore.get(world).finish(padId, MissileStore.State.DESTROYED);
+        }
+        super.empDestroy(fizzlePower);
     }
 
     /** Server: the pilot's steering for the dive (stick forward/right as pitch/roll, boost). Controller only. */

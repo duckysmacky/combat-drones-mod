@@ -508,3 +508,5 @@ item.combat_drones.emp_blast.details.2=grows out from where you stand. Drones, u
 item.combat_drones.emp_blast.details.3=it reaches go down as if shot down. Long recharge.
 subtitles.combat_drones.emp.charge=EMP charging
 subtitles.combat_drones.emp.blast=EMP blast
+message.combat_drones.emp.link_lost=EMP hit: link lost
+message.combat_drones.emp.disabled=Knocked out by an EMP: try again in a moment

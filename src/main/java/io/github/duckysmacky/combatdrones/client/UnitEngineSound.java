@@ -27,7 +27,7 @@ class UnitEngineSound extends EngineVoice {
     }
 
     static boolean isRunning(EntityRampUnit unit) {
-        return !unit.isDead && unit.getFuelFraction() > 0;
+        return !unit.isDead && unit.isEngineRunning();
     }
 
     /** Engine pitch from speed against top speed, up when boosting. */

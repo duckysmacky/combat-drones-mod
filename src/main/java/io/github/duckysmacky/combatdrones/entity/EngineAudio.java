@@ -40,7 +40,7 @@ public final class EngineAudio {
         for (WorldServer world : server.worlds) {
             List<EntityRampUnit> running = new ArrayList<>();
             for (Entity entity : world.loadedEntityList) {
-                if (entity instanceof EntityRampUnit && !entity.isDead && ((EntityRampUnit) entity).getFuelFraction() > 0) {
+                if (entity instanceof EntityRampUnit && !entity.isDead && ((EntityRampUnit) entity).isEngineRunning()) {
                     running.add((EntityRampUnit) entity);
                 }
             }

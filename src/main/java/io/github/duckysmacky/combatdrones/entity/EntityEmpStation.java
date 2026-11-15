@@ -101,7 +101,7 @@ public class EntityEmpStation extends Entity {
             if (charge <= 0) {
                 switchTo(false);
             } else {
-                Emp.fry(world, getFieldCentre(), getRadius(), owner, ModConfig.stationSpares);
+                Emp.fry(world, getFieldCentre(), getRadius(), owner, Emp.Rules.station());
             }
         } else {
             charge = Math.min(MAX_CHARGE, charge + (float) ModConfig.stationRechargePerSecond / 20);

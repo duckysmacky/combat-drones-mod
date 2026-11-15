@@ -109,6 +109,9 @@ public final class ModConfig {
     public static double stationDischargePerSecond = 4.0;
     public static double stationRechargePerSecond = 2.0;
     public static String stationSpares = "owner";
+    public static String stationOnContact = "disable";
+    public static double stationDisableSeconds = 5.0;
+    public static double stationFizzlePower = 5.0;
 
     // [emp_blast]
     public static double blastRadius = 18.0;
@@ -118,6 +121,9 @@ public final class ModConfig {
     public static double blastBuildUpSeconds = 1.0;
     public static double blastExpandSeconds = 2.0;
     public static String blastSpares = "owner";
+    public static String blastOnContact = "disable";
+    public static double blastDisableSeconds = 5.0;
+    public static double blastFizzlePower = 5.0;
 
     // [weapons]
     public static int roundsPerRifleItem = 16;
@@ -378,6 +384,15 @@ public final class ModConfig {
             stationSpares = defaults.choice("emp_station.spares", stationSpares, SPARES,
                     "Whose vehicles the field leaves alone: none, owner (whoever placed the station) or team (the owner and their "
                             + "scoreboard teammates, see general.ignoredTeams).");
+            stationOnContact = defaults.choice("emp_station.onContact", stationOnContact, ON_CONTACT,
+                    "What the field does to a flying vehicle it touches: destroy (it's knocked out with only a fizzlePower blast: "
+                            + "no warhead, bombs or fuel going off) or disable (for disableSeconds its motors cut out and it falls, nobody "
+                            + "can fly, view or re-route it; hitting anything meanwhile destroys it with the same fizzlePower blast, except a cruise "
+                            + "missile, whose warhead still goes off).");
+            stationDisableSeconds = defaults.number("emp_station.disableSeconds", stationDisableSeconds, 0.5, 120,
+                    "How long a vehicle stays disabled (onContact = disable), in seconds, counted from when it last touched the field.");
+            stationFizzlePower = defaults.number("emp_station.fizzlePower", stationFizzlePower, 0, 10,
+                    "Blast power of a vehicle the field knocks out, or of a disabled one crashing (vanilla TNT = 4). 0 = no blast, just a wreck.");
 
             blastRadius = defaults.number("emp_blast.radius", blastRadius, 1, 32, "Radius the EMP blast grows to, in blocks.");
             blastCharges = (int) defaults.number("emp_blast.charges", blastCharges, 1, 20, "Blasts the gadget holds. Each use takes one.");
@@ -392,6 +407,15 @@ public final class ModConfig {
             blastSpares = defaults.choice("emp_blast.spares", blastSpares, SPARES,
                     "Whose vehicles the blast leaves alone: none, owner (the user) or team (the user and their scoreboard teammates, "
                             + "see general.ignoredTeams).");
+            blastOnContact = defaults.choice("emp_blast.onContact", blastOnContact, ON_CONTACT,
+                    "What the blast does to a flying vehicle it touches: destroy (it's knocked out with only a fizzlePower blast: "
+                            + "no warhead, bombs or fuel going off) or disable (for disableSeconds its motors cut out and it falls, nobody "
+                            + "can fly, view or re-route it; hitting anything meanwhile destroys it with the same fizzlePower blast, except a cruise "
+                            + "missile, whose warhead still goes off).");
+            blastDisableSeconds = defaults.number("emp_blast.disableSeconds", blastDisableSeconds, 0.5, 120,
+                    "How long a vehicle stays disabled (onContact = disable), in seconds, counted from when it last touched the blast.");
+            blastFizzlePower = defaults.number("emp_blast.fizzlePower", blastFizzlePower, 0, 10,
+                    "Blast power of a vehicle the blast knocks out, or of a disabled one crashing (vanilla TNT = 4). 0 = no blast, just a wreck.");
 
             roundsPerRifleItem = (int) defaults.number("weapons.roundsPerRifleItem", roundsPerRifleItem, 1, 256,
                     "Gun rounds one Rifle Rounds item loads into an Attack Plane's belt.");
@@ -565,6 +589,8 @@ public final class ModConfig {
 
     /** Values of the EMP {@code spares} settings. */
     private static final String[] SPARES = {"none", "owner", "team"};
+    /** Values of the EMP {@code onContact} settings. */
+    private static final String[] ON_CONTACT = {"destroy", "disable"};
     private static final String DEFAULT_MARK = "Default: ";
     private static final String CLIENT_COMMENT = "Options for your own client only. Apply edits with /combat_drones reload_client_config "
             + "(an op's config_reload also reloads everyone's).";

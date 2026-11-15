@@ -9,7 +9,7 @@ import net.minecraft.util.SoundCategory;
 import java.util.Map;
 import java.util.WeakHashMap;
 
-/** The hum and crackle of a switched-on EMP Field Station, heard out to about 24 blocks. */
+/** The hum and crackle of a switched-on EMP Field Station, heard a little beyond its field. */
 public class EmpHumSound extends MovingSound {
     private static final Map<EntityEmpStation, EmpHumSound> PLAYING = new WeakHashMap<>();
 
@@ -20,7 +20,6 @@ public class EmpHumSound extends MovingSound {
         this.station = station;
         repeat = true;
         repeatDelay = 0;
-        volume = 1.5F; // range only (16 x volume blocks); the file sets the loudness
         update();
     }
 
@@ -43,6 +42,8 @@ public class EmpHumSound extends MovingSound {
         xPosF = (float) station.posX;
         yPosF = (float) (station.posY + station.height / 2);
         zPosF = (float) station.posZ;
+        // Heard as far as the field reaches and a bit beyond (16 x volume blocks); the file sets the loudness
+        volume = Math.max(1, (station.getRadius() + 16) / 16);
         // A little sag as the charge runs down
         pitch = 0.94F + 0.06F * station.getCharge() / EntityEmpStation.MAX_CHARGE;
     }

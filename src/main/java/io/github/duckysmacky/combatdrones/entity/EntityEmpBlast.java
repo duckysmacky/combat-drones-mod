@@ -107,7 +107,7 @@ public class EntityEmpBlast extends Entity {
         }
         int since = age - build;
         if (since >= 0 && since <= expand) {
-            Emp.fry(world, getPositionVector(), radiusAt(since, expand, getMaxRadius()), owner, ModConfig.blastSpares);
+            Emp.fry(world, getPositionVector(), radiusAt(since, expand, getMaxRadius()), owner, Emp.Rules.blast());
         }
         if (since > expand + FADE_TICKS) {
             setDead();

@@ -137,6 +137,9 @@ public final class RemoteSessions {
         if (control && (type.getControlScheme() == null || !type.getControlScheme().isFlyable())) {
             return "message.combat_drones.remote.not_flyable";
         }
+        if (unit.isEmpDisabled()) {
+            return "message.combat_drones.emp.disabled";
+        }
         Session other = sessionOf(unit);
         if (other != null && other.player != player) {
             return "message.combat_drones.remote.busy";
@@ -166,6 +169,9 @@ public final class RemoteSessions {
     public static String startMissile(EntityPlayerMP player, EntityCruiseMissile missile) {
         if (missile.getPadId() == null || !ItemMissileTablet.isHoldingLinked(player, missile.getPadId())) {
             return "message.combat_drones.tablet.unguided";
+        }
+        if (missile.isEmpDisabled()) {
+            return "message.combat_drones.emp.disabled";
         }
         if (SESSIONS.containsKey(player.getUniqueID())) {
             end(player, null);
@@ -347,9 +353,14 @@ public final class RemoteSessions {
 
     /** A unit is about to leave the world (destroyed, detonating): get its rider home before anything goes off. */
     static void onUnitRemoved(Entity unit) {
+        endOn(unit, "message.combat_drones.remote.unit_lost");
+    }
+
+    /** Ends whatever session (flying or watching) is on this unit, telling the player why. */
+    static void endOn(Entity unit, String message) {
         Session session = sessionOf(unit);
         if (session != null) {
-            end(session.player, "message.combat_drones.remote.unit_lost");
+            end(session.player, message);
         }
     }
 

@@ -65,6 +65,8 @@ public class EntityHandFlownDrone extends Entity implements ChunkAnchor.Holder {
     /** Entity ID of the player flying this drone, or -1. Lets the pilot's client know to switch into FPV. */
     private static final DataParameter<Integer> PILOT_ID = EntityDataManager.createKey(EntityHandFlownDrone.class, DataSerializers.VARINT);
     private static final DataParameter<Boolean> MOTORS_ON = EntityDataManager.createKey(EntityHandFlownDrone.class, DataSerializers.BOOLEAN);
+    /** Knocked out by an EMP: motors forced off, nobody can fly it. */
+    private static final DataParameter<Boolean> EMP_DISABLED = EntityDataManager.createKey(EntityHandFlownDrone.class, DataSerializers.BOOLEAN);
     /** Installed {@link BatteryPack} ordinal, or -1. Synced because the pack's weight changes flight prediction. */
     private static final DataParameter<Integer> BATTERY_PACK = EntityDataManager.createKey(EntityHandFlownDrone.class, DataSerializers.VARINT);
     /** Health as a fraction of max, for damage smoke on every client and the pilot's HUD. */
@@ -92,6 +94,9 @@ public class EntityHandFlownDrone extends Entity implements ChunkAnchor.Holder {
     @Nullable
     private EntityPlayerMP pilot;
     private final ArrayDeque<InputFrame> inputQueue = new ArrayDeque<>();
+    /** Ticks left EMP-disabled, and the blast it gives if it crashes meanwhile. */
+    private int empTicks;
+    private float empFizzle;
     private HandFlownFlight.Input lastInput = HandFlownFlight.Input.MOTORS_OFF;
     private int lastQueuedSequence = Integer.MIN_VALUE;
     /** Ticks until the trigger can fire again (rate limit for TriggerPacket). */
@@ -141,6 +146,7 @@ public class EntityHandFlownDrone extends Entity implements ChunkAnchor.Holder {
         dataManager.register(ROLL, 0.0F);
         dataManager.register(PILOT_ID, -1);
         dataManager.register(MOTORS_ON, false);
+        dataManager.register(EMP_DISABLED, false);
         dataManager.register(BATTERY_PACK, -1);
         dataManager.register(THRUST, 0.0F);
         dataManager.register(HEALTH_FRACTION, 1.0F);
@@ -273,6 +279,9 @@ public class EntityHandFlownDrone extends Entity implements ChunkAnchor.Holder {
                 hitFlashTicks--;
             }
             DamageEffects.damageSmoke(this, getHealthFraction());
+            if (isEmpDisabled() && rand.nextInt(3) == 0) {
+                Emp.crackle(this);
+            }
             return;
         }
         DroneType type = getDroneType();
@@ -291,6 +300,13 @@ public class EntityHandFlownDrone extends Entity implements ChunkAnchor.Holder {
             }
         }
         HandFlownFlight.Input input = nextInput();
+        if (empTicks > 0) {
+            // The motors stay off afterwards too, until a pilot spins them up again
+            input = HandFlownFlight.Input.MOTORS_OFF;
+            if (--empTicks <= 0) {
+                dataManager.set(EMP_DISABLED, false);
+            }
+        }
         if (input.motorsOn && !hasPower()) {
             input = HandFlownFlight.Input.MOTORS_OFF;
             if (pilot != null && areMotorsOn()) {
@@ -416,6 +432,9 @@ public class EntityHandFlownDrone extends Entity implements ChunkAnchor.Holder {
         }
         if (!isOwnedBy(player)) {
             return "message.combat_drones.owned_by_other";
+        }
+        if (isEmpDisabled()) {
+            return "message.combat_drones.emp.disabled";
         }
         if (player.getItemStackFromSlot(EntityEquipmentSlot.HEAD).getItem() != ModContent.fpvGoggles) {
             return "message.combat_drones.need_goggles";
@@ -708,7 +727,9 @@ public class EntityHandFlownDrone extends Entity implements ChunkAnchor.Holder {
     }
 
     private void onImpact(DroneType type, double impactSpeed) {
-        if (type.isImpactDetonates()) {
+        if (isEmpDisabled() && type.isImpactDetonates()) {
+            empDestroy(empFizzle); // its fuze is dead: only the small blast
+        } else if (type.isImpactDetonates()) {
             detonate(type);
         } else {
             damage((float) (impactSpeed * CRASH_DAMAGE_PER_SPEED));
@@ -738,6 +759,10 @@ public class EntityHandFlownDrone extends Entity implements ChunkAnchor.Holder {
 
     /** Server: knocked out (shot down, or fried by an EMP). A kamikaze in the air goes off; anything else is destroyed. */
     void shotDown() {
+        if (isEmpDisabled()) {
+            empDestroy(empFizzle);
+            return;
+        }
         DroneType type = getDroneType();
         if (type != null && type.isImpactDetonates() && !onGround) {
             detonate(type);
@@ -756,6 +781,32 @@ public class EntityHandFlownDrone extends Entity implements ChunkAnchor.Holder {
             DroneExplosion.detonate((WorldServer) world, this, getBlameTarget(), posX, posY + height / 2, posZ, power,
                     shrapnel, (float) ModConfig.shrapnelRadius);
         }
+    }
+
+    public boolean isEmpDisabled() {
+        return dataManager.get(EMP_DISABLED);
+    }
+
+    /** Server: an EMP knocks it out for good: only a small blast, no grenade or bombs going off. */
+    void empDestroy(float fizzlePower) {
+        setDead();
+        Emp.fizzle(this, getBlameTarget(), fizzlePower);
+    }
+
+    /**
+     * Server: an EMP disables it for {@code ticks} (topped up while it stays in the field): the pilot is sent back to
+     * their body, the motors cut out and it falls; a kamikaze hitting anything meanwhile only gives {@code fizzlePower}.
+     */
+    void empDisable(int ticks, float fizzlePower) {
+        if (!isEmpDisabled()) {
+            if (pilot != null) {
+                pilot.sendStatusMessage(new TextComponentTranslation("message.combat_drones.emp.link_lost"), true);
+                clearPilot(LinkLoss.NONE);
+            }
+            dataManager.set(EMP_DISABLED, true);
+        }
+        empTicks = Math.max(empTicks, ticks);
+        empFizzle = fizzlePower;
     }
 
     /** Kill credit goes to the owner (the only player who can fly it), if they're online. */
@@ -945,6 +996,8 @@ public class EntityHandFlownDrone extends Entity implements ChunkAnchor.Holder {
     @Override
     protected void writeEntityToNBT(NBTTagCompound compound) {
         compound.setString("Type", dataManager.get(TYPE_ID));
+        compound.setInteger("EmpTicks", empTicks);
+        compound.setFloat("EmpFizzle", empFizzle);
         if (owner != null) {
             compound.setUniqueId("Owner", owner);
         }
@@ -969,6 +1022,9 @@ public class EntityHandFlownDrone extends Entity implements ChunkAnchor.Holder {
     @Override
     protected void readEntityFromNBT(NBTTagCompound compound) {
         dataManager.set(TYPE_ID, compound.getString("Type"));
+        empTicks = compound.getInteger("EmpTicks");
+        empFizzle = compound.getFloat("EmpFizzle");
+        dataManager.set(EMP_DISABLED, empTicks > 0);
         owner = compound.hasUniqueId("Owner") ? compound.getUniqueId("Owner") : null;
         setHealth(compound.getFloat("Health"));
         // "Grenades" was the M2/M3 key, before bombs shared the slot
