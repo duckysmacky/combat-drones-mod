@@ -4,6 +4,7 @@ import io.github.duckysmacky.combatdrones.CombatDrones;
 import io.github.duckysmacky.combatdrones.Fx;
 import io.github.duckysmacky.combatdrones.client.fx.FxParticle;
 import io.github.duckysmacky.combatdrones.client.fx.Impact;
+import io.github.duckysmacky.combatdrones.client.fx.ScanWave;
 import io.github.duckysmacky.combatdrones.ModSounds;
 import io.github.duckysmacky.combatdrones.entity.EntityRampUnit;
 import io.github.duckysmacky.combatdrones.network.EffectPacket;
@@ -81,6 +82,9 @@ public final class Effects {
                 play(new PositionedSoundRecord(ModSounds.MISSILE_ALARM.getSoundName(), SoundCategory.MASTER, 1.0F, 1.0F, false, 0,
                         ISound.AttenuationType.NONE, 0, 0, 0), 0);
                 HudOverlay.showStrikeAlert();
+                break;
+            case SCAN:
+                ScanWave.start(packet.getPosition(), packet.getScale());
                 break;
         }
     }

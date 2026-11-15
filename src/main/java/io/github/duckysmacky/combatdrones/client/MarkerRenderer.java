@@ -25,8 +25,8 @@ import java.util.List;
 /**
  * In-world overlays, drawn through terrain: a red cross in a square over the point your unit is diving on (in its
  * camera), and the recon intel you may see wherever you are: an ESP box around every locked-on target (with its name)
- * and a dot above every tracked one. Players are red, anything else yellow. Locked-on targets (and every target with
- * live tracking) are drawn where this client sees them, when it tracks them; otherwise at the server's position.
+ * and a dot above every tracked one, plus a dot over every pilot a Pilot Detector scan found. Players are red,
+ * anything else yellow. Locked-on targets (and every target with live tracking) are drawn where this client sees them, when it tracks them; otherwise at the server's position.
  * Grown with distance so they stay readable from altitude.
  */
 @Mod.EventBusSubscriber(modid = CombatDrones.MOD_ID, value = Side.CLIENT)
@@ -46,6 +46,11 @@ public final class MarkerRenderer {
         EntityRampUnit unit = RemoteController.getUnit();
         BlockPos point = unit == null ? null : unit.getStrikePoint();
         List<IntelPacket.Entry> marks = ClientIntel.getMarks();
+        List<IntelPacket.Entry> detections = ClientIntel.getDetections();
+        if (!detections.isEmpty()) {
+            marks = new ArrayList<>(marks);
+            marks.addAll(detections);
+        }
         if (point == null && marks.isEmpty()) {
             return;
         }

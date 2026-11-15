@@ -12,7 +12,9 @@ import net.minecraftforge.fml.common.gameevent.TickEvent;
 import net.minecraftforge.fml.common.network.FMLNetworkEvent;
 import net.minecraftforge.fml.relauncher.Side;
 
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 
 /**
@@ -38,6 +40,9 @@ public final class ClientIntel {
     private static final long WARNING_TIMEOUT_MILLIS = 600;
     /** When the lock-on on this player runs out (ms), or 0. */
     private static long lockedUntil;
+    /** Pilots found by Pilot Detector scans (own or a teammate's), each until its time runs out (ms). */
+    private static final List<IntelPacket.Entry> detections = new ArrayList<>();
+    private static final List<Long> detectionsUntil = new ArrayList<>();
 
     private ClientIntel() {
     }
@@ -49,6 +54,39 @@ public final class ClientIntel {
     static void set(List<IntelPacket.Entry> newMarks) {
         marks = newMarks;
         marksReceived = Minecraft.getSystemTime();
+    }
+
+    /** Pilot Detector dots still up (live: drawn on the body where this client has it). */
+    public static List<IntelPacket.Entry> getDetections() {
+        long now = Minecraft.getSystemTime();
+        Iterator<Long> until = detectionsUntil.iterator();
+        Iterator<IntelPacket.Entry> entry = detections.iterator();
+        while (until.hasNext()) {
+            entry.next();
+            if (until.next() <= now) {
+                until.remove();
+                entry.remove();
+            }
+        }
+        return detections;
+    }
+
+    /** A scan's finds: a dot each for {@code ticks}, replacing an older dot on the same body. A beep if this player found someone. */
+    static void addDetections(List<IntelPacket.Entry> found, int ticks, boolean own) {
+        long until = Minecraft.getSystemTime() + ticks * 50L;
+        for (IntelPacket.Entry entry : found) {
+            for (int index = detections.size() - 1; index >= 0; index--) {
+                if (detections.get(index).entityId == entry.entityId) {
+                    detections.remove(index);
+                    detectionsUntil.remove(index);
+                }
+            }
+            detections.add(entry);
+            detectionsUntil.add(until);
+        }
+        if (own && !found.isEmpty()) {
+            Minecraft.getMinecraft().getSoundHandler().playSound(PositionedSoundRecord.getMasterRecord(ModSounds.DETECTOR_CONTACT, 1.0F));
+        }
     }
 
     /** Milliseconds left on a lock-on mark, counting down from when the server sent it. */
@@ -127,6 +165,8 @@ public final class ClientIntel {
     @SubscribeEvent
     public static void onDisconnect(FMLNetworkEvent.ClientDisconnectionFromServerEvent event) {
         marks = Collections.emptyList();
+        detections.clear();
+        detectionsUntil.clear();
         lockProgress = 0;
         warningUntil = 0;
         lockedUntil = 0;

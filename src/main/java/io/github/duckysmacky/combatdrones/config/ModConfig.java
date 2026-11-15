@@ -29,6 +29,7 @@ import java.util.Map;
  * <ul>
  *   <li>{@code [general]}: global server balance knobs.</li>
  *   <li>{@code [uav]}: recon UAV tracking dots and lock-ons (server).</li>
+ *   <li>{@code [pilot_detector]}: the Pilot Detector scanner (server).</li>
  *   <li>{@code [client]}: options for your own client only; a server ignores them. Re-read alone by
  *       {@link #reloadClient}.</li>
  *   <li>{@code [batteries.<size>]}: battery pack capacity and weight multipliers, synced to clients.</li>
@@ -93,6 +94,13 @@ public final class ModConfig {
     public static boolean lockOnWarning = true;
     public static boolean lockedWarning = true;
     public static boolean trackNonPlayers = false;
+
+    // [pilot_detector]
+    public static double detectorRange = 32.0;
+    public static int detectorCharges = 1;
+    public static double detectorReloadSeconds = 30.0;
+    public static double detectorDotSeconds = 15.0;
+    public static boolean detectorDotsForAllies = false;
 
     // [weapons]
     public static int roundsPerRifleItem = 16;
@@ -333,6 +341,17 @@ public final class ModConfig {
             trackNonPlayers = defaults.get("uav.trackNonPlayers", trackNonPlayers,
                     "Mobs and other living non-players can be tracked and locked on too, shown in yellow. Mostly for testing.");
 
+            detectorRange = defaults.number("pilot_detector.range", detectorRange, 4, 256,
+                    "How far a scan reaches, in blocks: pilots' stand-in bodies within it get a dot.");
+            detectorCharges = (int) defaults.number("pilot_detector.charges", detectorCharges, 1, 20,
+                    "Scans the detector holds. Each scan uses one.");
+            detectorReloadSeconds = defaults.number("pilot_detector.reloadSeconds", detectorReloadSeconds, 0, 3600,
+                    "Seconds to win back one spent scan (one at a time).");
+            detectorDotSeconds = defaults.number("pilot_detector.dotSeconds", detectorDotSeconds, 1, 600,
+                    "How long a found pilot keeps the red dot over their body, in seconds. It follows the body and shows through walls.");
+            detectorDotsForAllies = defaults.get("pilot_detector.dotsForAllies", detectorDotsForAllies,
+                    "The scanning player's vanilla scoreboard teammates (see general.ignoredTeams) also see the dots. Off: only the scanner.");
+
             roundsPerRifleItem = (int) defaults.number("weapons.roundsPerRifleItem", roundsPerRifleItem, 1, 256,
                     "Gun rounds one Rifle Rounds item loads into an Attack Plane's belt.");
             rocketSpeed = defaults.number("weapons.rocketSpeed", rocketSpeed, 0.5, 10, "Rocket speed on top of the plane's own, in blocks/tick.");
@@ -425,6 +444,8 @@ public final class ModConfig {
             // Table comments last: a comment can only attach to a table that exists
             defaults.comment("general", "Global balance settings. On a server these apply to everyone.");
             defaults.comment("uav", "Recon UAV: tracking dots over the enemies it sees, and lock-ons from its camera.");
+            defaults.comment("pilot_detector", "Pilot Detector: a hand-held scanner whose pulse marks the stand-in bodies of players "
+                    + "flying a drone, unit or missile nearby. Self and teammates are never marked.");
             defaults.comment("weapons", "Armed plane weapons, fired only under manual control.");
             defaults.comment("missiles", "Cruise Missile launch, standby and strike. Its speed, warhead, health and standby fuel are in "
                     + "[drones.cruise_missile].");

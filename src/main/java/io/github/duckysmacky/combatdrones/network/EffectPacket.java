@@ -29,7 +29,9 @@ public class EffectPacket implements IMessage {
         /** The gunship's cannon firing: its report, heard out to {@link #CANNON_RANGE}. */
         CANNON_SHOT,
         /** The gunship's howitzer firing: a heavy report heard out to {@link #HOWITZER_RANGE}. */
-        HOWITZER_SHOT
+        HOWITZER_SHOT,
+        /** A Pilot Detector's pulse; scale = its range. */
+        SCAN
     }
 
     public static final double EXPLOSION_RANGE = 400;
@@ -68,6 +70,11 @@ public class EffectPacket implements IMessage {
     public static void gunShot(World world, Vec3d position, boolean howitzer) {
         send(world, new EffectPacket(howitzer ? Kind.HOWITZER_SHOT : Kind.CANNON_SHOT, position, Vec3d.ZERO, 1),
                 howitzer ? HOWITZER_RANGE : CANNON_RANGE);
+    }
+
+    /** A Pilot Detector scan from {@code position}: the pulse, seen by everyone near enough to be caught by it. */
+    public static void scan(World world, Vec3d position, double range) {
+        send(world, new EffectPacket(Kind.SCAN, position, Vec3d.ZERO, (float) range), range + 32);
     }
 
     /** To every player within {@code radius} of the strike point. */

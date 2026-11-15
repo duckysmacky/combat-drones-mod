@@ -471,3 +471,17 @@ subtitles.combat_drones.unit.remove=Unit taken off ramp
 subtitles.combat_drones.unit.ammo=Ammunition loaded
 subtitles.combat_drones.pad.load=Missile seated
 subtitles.combat_drones.ramp.place=Launcher set down
+
+# Anti-drone gear
+tooltip.combat_drones.gadget.charges=Charges: %s/%s
+tooltip.combat_drones.gadget.next=(next in %s s)
+message.combat_drones.gadget.recharging=Recharging: ready in %s s
+item.combat_drones.pilot_detector.name=Pilot Detector
+item.combat_drones.pilot_detector.tooltip=Finds players flying drones nearby
+item.combat_drones.pilot_detector.details.1=Right-click sends out a pulse: every enemy flying a drone, unit or missile
+item.combat_drones.pilot_detector.details.2=whose body stands within range gets a red dot over their head,
+item.combat_drones.pilot_detector.details.3=seen through walls for a while. Everyone near hears the ping.
+message.combat_drones.detector.found=Pilots detected: %s
+message.combat_drones.detector.none=No pilots in range
+subtitles.combat_drones.detector.ping=Detector pings
+subtitles.combat_drones.detector.contact=Detector finds a pilot

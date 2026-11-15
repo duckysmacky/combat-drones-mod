@@ -16,6 +16,7 @@ import io.github.duckysmacky.combatdrones.item.ItemGoggles;
 import io.github.duckysmacky.combatdrones.item.ItemLaunchRamp;
 import io.github.duckysmacky.combatdrones.item.ItemMissilePad;
 import io.github.duckysmacky.combatdrones.item.ItemMissionPlanner;
+import io.github.duckysmacky.combatdrones.item.ItemPilotDetector;
 import io.github.duckysmacky.combatdrones.item.ItemRemote;
 import io.github.duckysmacky.combatdrones.item.ItemMissileTablet;
 import io.github.duckysmacky.combatdrones.item.ItemWithTooltip;
@@ -72,7 +73,7 @@ public final class ModContent {
 
     /**
      * Creative tab position: FPV gear (0+), hand-flown drones (100+), batteries and payloads (200+), ramp gear (400+),
-     * ramp units (500+), their ammo (600+), anything else (800), the not yet functional Rearm Station last.
+     * ramp units (500+), their ammo (600+), anti-drone gear (700+), anything else (800), the not yet functional Rearm Station last.
      */
     private static int tabRank(ItemStack stack) {
         Item item = stack.getItem();
@@ -82,12 +83,13 @@ public final class ModContent {
             boolean handFlown = type != null && type.getCategory() == DroneType.Category.HAND_FLOWN;
             return (handFlown ? 100 : 500) + (index < 0 ? 99 : index);
         }
-        int[] bases = {0, 200, 400, 600};
+        int[] bases = {0, 200, 400, 600, 700};
         List<List<Item>> groups = Arrays.asList(
                 Arrays.asList(fpvRemote, fpvGoggles),
                 Arrays.asList(lightBattery, standardBattery, heavyBattery, fragGrenade, bombLight, bomb, bombHeavy),
                 Arrays.asList(launchRamp, planeRamp, missionPlanner, fuelCan, missilePad, missileTablet),
-                Arrays.asList(rocket, rocketHeavy, rifleRounds, cannonShell, howitzerShell));
+                Arrays.asList(rocket, rocketHeavy, rifleRounds, cannonShell, howitzerShell),
+                Arrays.asList(pilotDetector));
         for (int group = 0; group < groups.size(); group++) {
             int index = groups.get(group).indexOf(item);
             if (index >= 0) {
@@ -126,6 +128,7 @@ public final class ModContent {
     public static Item rifleRounds;
     public static Item cannonShell;
     public static Item howitzerShell;
+    public static Item pilotDetector;
 
     private ModContent() {
     }
@@ -160,6 +163,7 @@ public final class ModContent {
         rifleRounds = register(event, simpleItem("rifle_rounds"));
         cannonShell = register(event, simpleItem("cannon_shell"));
         howitzerShell = register(event, simpleItem("howitzer_shell").setMaxStackSize(16));
+        pilotDetector = register(event, named(new ItemPilotDetector(), "pilot_detector"));
         // One placeable item per data-defined type; the registry name is the type ID
         for (DroneType type : DroneTypes.all()) {
             register(event, named(new ItemDrone(type.getId()), type.getId()));

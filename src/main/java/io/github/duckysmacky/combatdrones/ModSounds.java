@@ -48,6 +48,11 @@ public final class ModSounds {
     /** INBOUND alarm for everyone near a strike point. */
     public static final SoundEvent MISSILE_ALARM = create("missile.alarm");
 
+    /** Pilot Detector pulse going out, heard by everyone near. */
+    public static final SoundEvent DETECTOR_PING = create("detector.ping");
+    /** Pilot Detector: someone found (the scanner only). */
+    public static final SoundEvent DETECTOR_CONTACT = create("detector.contact");
+
     private ModSounds() {
     }
 
@@ -60,6 +65,7 @@ public final class ModSounds {
     public static void registerSounds(RegistryEvent.Register<SoundEvent> event) {
         event.getRegistry().registerAll(DRONE_MOTOR, DRONE_LINK, DRONE_BEEP, DRONE_BATTERY, DRONE_ATTACH, DRONE_CONNECT, DRONE_HIT, DRONE_PILOT_STATIC, UNIT_LAUNCH,
                 GUNSHIP_ROCKET, GUNSHIP_GUN, UNIT_BOOST, BOMB_RELEASE, BULLET_IMPACT, BULLET_FLYBY, MISSILE_IGNITION, MISSILE_LIFTOFF, MISSILE_SCREAM, MISSILE_ALARM,
-                DRONE_PLACE, DRONE_PICKUP, UNIT_INSTALL, UNIT_REMOVE, UNIT_AMMO, PAD_LOAD, RAMP_PLACE);
+                DRONE_PLACE, DRONE_PICKUP, UNIT_INSTALL, UNIT_REMOVE, UNIT_AMMO, PAD_LOAD, RAMP_PLACE,
+                DETECTOR_PING, DETECTOR_CONTACT);
     }
 }

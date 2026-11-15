@@ -3,6 +3,7 @@ package io.github.duckysmacky.combatdrones.client;
 import io.github.duckysmacky.combatdrones.CombatDrones;
 import io.github.duckysmacky.combatdrones.config.ModConfig;
 import io.github.duckysmacky.combatdrones.entity.EntityHandFlownDrone;
+import io.github.duckysmacky.combatdrones.network.DetectorPacket;
 import io.github.duckysmacky.combatdrones.network.DroneStatePacket;
 import io.github.duckysmacky.combatdrones.network.EffectPacket;
 import io.github.duckysmacky.combatdrones.network.EngineSoundPacket;
@@ -84,6 +85,10 @@ public final class ClientPacketHandlers {
 
     public static void onIntel(IntelPacket packet) {
         ClientIntel.set(packet.getEntries());
+    }
+
+    public static void onDetector(DetectorPacket packet) {
+        ClientIntel.addDetections(packet.getFound(), packet.getTicks(), packet.isOwn());
     }
 
     public static void onEngineSounds(EngineSoundPacket packet) {

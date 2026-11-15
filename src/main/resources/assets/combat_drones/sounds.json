@@ -625,5 +625,19 @@
     "sounds": [
       "combat_drones:ramp/place"
     ]
+  },
+  "detector.ping": {
+    "category": "player",
+    "subtitle": "subtitles.combat_drones.detector.ping",
+    "sounds": [
+      "combat_drones:detector/ping"
+    ]
+  },
+  "detector.contact": {
+    "category": "player",
+    "subtitle": "subtitles.combat_drones.detector.contact",
+    "sounds": [
+      "combat_drones:detector/contact"
+    ]
   }
 }
