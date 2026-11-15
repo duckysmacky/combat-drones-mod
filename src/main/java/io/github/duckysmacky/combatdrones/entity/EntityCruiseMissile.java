@@ -312,6 +312,12 @@ public class EntityCruiseMissile extends EntityRampUnit {
         return true;
     }
 
+    /** Shot down or fried: only the fuel goes up. */
+    @Override
+    void shotDown() {
+        fuelBlast();
+    }
+
     /** Server: the pilot's steering for the dive (stick forward/right as pitch/roll, boost). Controller only. */
     @Override
     public void acceptManualInput(EntityPlayerMP sender, double pitch, double roll, double throttle, boolean trigger, boolean free, boolean boost) {

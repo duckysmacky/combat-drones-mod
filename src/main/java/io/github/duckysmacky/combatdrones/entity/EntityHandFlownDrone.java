@@ -733,6 +733,11 @@ public class EntityHandFlownDrone extends Entity implements ChunkAnchor.Holder {
             DamageEffects.hit(this);
             return;
         }
+        shotDown();
+    }
+
+    /** Server: knocked out (shot down, or fried by an EMP). A kamikaze in the air goes off; anything else is destroyed. */
+    void shotDown() {
         DroneType type = getDroneType();
         if (type != null && type.isImpactDetonates() && !onGround) {
             detonate(type);

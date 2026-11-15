@@ -639,5 +639,39 @@
     "sounds": [
       "combat_drones:detector/contact"
     ]
+  },
+  "emp.station_on": {
+    "category": "block",
+    "subtitle": "subtitles.combat_drones.emp.station_on",
+    "sounds": [
+      "combat_drones:emp/station_on"
+    ]
+  },
+  "emp.station_off": {
+    "category": "block",
+    "subtitle": "subtitles.combat_drones.emp.station_off",
+    "sounds": [
+      "combat_drones:emp/station_off"
+    ]
+  },
+  "emp.hum": {
+    "category": "block",
+    "subtitle": "subtitles.combat_drones.emp.hum",
+    "sounds": [
+      {
+        "name": "combat_drones:emp/hum",
+        "stream": false
+      }
+    ]
+  },
+  "emp.zap": {
+    "category": "neutral",
+    "subtitle": "subtitles.combat_drones.emp.zap",
+    "sounds": [
+      "combat_drones:emp/zap0",
+      "combat_drones:emp/zap1",
+      "combat_drones:emp/zap2",
+      "combat_drones:emp/zap3"
+    ]
   }
 }

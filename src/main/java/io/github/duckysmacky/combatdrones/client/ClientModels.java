@@ -20,7 +20,8 @@ public final class ClientModels {
     @SubscribeEvent
     public static void registerModels(ModelRegistryEvent event) {
         for (Item item : ModContent.ITEMS) {
-            if (item instanceof ItemDrone || item == ModContent.launchRamp || item == ModContent.planeRamp || item == ModContent.missilePad) {
+            if (item instanceof ItemDrone || item == ModContent.launchRamp || item == ModContent.planeRamp || item == ModContent.missilePad
+                    || item == ModContent.empStation) {
                 item.setTileEntityItemStackRenderer(GeoModels.ItemRenderer.INSTANCE);
             }
             ModelLoader.setCustomModelResourceLocation(item, 0, new ModelResourceLocation(item.getRegistryName(), "inventory"));

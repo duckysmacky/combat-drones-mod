@@ -25,7 +25,7 @@ import java.util.Random;
 public final class FxParticle extends Particle {
     private static final String[][] SPRITES = {
             {"smoke_0", "smoke_1", "smoke_2"}, {"smoke_0", "smoke_1", "smoke_2"}, {"fire_0", "fire_1", "fire_2"}, {"spark"},
-            {"debris_0", "debris_1", "debris_2"}, {"dust_0", "dust_1"}, {"ring"}, {"flash"}};
+            {"debris_0", "debris_1", "debris_2"}, {"dust_0", "dust_1"}, {"ring"}, {"flash"}, {"arc_0", "arc_1", "arc_2"}};
 
     private final float startScale;
     private final float endScale;
@@ -121,6 +121,17 @@ public final class FxParticle extends Particle {
                 drag = 1.0F;
                 particleAlpha = 0.7F;
                 break;
+            case ARC:
+                particleMaxAge = 2 + random.nextInt(3);
+                particleGravity = 0;
+                startScale = size * 2.5F;
+                endScale = size * 2.2F;
+                glow = true;
+                fadeFrom = 0.5F;
+                drag = 0.6F;
+                particleAngle = random.nextFloat() * 6.28F;
+                setRBGColorF(1.0F, 1.0F, 1.0F);
+                break;
             default:
                 particleMaxAge = 2 + random.nextInt(2);
                 particleGravity = 0;
@@ -139,7 +150,7 @@ public final class FxParticle extends Particle {
     public static void spawn(World world, Fx kind, double x, double y, double z, double velocityX, double velocityY, double velocityZ, float size) {
         Minecraft minecraft = Minecraft.getMinecraft();
         int setting = minecraft.gameSettings.particleSetting;
-        boolean bright = kind == Fx.FIRE || kind == Fx.RING || kind == Fx.FLASH;
+        boolean bright = kind == Fx.FIRE || kind == Fx.RING || kind == Fx.FLASH || kind == Fx.ARC;
         if ((setting == 1 && world.rand.nextInt(2) == 0) || (setting == 2 && (!bright || world.rand.nextInt(3) != 0))) {
             return;
         }

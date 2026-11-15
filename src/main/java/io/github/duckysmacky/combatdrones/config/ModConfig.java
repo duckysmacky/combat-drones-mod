@@ -30,6 +30,7 @@ import java.util.Map;
  *   <li>{@code [general]}: global server balance knobs.</li>
  *   <li>{@code [uav]}: recon UAV tracking dots and lock-ons (server).</li>
  *   <li>{@code [pilot_detector]}: the Pilot Detector scanner (server).</li>
+ *   <li>{@code [emp_station]}: the EMP Field Station (server).</li>
  *   <li>{@code [client]}: options for your own client only; a server ignores them. Re-read alone by
  *       {@link #reloadClient}.</li>
  *   <li>{@code [batteries.<size>]}: battery pack capacity and weight multipliers, synced to clients.</li>
@@ -102,6 +103,12 @@ public final class ModConfig {
     public static double detectorDotSeconds = 15.0;
     public static boolean detectorDotsForAllies = false;
 
+    // [emp_station]
+    public static double stationRadius = 24.0;
+    public static double stationDischargePerSecond = 4.0;
+    public static double stationRechargePerSecond = 2.0;
+    public static String stationSpares = "owner";
+
     // [weapons]
     public static int roundsPerRifleItem = 16;
     public static double rocketSpeed = 3.0;
@@ -163,7 +170,7 @@ public final class ModConfig {
         Map<Field, Object> values = new LinkedHashMap<>();
         for (Field field : ModConfig.class.getDeclaredFields()) {
             int modifiers = field.getModifiers();
-            if (Modifier.isStatic(modifiers) && !Modifier.isFinal(modifiers) && (field.getType().isPrimitive() || field.getType() == List.class)) {
+            if (Modifier.isStatic(modifiers) && !Modifier.isFinal(modifiers) && (field.getType().isPrimitive() || field.getType() == List.class || field.getType() == String.class)) {
                 try {
                     values.put(field, field.get(null));
                 } catch (IllegalAccessException e) {
@@ -352,6 +359,16 @@ public final class ModConfig {
             detectorDotsForAllies = defaults.get("pilot_detector.dotsForAllies", detectorDotsForAllies,
                     "The scanning player's vanilla scoreboard teammates (see general.ignoredTeams) also see the dots. Off: only the scanner.");
 
+            stationRadius = defaults.number("emp_station.radius", stationRadius, 1, 32,
+                    "Radius of the station's EMP field, in blocks. Drones, units and missiles flying into it are knocked out as if shot down.");
+            stationDischargePerSecond = defaults.number("emp_station.dischargePerSecond", stationDischargePerSecond, 0, 100,
+                    "Charge (of 100) the station uses per second while its field is up. It switches itself off when empty.");
+            stationRechargePerSecond = defaults.number("emp_station.rechargePerSecond", stationRechargePerSecond, 0, 100,
+                    "Charge (of 100) the station wins back per second while switched off.");
+            stationSpares = defaults.choice("emp_station.spares", stationSpares, SPARES,
+                    "Whose vehicles the field leaves alone: none, owner (whoever placed the station) or team (the owner and their "
+                            + "scoreboard teammates, see general.ignoredTeams).");
+
             roundsPerRifleItem = (int) defaults.number("weapons.roundsPerRifleItem", roundsPerRifleItem, 1, 256,
                     "Gun rounds one Rifle Rounds item loads into an Attack Plane's belt.");
             rocketSpeed = defaults.number("weapons.rocketSpeed", rocketSpeed, 0.5, 10, "Rocket speed on top of the plane's own, in blocks/tick.");
@@ -446,6 +463,7 @@ public final class ModConfig {
             defaults.comment("uav", "Recon UAV: tracking dots over the enemies it sees, and lock-ons from its camera.");
             defaults.comment("pilot_detector", "Pilot Detector: a hand-held scanner whose pulse marks the stand-in bodies of players "
                     + "flying a drone, unit or missile nearby. Self and teammates are never marked.");
+            defaults.comment("emp_station", "EMP Field Station: a placed block that keeps an EMP field up around itself while switched on.");
             defaults.comment("weapons", "Armed plane weapons, fired only under manual control.");
             defaults.comment("missiles", "Cruise Missile launch, standby and strike. Its speed, warhead, health and standby fuel are in "
                     + "[drones.cruise_missile].");
@@ -520,6 +538,8 @@ public final class ModConfig {
         }
     }
 
+    /** Values of the EMP {@code spares} settings. */
+    private static final String[] SPARES = {"none", "owner", "team"};
     private static final String DEFAULT_MARK = "Default: ";
     private static final String CLIENT_COMMENT = "Options for your own client only. Apply edits with /combat_drones reload_client_config "
             + "(an op's config_reload also reloads everyone's).";
@@ -591,6 +611,18 @@ public final class ModConfig {
                 }
             }
             return Collections.unmodifiableList(new ArrayList<>((List<String>) (List<?>) value));
+        }
+
+        /** One of {@code allowed} (case-insensitive, returned lower case); anything else falls back. */
+        String choice(String path, String fallback, String[] allowed, String description) {
+            String value = (String) track(path, fallback, description, String.class, false);
+            for (String option : allowed) {
+                if (option.equalsIgnoreCase(value)) {
+                    return option;
+                }
+            }
+            CombatDrones.logger.error("{} = {} in {} must be one of {}, using {}", path, value, FILE_NAME, String.join(", ", allowed), fallback);
+            return fallback;
         }
 
         double number(String path, double fallback, double min, double max, @Nullable String description) {

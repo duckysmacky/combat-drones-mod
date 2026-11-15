@@ -9,6 +9,7 @@ import io.github.duckysmacky.combatdrones.entity.EntityBomb;
 import io.github.duckysmacky.combatdrones.entity.EntityCruiseMissile;
 import io.github.duckysmacky.combatdrones.entity.EntityHandFlownDrone;
 import io.github.duckysmacky.combatdrones.entity.EntityLaunchRamp;
+import io.github.duckysmacky.combatdrones.entity.EntityEmpStation;
 import io.github.duckysmacky.combatdrones.entity.EntityMissilePad;
 import io.github.duckysmacky.combatdrones.entity.EntityPilotBody;
 import io.github.duckysmacky.combatdrones.entity.EntityRocket;
@@ -31,6 +32,7 @@ public class ClientProxy extends CommonProxy {
         RenderingRegistry.registerEntityRenderingHandler(EntityRampUnit.class, RenderRampUnit::new);
         RenderingRegistry.registerEntityRenderingHandler(EntityLaunchRamp.class, RenderLaunchRamp::new);
         RenderingRegistry.registerEntityRenderingHandler(EntityMissilePad.class, RenderMissilePad::new);
+        RenderingRegistry.registerEntityRenderingHandler(EntityEmpStation.class, RenderEmpStation::new);
         RenderingRegistry.registerEntityRenderingHandler(EntityCruiseMissile.class, RenderRampUnit::new);
         RenderingRegistry.registerEntityRenderingHandler(EntityPilotBody.class, RenderPilotBody::new);
         RenderingRegistry.registerEntityRenderingHandler(EntityRocket.class, RenderProjectile::rocket);
@@ -42,6 +44,11 @@ public class ClientProxy extends CommonProxy {
         if (world.isRemote) {
             FxParticle.spawn(world, kind, x, y, z, velocityX, velocityY, velocityZ, size);
         }
+    }
+
+    @Override
+    public void empHum(EntityEmpStation station) {
+        EmpHumSound.ensure(station);
     }
 
     @Override

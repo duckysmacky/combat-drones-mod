@@ -2,6 +2,7 @@ package io.github.duckysmacky.combatdrones;
 
 import io.github.duckysmacky.combatdrones.entity.EntityBomb;
 import io.github.duckysmacky.combatdrones.entity.EntityCruiseMissile;
+import io.github.duckysmacky.combatdrones.entity.EntityEmpStation;
 import io.github.duckysmacky.combatdrones.entity.EntityHandFlownDrone;
 import io.github.duckysmacky.combatdrones.entity.EntityLaunchRamp;
 import io.github.duckysmacky.combatdrones.entity.EntityMissilePad;
@@ -12,6 +13,7 @@ import io.github.duckysmacky.combatdrones.item.ItemBattery;
 import io.github.duckysmacky.combatdrones.item.ItemBlockWithTooltip;
 import io.github.duckysmacky.combatdrones.item.ItemBomb;
 import io.github.duckysmacky.combatdrones.item.ItemDrone;
+import io.github.duckysmacky.combatdrones.item.ItemEmpStation;
 import io.github.duckysmacky.combatdrones.item.ItemGoggles;
 import io.github.duckysmacky.combatdrones.item.ItemLaunchRamp;
 import io.github.duckysmacky.combatdrones.item.ItemMissilePad;
@@ -89,7 +91,7 @@ public final class ModContent {
                 Arrays.asList(lightBattery, standardBattery, heavyBattery, fragGrenade, bombLight, bomb, bombHeavy),
                 Arrays.asList(launchRamp, planeRamp, missionPlanner, fuelCan, missilePad, missileTablet),
                 Arrays.asList(rocket, rocketHeavy, rifleRounds, cannonShell, howitzerShell),
-                Arrays.asList(pilotDetector));
+                Arrays.asList(pilotDetector, empStation));
         for (int group = 0; group < groups.size(); group++) {
             int index = groups.get(group).indexOf(item);
             if (index >= 0) {
@@ -129,6 +131,7 @@ public final class ModContent {
     public static Item cannonShell;
     public static Item howitzerShell;
     public static Item pilotDetector;
+    public static Item empStation;
 
     private ModContent() {
     }
@@ -164,6 +167,7 @@ public final class ModContent {
         cannonShell = register(event, simpleItem("cannon_shell"));
         howitzerShell = register(event, simpleItem("howitzer_shell").setMaxStackSize(16));
         pilotDetector = register(event, named(new ItemPilotDetector(), "pilot_detector"));
+        empStation = register(event, named(new ItemEmpStation(), "emp_station"));
         // One placeable item per data-defined type; the registry name is the type ID
         for (DroneType type : DroneTypes.all()) {
             register(event, named(new ItemDrone(type.getId()), type.getId()));
@@ -254,6 +258,13 @@ public final class ModContent {
                 .id(new ResourceLocation(CombatDrones.MOD_ID, "cruise_missile"), 7)
                 .name(CombatDrones.MOD_ID + ".cruise_missile")
                 .tracker(256, 1, false)
+                .build());
+        // Static like the ramps; its charge and on/off state arrive as entity data
+        event.getRegistry().register(EntityEntryBuilder.create()
+                .entity(EntityEmpStation.class)
+                .id(new ResourceLocation(CombatDrones.MOD_ID, "emp_station"), 8)
+                .name(CombatDrones.MOD_ID + ".emp_station")
+                .tracker(160, 20, false)
                 .build());
     }
 

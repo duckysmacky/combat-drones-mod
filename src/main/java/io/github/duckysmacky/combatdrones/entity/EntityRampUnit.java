@@ -823,17 +823,24 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder {
         }
         if (!world.isRemote) {
             setHealth(health - amount * (float) ModConfig.droneDamageTakenMultiplier);
-            DroneType type = getDroneType();
             if (health > 0) {
                 DamageEffects.hit(this);
-            } else if (type != null && type.getBlastPower() > 0) {
-                detonate(type); // a warhead shot down goes off in the air
             } else {
-                setDead();
-                DamageEffects.wreck(this);
+                shotDown();
             }
         }
         return true;
+    }
+
+    /** Server: knocked out of the sky (shot down, or fried by an EMP). A warhead goes off in the air; else a wreck. */
+    void shotDown() {
+        DroneType type = getDroneType();
+        if (type != null && type.getBlastPower() > 0) {
+            detonate(type);
+        } else {
+            setDead();
+            DamageEffects.wreck(this);
+        }
     }
 
     @Override

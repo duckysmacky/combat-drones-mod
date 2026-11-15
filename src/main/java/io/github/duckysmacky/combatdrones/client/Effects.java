@@ -86,6 +86,9 @@ public final class Effects {
             case SCAN:
                 ScanWave.start(packet.getPosition(), packet.getScale());
                 break;
+            case EMP_ZAP:
+                empZap(world, packet.getPosition(), packet.getScale());
+                break;
         }
     }
 
@@ -169,6 +172,21 @@ public final class Effects {
             fx(world, Fx.FIRE, pad.add(random.nextDouble() - 0.5, 0.2, random.nextDouble() - 0.5),
                     new Vec3d((random.nextDouble() - 0.5) * 0.3, 0.02, (random.nextDouble() - 0.5) * 0.3), 1.2F);
         }
+    }
+
+    /** A vehicle fried by an EMP: arcs crawling all over it, a shower of sparks, the crack of the discharge. */
+    private static void empZap(World world, Vec3d at, float size) {
+        Random random = world.rand;
+        for (int index = 0; index < 6 + size * 6; index++) {
+            Vec3d out = randomDirection(random).scale(size * (0.3 + random.nextDouble() * 0.5));
+            fx(world, Fx.ARC, at.add(out), Vec3d.ZERO, 0.4F + size * 0.25F);
+        }
+        for (int index = 0; index < 8; index++) {
+            Vec3d out = randomDirection(random);
+            fx(world, Fx.SPARK, at, new Vec3d(out.x * 0.3, Math.abs(out.y) * 0.3 + 0.1, out.z * 0.3), 0.6F);
+        }
+        play(new PositionedSoundRecord(ModSounds.EMP_ZAP, SoundCategory.NEUTRAL, 2.0F, 0.9F + random.nextFloat() * 0.2F,
+                (float) at.x, (float) at.y, (float) at.z), 0);
     }
 
     private static void fx(World world, Fx kind, Vec3d at, Vec3d velocity, float size) {

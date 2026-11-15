@@ -53,6 +53,13 @@ public final class ModSounds {
     /** Pilot Detector: someone found (the scanner only). */
     public static final SoundEvent DETECTOR_CONTACT = create("detector.contact");
 
+    /** EMP Field Station: switched on / off, and its field's hum (loop). */
+    public static final SoundEvent EMP_STATION_ON = create("emp.station_on");
+    public static final SoundEvent EMP_STATION_OFF = create("emp.station_off");
+    public static final SoundEvent EMP_HUM = create("emp.hum");
+    /** A vehicle knocked out by an EMP. */
+    public static final SoundEvent EMP_ZAP = create("emp.zap");
+
     private ModSounds() {
     }
 
@@ -66,6 +73,6 @@ public final class ModSounds {
         event.getRegistry().registerAll(DRONE_MOTOR, DRONE_LINK, DRONE_BEEP, DRONE_BATTERY, DRONE_ATTACH, DRONE_CONNECT, DRONE_HIT, DRONE_PILOT_STATIC, UNIT_LAUNCH,
                 GUNSHIP_ROCKET, GUNSHIP_GUN, UNIT_BOOST, BOMB_RELEASE, BULLET_IMPACT, BULLET_FLYBY, MISSILE_IGNITION, MISSILE_LIFTOFF, MISSILE_SCREAM, MISSILE_ALARM,
                 DRONE_PLACE, DRONE_PICKUP, UNIT_INSTALL, UNIT_REMOVE, UNIT_AMMO, PAD_LOAD, RAMP_PLACE,
-                DETECTOR_PING, DETECTOR_CONTACT);
+                DETECTOR_PING, DETECTOR_CONTACT, EMP_STATION_ON, EMP_STATION_OFF, EMP_HUM, EMP_ZAP);
     }
 }

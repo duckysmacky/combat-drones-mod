@@ -20,5 +20,7 @@ public enum Fx {
     /** A shockwave: a bright ring growing fast and fading. */
     RING,
     /** A muzzle or blast flash: one bright frame or two. */
-    FLASH
+    FLASH,
+    /** An electric arc: a blue-white jagged bolt, gone in a few frames (EMP fields, fried vehicles). */
+    ARC
 }

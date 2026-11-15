@@ -31,7 +31,9 @@ public class EffectPacket implements IMessage {
         /** The gunship's howitzer firing: a heavy report heard out to {@link #HOWITZER_RANGE}. */
         HOWITZER_SHOT,
         /** A Pilot Detector's pulse; scale = its range. */
-        SCAN
+        SCAN,
+        /** A vehicle fried by an EMP: arcs crawling over it and a zap; scale = the vehicle's size. */
+        EMP_ZAP
     }
 
     public static final double EXPLOSION_RANGE = 400;
@@ -75,6 +77,11 @@ public class EffectPacket implements IMessage {
     /** A Pilot Detector scan from {@code position}: the pulse, seen by everyone near enough to be caught by it. */
     public static void scan(World world, Vec3d position, double range) {
         send(world, new EffectPacket(Kind.SCAN, position, Vec3d.ZERO, (float) range), range + 32);
+    }
+
+    /** An EMP knocking out a vehicle of about {@code size} blocks. */
+    public static void empZap(World world, Vec3d position, float size) {
+        send(world, new EffectPacket(Kind.EMP_ZAP, position, Vec3d.ZERO, size), LAUNCH_RANGE);
     }
 
     /** To every player within {@code radius} of the strike point. */
