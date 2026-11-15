@@ -33,7 +33,9 @@ public class EffectPacket implements IMessage {
         /** A Pilot Detector's pulse; scale = its range. */
         SCAN,
         /** A vehicle fried by an EMP: arcs crawling over it and a zap; scale = the vehicle's size. */
-        EMP_ZAP
+        EMP_ZAP,
+        /** An EMP Blast Gadget going off: the discharge flash, ring and crack; scale = the blast radius. */
+        EMP_BLAST
     }
 
     public static final double EXPLOSION_RANGE = 400;
@@ -82,6 +84,11 @@ public class EffectPacket implements IMessage {
     /** An EMP knocking out a vehicle of about {@code size} blocks. */
     public static void empZap(World world, Vec3d position, float size) {
         send(world, new EffectPacket(Kind.EMP_ZAP, position, Vec3d.ZERO, size), LAUNCH_RANGE);
+    }
+
+    /** An EMP blast going off with the given radius. */
+    public static void empBlast(World world, Vec3d position, float radius) {
+        send(world, new EffectPacket(Kind.EMP_BLAST, position, Vec3d.ZERO, radius), LAUNCH_RANGE);
     }
 
     /** To every player within {@code radius} of the strike point. */

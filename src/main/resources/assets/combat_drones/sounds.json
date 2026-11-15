@@ -673,5 +673,19 @@
       "combat_drones:emp/zap2",
       "combat_drones:emp/zap3"
     ]
+  },
+  "emp.charge": {
+    "category": "player",
+    "subtitle": "subtitles.combat_drones.emp.charge",
+    "sounds": [
+      "combat_drones:emp/charge"
+    ]
+  },
+  "emp.blast": {
+    "category": "player",
+    "subtitle": "subtitles.combat_drones.emp.blast",
+    "sounds": [
+      "combat_drones:emp/blast"
+    ]
   }
 }

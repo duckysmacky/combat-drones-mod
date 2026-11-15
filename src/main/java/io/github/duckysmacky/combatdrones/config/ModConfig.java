@@ -31,6 +31,7 @@ import java.util.Map;
  *   <li>{@code [uav]}: recon UAV tracking dots and lock-ons (server).</li>
  *   <li>{@code [pilot_detector]}: the Pilot Detector scanner (server).</li>
  *   <li>{@code [emp_station]}: the EMP Field Station (server).</li>
+ *   <li>{@code [emp_blast]}: the EMP Blast Gadget (server).</li>
  *   <li>{@code [client]}: options for your own client only; a server ignores them. Re-read alone by
  *       {@link #reloadClient}.</li>
  *   <li>{@code [batteries.<size>]}: battery pack capacity and weight multipliers, synced to clients.</li>
@@ -108,6 +109,15 @@ public final class ModConfig {
     public static double stationDischargePerSecond = 4.0;
     public static double stationRechargePerSecond = 2.0;
     public static String stationSpares = "owner";
+
+    // [emp_blast]
+    public static double blastRadius = 18.0;
+    public static int blastCharges = 1;
+    public static double blastReloadSeconds = 180.0;
+    public static boolean blastBuildUp = true;
+    public static double blastBuildUpSeconds = 1.0;
+    public static double blastExpandSeconds = 2.0;
+    public static String blastSpares = "owner";
 
     // [weapons]
     public static int roundsPerRifleItem = 16;
@@ -369,6 +379,20 @@ public final class ModConfig {
                     "Whose vehicles the field leaves alone: none, owner (whoever placed the station) or team (the owner and their "
                             + "scoreboard teammates, see general.ignoredTeams).");
 
+            blastRadius = defaults.number("emp_blast.radius", blastRadius, 1, 32, "Radius the EMP blast grows to, in blocks.");
+            blastCharges = (int) defaults.number("emp_blast.charges", blastCharges, 1, 20, "Blasts the gadget holds. Each use takes one.");
+            blastReloadSeconds = defaults.number("emp_blast.reloadSeconds", blastReloadSeconds, 0, 3600,
+                    "Seconds to win back one spent blast (one at a time).");
+            blastBuildUp = defaults.get("emp_blast.buildUp", blastBuildUp,
+                    "The gadget charges up (crackling, a rising whine) for buildUpSeconds before the blast. Off: it goes off at once.");
+            blastBuildUpSeconds = defaults.number("emp_blast.buildUpSeconds", blastBuildUpSeconds, 0.5, 3,
+                    "How long the build-up takes, in seconds. The field forms where the user stands when it ends.");
+            blastExpandSeconds = defaults.number("emp_blast.expandSeconds", blastExpandSeconds, 0.25, 10,
+                    "How long the field takes to grow from a block across to its full radius, in seconds. It then fades out.");
+            blastSpares = defaults.choice("emp_blast.spares", blastSpares, SPARES,
+                    "Whose vehicles the blast leaves alone: none, owner (the user) or team (the user and their scoreboard teammates, "
+                            + "see general.ignoredTeams).");
+
             roundsPerRifleItem = (int) defaults.number("weapons.roundsPerRifleItem", roundsPerRifleItem, 1, 256,
                     "Gun rounds one Rifle Rounds item loads into an Attack Plane's belt.");
             rocketSpeed = defaults.number("weapons.rocketSpeed", rocketSpeed, 0.5, 10, "Rocket speed on top of the plane's own, in blocks/tick.");
@@ -464,6 +488,7 @@ public final class ModConfig {
             defaults.comment("pilot_detector", "Pilot Detector: a hand-held scanner whose pulse marks the stand-in bodies of players "
                     + "flying a drone, unit or missile nearby. Self and teammates are never marked.");
             defaults.comment("emp_station", "EMP Field Station: a placed block that keeps an EMP field up around itself while switched on.");
+            defaults.comment("emp_blast", "EMP Blast Gadget: a hand-held charge that sets off a growing EMP field around its user.");
             defaults.comment("weapons", "Armed plane weapons, fired only under manual control.");
             defaults.comment("missiles", "Cruise Missile launch, standby and strike. Its speed, warhead, health and standby fuel are in "
                     + "[drones.cruise_missile].");

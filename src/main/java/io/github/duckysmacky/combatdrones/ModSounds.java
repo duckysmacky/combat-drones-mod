@@ -60,6 +60,10 @@ public final class ModSounds {
     /** A vehicle knocked out by an EMP. */
     public static final SoundEvent EMP_ZAP = create("emp.zap");
 
+    /** EMP Blast Gadget: the build-up whine, and the blast. */
+    public static final SoundEvent EMP_CHARGE = create("emp.charge");
+    public static final SoundEvent EMP_BLAST = create("emp.blast");
+
     private ModSounds() {
     }
 
@@ -73,6 +77,6 @@ public final class ModSounds {
         event.getRegistry().registerAll(DRONE_MOTOR, DRONE_LINK, DRONE_BEEP, DRONE_BATTERY, DRONE_ATTACH, DRONE_CONNECT, DRONE_HIT, DRONE_PILOT_STATIC, UNIT_LAUNCH,
                 GUNSHIP_ROCKET, GUNSHIP_GUN, UNIT_BOOST, BOMB_RELEASE, BULLET_IMPACT, BULLET_FLYBY, MISSILE_IGNITION, MISSILE_LIFTOFF, MISSILE_SCREAM, MISSILE_ALARM,
                 DRONE_PLACE, DRONE_PICKUP, UNIT_INSTALL, UNIT_REMOVE, UNIT_AMMO, PAD_LOAD, RAMP_PLACE,
-                DETECTOR_PING, DETECTOR_CONTACT, EMP_STATION_ON, EMP_STATION_OFF, EMP_HUM, EMP_ZAP);
+                DETECTOR_PING, DETECTOR_CONTACT, EMP_STATION_ON, EMP_STATION_OFF, EMP_HUM, EMP_ZAP, EMP_CHARGE, EMP_BLAST);
     }
 }

@@ -89,6 +89,9 @@ public final class Effects {
             case EMP_ZAP:
                 empZap(world, packet.getPosition(), packet.getScale());
                 break;
+            case EMP_BLAST:
+                empBlast(world, player, packet.getPosition(), packet.getScale());
+                break;
         }
     }
 
@@ -187,6 +190,26 @@ public final class Effects {
         }
         play(new PositionedSoundRecord(ModSounds.EMP_ZAP, SoundCategory.NEUTRAL, 2.0F, 0.9F + random.nextFloat() * 0.2F,
                 (float) at.x, (float) at.y, (float) at.z), 0);
+    }
+
+    /** An EMP blast going off: a ring and a burst of arcs, the discharge's crack, a jolt close in. */
+    private static void empBlast(World world, EntityPlayer player, Vec3d at, float radius) {
+        Random random = world.rand;
+        fx(world, Fx.RING, at, Vec3d.ZERO, 0.5F + radius * 0.08F);
+        for (int index = 0; index < 24; index++) {
+            Vec3d out = randomDirection(random).scale(0.4 + random.nextDouble() * 1.4);
+            fx(world, Fx.ARC, at.add(out), Vec3d.ZERO, 0.8F + random.nextFloat() * 0.6F);
+        }
+        for (int index = 0; index < 14; index++) {
+            Vec3d out = randomDirection(random);
+            fx(world, Fx.SPARK, at, new Vec3d(out.x * 0.45, Math.abs(out.y) * 0.4 + 0.1, out.z * 0.45), 0.7F);
+        }
+        play(new PositionedSoundRecord(ModSounds.EMP_BLAST, SoundCategory.PLAYERS, 4.0F, 0.95F + random.nextFloat() * 0.1F,
+                (float) at.x, (float) at.y, (float) at.z), 0);
+        double distance = player.getPositionEyes(1).distanceTo(at);
+        if (distance < radius * 2) {
+            Impact.shake((float) (0.35 * (1 - distance / (radius * 2))));
+        }
     }
 
     private static void fx(World world, Fx kind, Vec3d at, Vec3d velocity, float size) {
