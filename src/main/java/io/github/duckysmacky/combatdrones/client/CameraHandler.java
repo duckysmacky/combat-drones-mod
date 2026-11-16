@@ -1,6 +1,7 @@
 package io.github.duckysmacky.combatdrones.client;
 
 import io.github.duckysmacky.combatdrones.CombatDrones;
+import io.github.duckysmacky.combatdrones.client.hud.StingerScope;
 import io.github.duckysmacky.combatdrones.entity.EntityHandFlownDrone;
 import io.github.duckysmacky.combatdrones.entity.EntityRampUnit;
 import io.github.duckysmacky.combatdrones.physics.HandFlownFlight;
@@ -86,6 +87,12 @@ public final class CameraHandler {
         if (unit != null && event.getEntity() == unit && RemoteController.getZoom() > 1) {
             event.setFOV(event.getFOV() / RemoteController.getZoom());
         }
+        // Through the Stinger's scope, easing in as it comes up
+        float scope = StingerController.scopeAmount((float) event.getRenderPartialTicks());
+        if (scope > 0) {
+            event.setFOV(event.getFOV() / (1 + (StingerController.ZOOM - 1) * scope));
+        }
+        StingerScope.setFov(event.getFOV());
     }
 
     /**
@@ -106,7 +113,7 @@ public final class CameraHandler {
 
     @SubscribeEvent
     public static void onRenderHand(RenderHandEvent event) {
-        if (PilotController.getPilotedDrone() != null || RemoteController.isActive()) {
+        if (PilotController.getPilotedDrone() != null || RemoteController.isActive() || StingerController.scopeAmount(event.getPartialTicks()) > 0.5F) {
             event.setCanceled(true);
         }
     }

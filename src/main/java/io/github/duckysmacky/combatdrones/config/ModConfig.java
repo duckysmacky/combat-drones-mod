@@ -31,6 +31,7 @@ import java.util.Map;
  *   <li>{@code [general]}: global server balance knobs.</li>
  *   <li>{@code [uav]}: recon UAV tracking dots and lock-ons (server).</li>
  *   <li>{@code [pilot_detector]}: the Pilot Detector scanner (server).</li>
+ *   <li>{@code [stinger]}: the Stinger anti-air launcher and its missile (server).</li>
  *   <li>{@code [emp_station]}: the EMP Field Station (server).</li>
  *   <li>{@code [emp_blast]}: the EMP Blast Gadget (server).</li>
  *   <li>{@code [client]}: options for your own client only; a server ignores them. Re-read alone by
@@ -126,6 +127,20 @@ public final class ModConfig {
     public static String blastOnContact = "disable";
     public static double blastDisableSeconds = 5.0;
     public static double blastFizzlePower = 5.0;
+
+    // [stinger]
+    public static double stingerDamage = 100.0;
+    public static double stingerBlastPower = 1.5;
+    public static double stingerLockRange = 64.0;
+    public static double stingerLockSeconds = 6.0;
+    public static double stingerLockConeDegrees = 6.0;
+    public static double stingerMissileSpeed = 3.0;
+    public static double stingerTurnDegreesPerTick = 12.0;
+    public static double stingerFuelSeconds = 10.0;
+    public static double stingerReloadSeconds = 3.0;
+    public static boolean stingerAllowDumbFire = false;
+    public static String stingerSpares = "team";
+    public static boolean stingerWarnTarget = true;
 
     // [weapons]
     public static int roundsPerRifleItem = 16;
@@ -421,6 +436,31 @@ public final class ModConfig {
             blastFizzlePower = defaults.number("emp_blast.fizzlePower", blastFizzlePower, 0, 10,
                     "Blast power of a vehicle the blast knocks out, or of a disabled one crashing (vanilla TNT = 4). 0 = no blast, just a wreck.");
 
+            stingerDamage = defaults.number("stinger.damage", stingerDamage, 0, 1000,
+                    "Damage a Stinger missile does to the aircraft it hits, on top of its blast (compare the maxHP of [drones.*]; "
+                            + "general.droneDamageTakenMultiplier applies). Only aircraft take it.");
+            stingerBlastPower = defaults.number("stinger.blastPower", stingerBlastPower, 0, 10, "Stinger missile blast (vanilla TNT = 4).");
+            stingerLockRange = defaults.number("stinger.lockRange", stingerLockRange, 8, 256, "How far the Stinger can lock on, in blocks.");
+            stingerLockSeconds = defaults.number("stinger.lockSeconds", stingerLockSeconds, 0.5, 30,
+                    "How long an aircraft has to stay inside the seeker circle of the scope to be locked, in seconds.");
+            stingerLockConeDegrees = defaults.number("stinger.lockConeDegrees", stingerLockConeDegrees, 1, 20,
+                    "Size of the seeker circle: how far from the middle of the scope the aircraft may be, in degrees.");
+            stingerMissileSpeed = defaults.number("stinger.missileSpeed", stingerMissileSpeed, 0.5, 10,
+                    "Stinger missile speed, in blocks/tick. Slower than an aircraft's maxSpeed and it can be outrun.");
+            stingerTurnDegreesPerTick = defaults.number("stinger.turnDegreesPerTick", stingerTurnDegreesPerTick, 1, 90,
+                    "How hard the missile can turn after its target, in degrees per tick.");
+            stingerFuelSeconds = defaults.number("stinger.fuelSeconds", stingerFuelSeconds, 1, 60,
+                    "How long the missile flies, in seconds, before it blows up in the air.");
+            stingerReloadSeconds = defaults.number("stinger.reloadSeconds", stingerReloadSeconds, 0, 60,
+                    "How long loading a Stinger Missile into the launcher takes, in seconds.");
+            stingerAllowDumbFire = defaults.get("stinger.allowDumbFire", stingerAllowDumbFire,
+                    "The launcher also fires without a lock: the missile then flies straight ahead, unguided.");
+            stingerSpares = defaults.choice("stinger.spares", stingerSpares, SPARES,
+                    "Whose aircraft the launcher refuses to lock on to: none, owner (the shooter's own) or team (the shooter's and "
+                            + "their scoreboard teammates', see general.ignoredTeams).");
+            stingerWarnTarget = defaults.get("stinger.warnTarget", stingerWarnTarget,
+                    "Whoever flies, watches or owns an aircraft being locked gets a warning while the lock builds and holds.");
+
             roundsPerRifleItem = (int) defaults.number("weapons.roundsPerRifleItem", roundsPerRifleItem, 1, 256,
                     "Gun rounds one Rifle Rounds item loads into an Attack Plane's belt.");
             rocketSpeed = defaults.number("weapons.rocketSpeed", rocketSpeed, 0.5, 10, "Rocket speed on top of the plane's own, in blocks/tick.");
@@ -525,6 +565,8 @@ public final class ModConfig {
                     + "flying a drone, unit or missile nearby. Self and teammates are never marked.");
             defaults.comment("emp_station", "EMP Field Station: a placed block that keeps an EMP field up around itself while switched on.");
             defaults.comment("emp_blast", "EMP Blast Gadget: a hand-held charge that sets off a growing EMP field around its user.");
+            defaults.comment("stinger", "Stinger: a shoulder-fired launcher whose missile homes in on a locked aircraft (drones, munitions, "
+                    + "planes, missiles in flight). Never locks on to players.");
             defaults.comment("weapons", "Armed plane weapons, fired only under manual control.");
             defaults.comment("missiles", "Cruise Missile launch, standby and strike. Its speed, warhead, health and standby fuel are in "
                     + "[drones.cruise_missile].");

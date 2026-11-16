@@ -15,6 +15,7 @@ import io.github.duckysmacky.combatdrones.network.LockWarningPacket;
 import io.github.duckysmacky.combatdrones.network.MapTilePacket;
 import io.github.duckysmacky.combatdrones.network.PlannerOpenPacket;
 import io.github.duckysmacky.combatdrones.network.RemoteSessionPacket;
+import io.github.duckysmacky.combatdrones.network.StingerStatePacket;
 import io.github.duckysmacky.combatdrones.network.TypeSyncPacket;
 import io.github.duckysmacky.combatdrones.type.DroneTypes;
 import net.minecraft.client.Minecraft;
@@ -104,7 +105,11 @@ public final class ClientPacketHandlers {
     }
 
     public static void onLockWarning(LockWarningPacket packet) {
-        ClientIntel.setWarning(packet.isLocked(), packet.getValue());
+        ClientIntel.setWarning(packet.isLocked(), packet.getValue(), packet.getSource());
+    }
+
+    public static void onStingerState(StingerStatePacket packet) {
+        StingerController.onState(packet.getTargetId(), packet.getProgress());
     }
 
     public static void onDroneState(DroneStatePacket packet) {

@@ -26,7 +26,10 @@ public final class DroneKeys {
     /** Stealth Bomber: flight view / bombsight. */
     public static final KeyBinding BOMB_SIGHT = new KeyBinding("key.combat_drones.bomb_sight", Keyboard.KEY_B, CATEGORY);
 
-    static final KeyBinding[] ALL = {TOGGLE_FPV, FLIGHT_MODE, MOTORS, PITCH_FORWARD, PITCH_BACK, ROLL_LEFT, ROLL_RIGHT, SWITCH_WEAPON, BOMB_SIGHT};
+    /** Stinger: load a missile. Shares R with the gunner's weapon switch (never both at once), so it's read by its key state. */
+    public static final KeyBinding RELOAD = new KeyBinding("key.combat_drones.reload", Keyboard.KEY_R, CATEGORY);
+
+    static final KeyBinding[] ALL = {TOGGLE_FPV, FLIGHT_MODE, MOTORS, PITCH_FORWARD, PITCH_BACK, ROLL_LEFT, ROLL_RIGHT, SWITCH_WEAPON, BOMB_SIGHT, RELOAD};
 
     private DroneKeys() {
     }

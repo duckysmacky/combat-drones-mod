@@ -92,6 +92,9 @@ public final class Effects {
             case EMP_BLAST:
                 empBlast(world, player, packet.getPosition(), packet.getScale());
                 break;
+            case STINGER_LAUNCH:
+                stingerLaunch(world, player, packet.getPosition(), packet.getDirection());
+                break;
         }
     }
 
@@ -209,6 +212,31 @@ public final class Effects {
         double distance = player.getPositionEyes(1).distanceTo(at);
         if (distance < radius * 2) {
             Impact.shake((float) (0.35 * (1 - distance / (radius * 2))));
+        }
+    }
+
+    /**
+     * A Stinger firing: the motor lighting at the muzzle, and the backblast thrown out of the back of the tube, some
+     * two blocks behind it. A jolt for whoever stands close.
+     */
+    private static void stingerLaunch(World world, EntityPlayer player, Vec3d muzzle, Vec3d direction) {
+        Random random = world.rand;
+        Vec3d breech = muzzle.subtract(direction.scale(2.4));
+        fx(world, Fx.FLASH, muzzle, Vec3d.ZERO, 0.9F);
+        fx(world, Fx.FLASH, breech, Vec3d.ZERO, 0.7F);
+        for (int index = 0; index < 6; index++) {
+            fx(world, Fx.SMOKE, muzzle, direction.scale(0.1 + random.nextDouble() * 0.15).add(randomDirection(random).scale(0.04)), 0.7F);
+        }
+        for (int index = 0; index < 14; index++) {
+            Vec3d back = direction.scale(-(0.15 + random.nextDouble() * 0.45)).add(randomDirection(random).scale(0.08));
+            fx(world, index % 3 == 0 ? Fx.FIRE : Fx.SMOKE, breech, back, 0.8F + random.nextFloat() * 0.5F);
+        }
+        for (int index = 0; index < 5; index++) {
+            fx(world, Fx.SPARK, breech, direction.scale(-(0.4 + random.nextDouble() * 0.4)).add(randomDirection(random).scale(0.15)), 0.6F);
+        }
+        double distance = player.getPositionEyes(1).distanceTo(muzzle);
+        if (distance < 6) {
+            Impact.shake((float) (0.3 * (1 - distance / 6)));
         }
     }
 

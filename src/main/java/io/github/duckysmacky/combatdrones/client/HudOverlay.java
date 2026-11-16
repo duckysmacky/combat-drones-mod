@@ -4,6 +4,7 @@ import io.github.duckysmacky.combatdrones.CombatDrones;
 import io.github.duckysmacky.combatdrones.client.hud.Feed;
 import io.github.duckysmacky.combatdrones.client.hud.FpvFeed;
 import io.github.duckysmacky.combatdrones.client.hud.MissileFeed;
+import io.github.duckysmacky.combatdrones.client.hud.StingerScope;
 import io.github.duckysmacky.combatdrones.client.hud.Ui;
 import io.github.duckysmacky.combatdrones.client.hud.UnitFeed;
 import io.github.duckysmacky.combatdrones.client.hud.Widgets;
@@ -39,6 +40,8 @@ public final class HudOverlay {
     /** How long the INBOUND banner stays up (ms). */
     private static final long STRIKE_ALERT_MILLIS = 6000;
     private static long strikeAlertUntil;
+    /** How far the Stinger has to be raised ({@code StingerController.scopeAmount}) before its scope fills the screen. */
+    private static final float SCOPE_SHOWN = 0.5F;
     /** What the current feed is looking through, and when it came up (for the flight timer and the link-up static). */
     private static Entity session;
     private static long sessionStart;
@@ -79,6 +82,10 @@ public final class HudOverlay {
         if ((PilotController.getPilotedDrone() != null || RemoteController.getUnit() != null) && HIDDEN_WHILE_FLYING.contains(event.getType())) {
             event.setCanceled(true);
         }
+        // Through the Stinger's scope: its reticle is the crosshair
+        if (event.getType() == ElementType.CROSSHAIRS && StingerController.scopeAmount(event.getPartialTicks()) > SCOPE_SHOWN) {
+            event.setCanceled(true);
+        }
     }
 
     @SubscribeEvent
@@ -102,6 +109,13 @@ public final class HudOverlay {
             Widgets.hitFlash(resolution, drone.hitFlashTicks);
             FpvFeed.draw(resolution, drone, drone.getDroneType(), feed, flown, event.getPartialTicks());
         }
+        if (feed == null) {
+            if (StingerController.scopeAmount(event.getPartialTicks()) > SCOPE_SHOWN) {
+                StingerScope.draw(resolution, event.getPartialTicks());
+            } else {
+                StingerScope.drawHip(resolution, event.getPartialTicks());
+            }
+        }
         int top = 4;
         if (Minecraft.getSystemTime() < strikeAlertUntil) {
             drawStrikeAlert(resolution);
@@ -112,7 +126,8 @@ public final class HudOverlay {
 
     /**
      * A recon UAV is after this player: a blinking LOCK-ON WARNING with a filling bar while a lock-on builds, then a
-     * steady TRACKED banner with the time left while it holds.
+     * steady TRACKED banner with the time left while it holds. The same for a Stinger after the player's aircraft,
+     * with a MISSILE LOCK banner.
      */
     private static void drawLockAlert(ScaledResolution resolution, int top) {
         float building = ClientIntel.getWarningProgress();
@@ -122,9 +137,17 @@ public final class HudOverlay {
         }
         int centerX = resolution.getScaledWidth() / 2;
         boolean bright = Ui.blink(building > 0 ? 4 : 1);
-        String title = I18n.format(building > 0 ? "hud.combat_drones.lock_warning" : "hud.combat_drones.lock_tracked");
-        String sub = building > 0 ? I18n.format("hud.combat_drones.lock_warning.sub")
-                : I18n.format("hud.combat_drones.lock_tracked.sub", Widgets.clock(lockedMillis));
+        String title;
+        String sub;
+        if (ClientIntel.isStingerWarning()) {
+            // A missile launcher on this player's aircraft
+            title = I18n.format(building > 0 ? "hud.combat_drones.lock_warning" : "hud.combat_drones.missile_lock");
+            sub = I18n.format(building > 0 ? "hud.combat_drones.missile_warning.sub" : "hud.combat_drones.missile_lock.sub");
+        } else {
+            title = I18n.format(building > 0 ? "hud.combat_drones.lock_warning" : "hud.combat_drones.lock_tracked");
+            sub = building > 0 ? I18n.format("hud.combat_drones.lock_warning.sub")
+                    : I18n.format("hud.combat_drones.lock_tracked.sub", Widgets.clock(lockedMillis));
+        }
         int halfWidth = Math.max(Ui.width(title), Ui.width(sub) / 2) + 14;
         Ui.rect(centerX - halfWidth, top, centerX + halfWidth, top + 34, bright ? 0xF08A1F20 : 0xF05E1418);
         Ui.frame(centerX - halfWidth, top, halfWidth * 2, 34);

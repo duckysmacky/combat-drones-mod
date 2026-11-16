@@ -4,6 +4,7 @@ import io.github.duckysmacky.combatdrones.client.hud.UiSounds;
 import io.github.duckysmacky.combatdrones.CombatDrones;
 import io.github.duckysmacky.combatdrones.ModSounds;
 import io.github.duckysmacky.combatdrones.network.IntelPacket;
+import io.github.duckysmacky.combatdrones.network.LockWarningPacket;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.audio.PositionedSoundRecord;
 import net.minecraftforge.fml.common.Mod;
@@ -40,6 +41,8 @@ public final class ClientIntel {
     private static final long WARNING_TIMEOUT_MILLIS = 600;
     /** When the lock-on on this player runs out (ms), or 0. */
     private static long lockedUntil;
+    /** What the warning is about: a UAV after this player, or a Stinger after their aircraft ({@code LockWarningPacket.*}). */
+    private static int warningSource;
     /** Pilots found by Pilot Detector scans (own or a teammate's), each until its time runs out (ms). */
     private static final List<IntelPacket.Entry> detections = new ArrayList<>();
     private static final List<Long> detectionsUntil = new ArrayList<>();
@@ -112,8 +115,11 @@ public final class ClientIntel {
     }
 
     /** From the server: a lock-on on this player is building ({@code locked} false) or holds ({@code locked} true). */
-    static void setWarning(boolean locked, float value) {
+    static void setWarning(boolean locked, float value, int source) {
         long now = Minecraft.getSystemTime();
+        if (value > 0) {
+            warningSource = source;
+        }
         if (locked) {
             if (value > 0 && now >= lockedUntil) {
                 Minecraft.getMinecraft().getSoundHandler().playSound(PositionedSoundRecord.getMasterRecord(ModSounds.DRONE_BEEP, 0.6F));
@@ -128,6 +134,11 @@ public final class ClientIntel {
     /** Progress of a lock-on building on this player, or 0 when none is. */
     public static float getWarningProgress() {
         return Minecraft.getSystemTime() < warningUntil ? warningProgress : 0;
+    }
+
+    /** True when the warning up now is a Stinger's on this player's aircraft rather than a UAV's on them. */
+    public static boolean isStingerWarning() {
+        return warningSource == LockWarningPacket.STINGER;
     }
 
     /** Milliseconds left on the lock-on on this player, or 0. */
@@ -155,6 +166,11 @@ public final class ClientIntel {
         if (warning > 0 && --warningBeepDelay <= 0) {
             UiSounds.play(UiSounds.DENY, 0.7F + warning * 0.4F);
             warningBeepDelay = beepTicks(warning);
+        }
+        // A missile launcher locked on their aircraft: a fast, steady alarm for as long as it holds
+        if (isStingerWarning() && getLockedMillisLeft() > 0 && --warningBeepDelay <= 0) {
+            UiSounds.play(UiSounds.DENY, 1.3F);
+            warningBeepDelay = 3;
         }
     }
 

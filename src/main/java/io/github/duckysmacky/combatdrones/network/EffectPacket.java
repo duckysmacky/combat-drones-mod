@@ -35,7 +35,9 @@ public class EffectPacket implements IMessage {
         /** A vehicle fried by an EMP: arcs crawling over it and a zap; scale = the vehicle's size. */
         EMP_ZAP,
         /** An EMP Blast Gadget going off: the discharge flash, ring and crack; scale = the blast radius. */
-        EMP_BLAST
+        EMP_BLAST,
+        /** A Stinger firing: the backblast behind the tube and the motor lighting ahead of it; direction = the shot's. */
+        STINGER_LAUNCH
     }
 
     public static final double EXPLOSION_RANGE = 400;
@@ -89,6 +91,11 @@ public class EffectPacket implements IMessage {
     /** An EMP blast going off with the given radius. */
     public static void empBlast(World world, Vec3d position, float radius) {
         send(world, new EffectPacket(Kind.EMP_BLAST, position, Vec3d.ZERO, radius), LAUNCH_RANGE);
+    }
+
+    /** A Stinger fired from {@code muzzle} along {@code direction}. */
+    public static void stingerLaunch(World world, Vec3d muzzle, Vec3d direction) {
+        send(world, new EffectPacket(Kind.STINGER_LAUNCH, muzzle, direction, 1), LAUNCH_RANGE);
     }
 
     /** To every player within {@code radius} of the strike point. */

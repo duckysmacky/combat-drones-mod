@@ -40,6 +40,8 @@ final class ProjectileVoice extends EngineVoice {
                     return new ProjectileVoice(entity, "projectile.cannon", 64, 1.0, false);
                 case HOWITZER_SHELL:
                     return new ProjectileVoice(entity, "projectile.howitzer", 160, 1.0, false);
+                case STINGER:
+                    return new ProjectileVoice(entity, "projectile.rocket", 128, 1.25, false);
                 default:
                     return null;
             }

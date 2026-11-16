@@ -1,6 +1,7 @@
 package io.github.duckysmacky.combatdrones.client;
 
 import io.github.duckysmacky.combatdrones.CombatDrones;
+import io.github.duckysmacky.combatdrones.item.ItemStinger;
 import io.github.duckysmacky.combatdrones.type.DroneType;
 import io.github.duckysmacky.combatdrones.type.DroneTypes;
 import net.minecraft.client.Minecraft;
@@ -370,12 +371,41 @@ public final class GeoModels implements IGeoRenderer<Object> {
             float scale = 1.0F / Math.max(box[3] - box[0], Math.max(box[4] - box[1], box[5] - box[2]));
             GlStateManager.pushMatrix();
             GlStateManager.translate(0.5F, 0.5F, 0.5F);
+            spinProps(name, 0, 0);
+            if (stack.getItem() instanceof ItemStinger) {
+                poseStinger(name, stack);
+            }
             GlStateManager.scale(scale, scale, scale);
             GlStateManager.translate(-(box[0] + box[3]) / 2, -(box[1] + box[4]) / 2, -(box[2] + box[5]) / 2);
-            spinProps(name, 0, 0);
             render(name, 1.0F, 1.0F, 1.0F);
             GlStateManager.popMatrix();
         }
+
+        /**
+         * The Stinger's round shows in the muzzle only while one is loaded. Reloading, in first person: the tube tips
+         * nose-down, the new round slides in from the breech, the tube comes back up.
+         */
+        private static void poseStinger(String name, ItemStack stack) {
+            boolean loaded = ItemStinger.isLoaded(stack);
+            float reload = loaded || !StingerModel.isFirstPerson() ? 0 : StingerController.reloadProgress(Minecraft.getMinecraft().getRenderPartialTicks());
+            show(name, "missile", loaded || reload >= RELOAD_TIP);
+            if (reload <= 0) {
+                return;
+            }
+            float tip = ease(Math.min(reload, 1 - reload) / RELOAD_TIP);
+            GlStateManager.translate(0, -0.12F * tip, 0);
+            GlStateManager.rotate(50 * tip, 1, 0, 0);
+            float seated = ease((reload - RELOAD_TIP) / (1 - 2 * RELOAD_TIP - 0.1F));
+            offset(name, "missile", 0, 0, 24 * (1 - seated));
+        }
+
+        private static float ease(float amount) {
+            float clamped = Math.max(0, Math.min(1, amount));
+            return clamped * clamped * (3 - 2 * clamped);
+        }
+
+        /** Share of the reload spent tipping the tube down, and again bringing it back up. */
+        private static final float RELOAD_TIP = 0.25F;
     }
 
     /**

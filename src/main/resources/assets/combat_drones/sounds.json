@@ -594,6 +594,32 @@
       "combat_drones:ui/deny"
     ]
   },
+  "stinger.seek": {
+    "category": "master",
+    "sounds": [
+      "combat_drones:stinger/seek"
+    ]
+  },
+  "stinger.lock": {
+    "category": "master",
+    "sounds": [
+      "combat_drones:stinger/lock"
+    ]
+  },
+  "stinger.fire": {
+    "category": "player",
+    "subtitle": "subtitles.combat_drones.stinger.fire",
+    "sounds": [
+      "combat_drones:stinger/fire"
+    ]
+  },
+  "stinger.reload": {
+    "category": "player",
+    "subtitle": "subtitles.combat_drones.stinger.reload",
+    "sounds": [
+      "combat_drones:stinger/reload"
+    ]
+  },
   "ui.lock_tick": {
     "category": "master",
     "sounds": [

@@ -95,12 +95,13 @@ public final class Emp {
                 0, 0, 0, 0.3F + Math.max(vehicle.width, vehicle.height) * 0.2F);
     }
 
-    private static boolean isVehicle(Entity entity) {
+    /** Something flying: a ramp unit or missile, or a hand-flown drone off the ground. */
+    static boolean isVehicle(Entity entity) {
         return entity instanceof EntityRampUnit || (entity instanceof EntityHandFlownDrone && !entity.onGround);
     }
 
     @Nullable
-    private static UUID ownerOf(Entity entity) {
+    static UUID ownerOf(Entity entity) {
         return entity instanceof EntityRampUnit ? ((EntityRampUnit) entity).getOwner() : ((EntityHandFlownDrone) entity).getOwner();
     }
 

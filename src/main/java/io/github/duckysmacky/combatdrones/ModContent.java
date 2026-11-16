@@ -22,6 +22,7 @@ import io.github.duckysmacky.combatdrones.item.ItemMissilePad;
 import io.github.duckysmacky.combatdrones.item.ItemMissionPlanner;
 import io.github.duckysmacky.combatdrones.item.ItemPilotDetector;
 import io.github.duckysmacky.combatdrones.item.ItemRemote;
+import io.github.duckysmacky.combatdrones.item.ItemStinger;
 import io.github.duckysmacky.combatdrones.item.ItemMissileTablet;
 import io.github.duckysmacky.combatdrones.item.ItemWithTooltip;
 import io.github.duckysmacky.combatdrones.type.AerialBombType;
@@ -94,7 +95,7 @@ public final class ModContent {
                 Arrays.asList(lightBattery, standardBattery, heavyBattery, fragGrenade, bombLight, bomb, bombHeavy),
                 Arrays.asList(launchRamp, planeRamp, missionPlanner, fuelCan, missilePad, missileTablet),
                 Arrays.asList(rocket, rocketHeavy, rifleRounds, cannonShell, howitzerShell, aerialBombSmall, aerialBombMedium, aerialBombLarge),
-                Arrays.asList(pilotDetector, empStation, empBlast));
+                Arrays.asList(pilotDetector, empStation, empBlast, stinger, stingerMissile));
         for (int group = 0; group < groups.size(); group++) {
             int index = groups.get(group).indexOf(item);
             if (index >= 0) {
@@ -139,6 +140,8 @@ public final class ModContent {
     public static Item pilotDetector;
     public static Item empStation;
     public static Item empBlast;
+    public static Item stinger;
+    public static Item stingerMissile;
 
     private ModContent() {
     }
@@ -179,6 +182,8 @@ public final class ModContent {
         pilotDetector = register(event, named(new ItemPilotDetector(), "pilot_detector"));
         empStation = register(event, named(new ItemEmpStation(), "emp_station"));
         empBlast = register(event, named(new ItemEmpBlast(), "emp_blast"));
+        stinger = register(event, named(new ItemStinger(), "stinger"));
+        stingerMissile = register(event, simpleItem("stinger_missile"));
         // One placeable item per data-defined type; the registry name is the type ID
         for (DroneType type : DroneTypes.all()) {
             register(event, named(new ItemDrone(type.getId()), type.getId()));

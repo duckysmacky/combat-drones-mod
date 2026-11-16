@@ -50,6 +50,8 @@ public final class ModNetwork {
         CHANNEL.registerMessage(GunnerInputPacket.Handler.class, GunnerInputPacket.class, id++, Side.SERVER);
         CHANNEL.registerMessage(LockWarningPacket.Handler.class, LockWarningPacket.class, id++, Side.CLIENT);
         CHANNEL.registerMessage(DetectorPacket.Handler.class, DetectorPacket.class, id++, Side.CLIENT);
+        CHANNEL.registerMessage(StingerInputPacket.Handler.class, StingerInputPacket.class, id++, Side.SERVER);
+        CHANNEL.registerMessage(StingerStatePacket.Handler.class, StingerStatePacket.class, id++, Side.CLIENT);
     }
 
     /** After a config reload: everyone gets the new stats right away. */
