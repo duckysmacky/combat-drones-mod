@@ -74,7 +74,7 @@ public final class ModContent {
     };
 
     /** Hand-flown, then ramp-launched drones in this order; types not listed go last in their group. */
-    private static final List<String> DRONE_TAB_ORDER = Arrays.asList("racer_micro", "racer_standard", "racer_longrange", "dji_drone",
+    private static final List<String> DRONE_TAB_ORDER = Arrays.asList("racer_drone", "standard_drone", "recon_drone", "dji_drone",
             "loitering_light", "loitering_heavy", "strike_plane", "attack_plane", "gunship", "stealth_bomber", "recon_uav", "cruise_missile");
 
     /**
@@ -202,7 +202,7 @@ public final class ModContent {
 
     /**
      * Renamed items carry over: the Missile Control Tablet was briefly the Strike Laptop (link and all), and the
-     * Strike and Attack Planes were the two Gunship Planes (fuel and ammo kept).
+     * Strike and Attack Planes were the two Gunship Planes (fuel and ammo kept), the FPV drones were the three racers.
      */
     @SubscribeEvent
     public static void remapRenamedItems(RegistryEvent.MissingMappings<Item> event) {

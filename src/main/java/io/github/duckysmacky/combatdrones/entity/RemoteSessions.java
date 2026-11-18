@@ -2,6 +2,7 @@ package io.github.duckysmacky.combatdrones.entity;
 
 import io.github.duckysmacky.combatdrones.CombatDrones;
 import io.github.duckysmacky.combatdrones.ModContent;
+import io.github.duckysmacky.combatdrones.config.LockOnSettings;
 import io.github.duckysmacky.combatdrones.config.ModConfig;
 import io.github.duckysmacky.combatdrones.item.ItemMissileTablet;
 import io.github.duckysmacky.combatdrones.network.LockProgressPacket;
@@ -70,7 +71,7 @@ public final class RemoteSessions {
         final EntityPilotBody body;
         final boolean wasInvisible;
         // Sensor units: the latest camera report from the client and the lock-on in progress
-        final LockOnAttempt lockOn = new LockOnAttempt((int) Math.round(ModConfig.lockOnHoldSeconds * 20), LOCK_ON_GRACE_TICKS);
+        final LockOnAttempt lockOn;
         boolean looking;
         float lookYaw;
         float lookPitch;
@@ -94,6 +95,8 @@ public final class RemoteSessions {
             this.control = control;
             this.body = body;
             this.wasInvisible = wasInvisible;
+            LockOnSettings settings = vehicle instanceof LockOnCarrier ? ((LockOnCarrier) vehicle).getLockOnSettings() : ModConfig.uavLockOn;
+            lockOn = new LockOnAttempt(settings.holdTicks(), LOCK_ON_GRACE_TICKS);
         }
     }
 
@@ -432,7 +435,7 @@ public final class RemoteSessions {
     /** Server: a viewer's camera report (sensor units only; anything else is ignored). */
     public static void onReconLook(EntityPlayerMP player, int unitId, float yaw, float pitch, float halfWidth, float halfHeight, boolean trigger) {
         Session session = SESSIONS.get(player.getUniqueID());
-        DroneType type = session == null || !(session.vehicle instanceof EntityRampUnit) ? null : ((EntityRampUnit) session.vehicle).getDroneType();
+        DroneType type = session == null || !(session.vehicle instanceof LockOnCarrier) ? null : ((LockOnCarrier) session.vehicle).getDroneType();
         if (type == null || !type.isSensor() || session.vehicle.getEntityId() != unitId || !Float.isFinite(yaw) || !Float.isFinite(pitch)
                 || !Float.isFinite(halfWidth) || !Float.isFinite(halfHeight)) {
             return;
@@ -470,14 +473,23 @@ public final class RemoteSessions {
      * lockOnHoldSeconds locks on. Letting go or losing them fails it. Either way the attempt uses a charge.
      */
     private static void updateLock(Session session) {
-        if (!(session.vehicle instanceof EntityRampUnit)) {
+        if (!(session.vehicle instanceof LockOnCarrier)) {
             return;
         }
-        EntityRampUnit unit = (EntityRampUnit) session.vehicle;
-        DroneType type = unit.getDroneType();
-        UUID owner = unit.getOwner();
+        Entity unit = session.vehicle;
+        LockOnCarrier carrier = (LockOnCarrier) unit;
+        DroneType type = carrier.getDroneType();
+        UUID owner = carrier.getOwner();
         if (type == null || !type.isSensor() || owner == null) {
             return;
+        }
+        LockOnSettings settings = carrier.getLockOnSettings();
+        if (unit instanceof EntityHandFlownDrone) {
+            // A drone's camera is fixed to the airframe: aim from the server's orientation, not the client's report
+            // (which only brings the trigger and the view size)
+            float[] look = ((EntityHandFlownDrone) unit).cameraYawPitch();
+            session.lookYaw = look[0];
+            session.lookPitch = look[1];
         }
         boolean fresh = hasFreshLook(session);
         if (!session.trigger) {
@@ -485,24 +497,25 @@ public final class RemoteSessions {
         }
         if (session.lockOn.isRunning()) {
             Entity target = unit.world.getEntityByID(session.lockOn.getTarget());
-            boolean onTarget = fresh && target != null && ReconIntel.isEnemy(owner, target) && aimAngle(session, unit, target) >= 0;
+            boolean onTarget = fresh && target != null && ReconIntel.isEnemy(owner, target, settings.trackNonPlayers)
+                    && aimAngle(session, unit, target, settings) >= 0;
             LockOnAttempt.Result result = session.lockOn.tick(onTarget, session.trigger);
             if (result == LockOnAttempt.Result.LOCKED) {
-                unit.spendLockCharge();
-                ReconIntel.lock(owner, target, unit.getUniqueID());
+                carrier.spendLockCharge();
+                ReconIntel.lock(owner, target, unit.getUniqueID(), settings);
                 session.lockedShowTicks = LOCKED_SHOW_TICKS;
                 session.needsRelease = true;
                 session.player.sendStatusMessage(new TextComponentTranslation("message.combat_drones.recon.locked", target.getName()), true);
             } else if (result == LockOnAttempt.Result.FAILED) {
-                unit.spendLockCharge();
+                carrier.spendLockCharge();
                 session.needsRelease = true;
                 session.player.sendStatusMessage(new TextComponentTranslation("message.combat_drones.recon.lock_failed"), true);
             }
-        } else if (fresh && session.trigger && !session.needsRelease && ModConfig.lockOnEnabled) {
-            Entity candidate = lockCandidate(session, unit, owner);
+        } else if (fresh && session.trigger && !session.needsRelease && settings.lockOnEnabled) {
+            Entity candidate = lockCandidate(session, unit, owner, settings);
             if (candidate != null) {
-                String refused = unit.getLockCharges() <= 0 ? "message.combat_drones.recon.no_charges"
-                        : ModConfig.maxActiveLockOns > 0 && ReconIntel.activeLockOns(unit.getUniqueID()) >= ModConfig.maxActiveLockOns
+                String refused = carrier.getLockCharges() <= 0 ? "message.combat_drones.recon.no_charges"
+                        : settings.maxActiveLockOns > 0 && ReconIntel.activeLockOns(unit.getUniqueID()) >= settings.maxActiveLockOns
                         ? "message.combat_drones.recon.lock_limit" : null;
                 if (refused == null) {
                     session.lockOn.start(candidate.getEntityId());
@@ -512,7 +525,7 @@ public final class RemoteSessions {
                 }
             }
         }
-        warnTarget(session, unit);
+        warnTarget(session, unit, settings);
         float progress;
         if (session.lockedShowTicks > 0) {
             session.lockedShowTicks--;
@@ -530,12 +543,12 @@ public final class RemoteSessions {
 
     /** Leaving the camera (or the unit going down) mid-attempt counts as a failed one. */
     private static void abandonLockOn(Session session) {
-        if (session.lockOn.isRunning() && session.vehicle instanceof EntityRampUnit) {
+        if (session.lockOn.isRunning() && session.vehicle instanceof LockOnCarrier) {
             session.lockOn.start(LockOnAttempt.NONE);
-            ((EntityRampUnit) session.vehicle).spendLockCharge();
+            ((LockOnCarrier) session.vehicle).spendLockCharge();
         }
-        if (session.vehicle instanceof EntityRampUnit) {
-            warnTarget(session, (EntityRampUnit) session.vehicle);
+        if (session.vehicle instanceof LockOnCarrier) {
+            warnTarget(session, session.vehicle, ((LockOnCarrier) session.vehicle).getLockOnSettings());
         }
     }
 
@@ -543,8 +556,8 @@ public final class RemoteSessions {
      * Keeps the player a running attempt is after (with lockOnWarning) told how far it is, every few ticks, and tells
      * them when it stops.
      */
-    private static void warnTarget(Session session, EntityRampUnit unit) {
-        Entity target = session.lockOn.isRunning() && ModConfig.lockOnWarning ? unit.world.getEntityByID(session.lockOn.getTarget()) : null;
+    private static void warnTarget(Session session, Entity unit, LockOnSettings settings) {
+        Entity target = session.lockOn.isRunning() && settings.lockOnWarning ? unit.world.getEntityByID(session.lockOn.getTarget()) : null;
         EntityPlayerMP warned = target == null ? null : ReconIntel.warneeOf(target);
         if (session.warned != null && session.warned != warned && !session.warned.hasDisconnected()) {
             ModNetwork.CHANNEL.sendTo(new LockWarningPacket(false, 0), session.warned);
@@ -557,16 +570,16 @@ public final class RemoteSessions {
 
     /** The enemy closest to the crosshair that a lock-on could start on (not one this owner already has), or null. */
     @Nullable
-    private static Entity lockCandidate(Session session, EntityRampUnit unit, UUID owner) {
+    private static Entity lockCandidate(Session session, Entity unit, UUID owner, LockOnSettings settings) {
         Vec3d eye = ReconIntel.sensorPosition(unit);
-        AxisAlignedBB area = new AxisAlignedBB(eye.x, eye.y, eye.z, eye.x, eye.y, eye.z).grow(ModConfig.lockOnRange);
+        AxisAlignedBB area = new AxisAlignedBB(eye.x, eye.y, eye.z, eye.x, eye.y, eye.z).grow(settings.lockOnRange);
         Entity best = null;
         double bestAngle = Double.MAX_VALUE;
-        for (Entity target : unit.world.getEntitiesWithinAABB(Entity.class, area, entity -> ReconIntel.isEnemy(owner, entity))) {
+        for (Entity target : unit.world.getEntitiesWithinAABB(Entity.class, area, entity -> ReconIntel.isEnemy(owner, entity, settings.trackNonPlayers))) {
             if (ReconIntel.isLockedBy(owner, target.getUniqueID())) {
                 continue;
             }
-            double angle = aimAngle(session, unit, target);
+            double angle = aimAngle(session, unit, target, settings);
             if (angle >= 0 && angle < bestAngle) {
                 best = target;
                 bestAngle = angle;
@@ -579,17 +592,17 @@ public final class RemoteSessions {
      * Degrees between the camera line and {@code target} if it counts as under the crosshair (within lockOnConeDegrees,
      * or the camera line passes through its hitbox grown by lockOnAimMargin) in range and in sight; else -1.
      */
-    private static double aimAngle(Session session, EntityRampUnit unit, Entity target) {
+    private static double aimAngle(Session session, Entity unit, Entity target, LockOnSettings settings) {
         Vec3d eye = ReconIntel.sensorPosition(unit);
-        double range = ModConfig.lockOnRange;
+        double range = settings.lockOnRange;
         if (target.getDistanceSq(eye.x, eye.y, eye.z) > range * range) {
             return -1;
         }
         Vec3d look = Vec3d.fromPitchYaw(session.lookPitch, session.lookYaw);
         Vec3d toTarget = new Vec3d(target.posX - eye.x, target.posY + target.height / 2 - eye.y, target.posZ - eye.z);
         double angle = LockOnAttempt.angleBetween(look.x, look.y, look.z, toTarget.x, toTarget.y, toTarget.z);
-        boolean aimed = angle <= ModConfig.lockOnConeDegrees
-                || target.getEntityBoundingBox().grow(ModConfig.lockOnAimMargin).calculateIntercept(eye, eye.add(look.scale(range))) != null;
+        boolean aimed = angle <= settings.lockOnConeDegrees
+                || target.getEntityBoundingBox().grow(settings.lockOnAimMargin).calculateIntercept(eye, eye.add(look.scale(range))) != null;
         return aimed && ReconIntel.hasLineOfSight(unit.world, eye, target) ? angle : -1;
     }
 

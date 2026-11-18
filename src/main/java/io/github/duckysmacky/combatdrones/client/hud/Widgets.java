@@ -2,6 +2,7 @@ package io.github.duckysmacky.combatdrones.client.hud;
 
 import io.github.duckysmacky.combatdrones.client.ClientIntel;
 import io.github.duckysmacky.combatdrones.entity.EntityRampUnit;
+import io.github.duckysmacky.combatdrones.entity.LockOnCarrier;
 import io.github.duckysmacky.combatdrones.entity.Raytrace;
 import io.github.duckysmacky.combatdrones.network.IntelPacket;
 import net.minecraft.client.Minecraft;
@@ -203,7 +204,7 @@ public final class Widgets {
      * Recon lock-on charges left, with the time to the next one (or HOLD while a lock-on keeps the reload waiting) and a
      * reload bar under it. Returns the y for the next line.
      */
-    public static int lockCharges(EntityRampUnit unit, int right, int y) {
+    public static int lockCharges(LockOnCarrier unit, int right, int y) {
         int charges = unit.getLockCharges();
         int max = unit.getLockMaxCharges();
         int reload = unit.getLockReloadLeft();
@@ -220,7 +221,7 @@ public final class Widgets {
     }
 
     /** A thin bar under the reticle while the next lock-on charge reloads, like a weapon's. */
-    public static void lockReload(EntityRampUnit unit, int x, int y, int width) {
+    public static void lockReload(LockOnCarrier unit, int x, int y, int width) {
         if (unit.getLockCharges() < unit.getLockMaxCharges()) {
             Ui.bar(x, y, width, 1, unit.getLockReloadFraction(), unit.getLockReloadLeft() < 0 ? Ui.DIM : Ui.WARN);
         }

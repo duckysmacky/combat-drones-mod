@@ -1,6 +1,7 @@
 package io.github.duckysmacky.combatdrones.entity;
 
 import io.github.duckysmacky.combatdrones.CombatDrones;
+import io.github.duckysmacky.combatdrones.config.LockOnSettings;
 import io.github.duckysmacky.combatdrones.config.ModConfig;
 import io.github.duckysmacky.combatdrones.network.IntelPacket;
 import io.github.duckysmacky.combatdrones.network.LockWarningPacket;
@@ -101,11 +102,16 @@ public final class ReconIntel {
         final long until;
         /** The UAV that locked it, for its active lock-on count. */
         final UUID source;
+        /** The source's lockOnForAllies and lockedWarning when it locked on. */
+        final boolean forAllies;
+        final boolean warn;
 
-        LockOn(Mark mark, long until, UUID source) {
+        LockOn(Mark mark, long until, UUID source, boolean forAllies, boolean warn) {
             this.mark = mark;
             this.until = until;
             this.source = source;
+            this.forAllies = forAllies;
+            this.warn = warn;
         }
     }
 
@@ -140,7 +146,7 @@ public final class ReconIntel {
         Vec3d eye = sensorPosition(unit);
         AxisAlignedBB area = new AxisAlignedBB(eye.x, eye.y, eye.z, eye.x, eye.y, eye.z).grow(radius);
         List<Mark> seen = new ArrayList<>();
-        for (Entity target : unit.world.getEntitiesWithinAABB(Entity.class, area, entity -> isEnemy(owner, entity))) {
+        for (Entity target : unit.world.getEntitiesWithinAABB(Entity.class, area, entity -> isEnemy(owner, entity, ModConfig.uavLockOn.trackNonPlayers))) {
             double reach = target.isSneaking() ? radius / 2 : radius;
             if (target.getDistanceSq(eye.x, eye.y, eye.z) <= reach * reach
                     && (!ModConfig.trackingNeedsPilot || RemoteSessions.isOnScreen(unit, eye, target))
@@ -155,16 +161,16 @@ public final class ReconIntel {
         return ModConfig.trackingIntervalSeconds <= 0 ? LIVE_SWEEP_TICKS : Math.max(1, (int) Math.round(ModConfig.trackingIntervalSeconds * 20));
     }
 
-    static Vec3d sensorPosition(EntityRampUnit unit) {
+    static Vec3d sensorPosition(Entity unit) {
         return new Vec3d(unit.posX, unit.posY + unit.height / 2, unit.posZ);
     }
 
     /**
      * Whether {@code entity} is someone a recon owned by {@code owner} tracks: any visible player (not spectating)
-     * who isn't a teammate, a non-teammate's stand-in body, or with trackNonPlayers any other living thing. Invisible
-     * players, remote pilots riding their units included, stay hidden.
+     * who isn't a teammate, a non-teammate's stand-in body, or with {@code nonPlayers} (trackNonPlayers) any other living
+     * thing. Invisible players, remote pilots riding their units included, stay hidden.
      */
-    static boolean isEnemy(UUID owner, @Nullable Entity entity) {
+    static boolean isEnemy(UUID owner, @Nullable Entity entity, boolean nonPlayers) {
         if (entity == null || !entity.isEntityAlive()) {
             return false;
         }
@@ -173,7 +179,7 @@ public final class ReconIntel {
             return !Teams.isTeammate(owner, player) && !player.isSpectator() && !player.isInvisible();
         }
         if (!(entity instanceof EntityPilotBody)) {
-            return ModConfig.trackNonPlayers && entity instanceof EntityLivingBase && !(entity instanceof EntityArmorStand) && !entity.isInvisible();
+            return nonPlayers && entity instanceof EntityLivingBase && !(entity instanceof EntityArmorStand) && !entity.isInvisible();
         }
         UUID bodyOwner = ((EntityPilotBody) entity).getOwner();
         if (bodyOwner == null || owner.equals(bodyOwner)) {
@@ -193,9 +199,9 @@ public final class ReconIntel {
         return Raytrace.blocks(world, from, eyes) == null || Raytrace.blocks(world, from, middle) == null;
     }
 
-    /** A lock-on by {@code source} (a UAV): the target is followed live for lockOnDurationSeconds. */
-    static void lock(UUID owner, Entity target, UUID source) {
-        addLockOn(owner, new LockOn(Mark.of(target), clock() + (long) (ModConfig.lockOnDurationSeconds * 20), source));
+    /** A lock-on by {@code source} (a recon vehicle): the target is followed live for lockOnDurationSeconds. */
+    static void lock(UUID owner, Entity target, UUID source, LockOnSettings settings) {
+        addLockOn(owner, new LockOn(Mark.of(target), clock() + settings.durationTicks(), source, settings.lockOnForAllies, settings.lockedWarning));
     }
 
     static void addLockOn(UUID owner, LockOn lockOn) {
@@ -226,12 +232,12 @@ public final class ReconIntel {
         return count;
     }
 
-    /** Ticks left on the longest lock-on anyone has on {@code player} (or their stand-in body), or 0. */
+    /** Ticks left on the longest lock-on with a banner (lockedWarning) anyone has on {@code player} (or their stand-in body), or 0. */
     private static long lockedTicksLeft(UUID player, long now) {
         long left = 0;
         for (Map<UUID, LockOn> owned : LOCK_ONS.values()) {
             for (LockOn lockOn : owned.values()) {
-                if (player.equals(lockOn.mark.warnee)) {
+                if (lockOn.warn && player.equals(lockOn.mark.warnee)) {
                     left = Math.max(left, lockOn.until - now);
                 }
             }
@@ -252,7 +258,7 @@ public final class ReconIntel {
 
     /** Tells each locked-on player how long it has left, when that changes (a new lock-on, or the last one ending). */
     private static void warnLocked(EntityPlayerMP player, long now) {
-        long until = ModConfig.lockedWarning ? now + lockedTicksLeft(player.getUniqueID(), now) : now;
+        long until = now + lockedTicksLeft(player.getUniqueID(), now);
         Long told = WARNED_UNTIL.get(player.getUniqueID());
         if (until > now ? told == null || told != until : told != null) {
             if (until > now) {
@@ -322,10 +328,10 @@ public final class ReconIntel {
             }
         }
         for (Map.Entry<UUID, Map<UUID, LockOn>> owner : LOCK_ONS.entrySet()) {
-            if (!sees(player, owner.getKey(), ModConfig.lockOnForAllies)) {
-                continue;
-            }
             for (LockOn lockOn : owner.getValue().values()) {
+                if (!sees(player, owner.getKey(), lockOn.forAllies)) {
+                    continue;
+                }
                 IntelPacket.Entry known = merged.get(lockOn.mark.targetId);
                 // Several lock-ons on one target: the one that lasts longest
                 if (now <= lockOn.until && lockOn.mark.dimension == player.dimension && (known == null || known.ticksLeft < lockOn.until - now)) {

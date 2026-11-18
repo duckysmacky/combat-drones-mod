@@ -1,5 +1,6 @@
 package io.github.duckysmacky.combatdrones.client.hud;
 
+import io.github.duckysmacky.combatdrones.client.ClientIntel;
 import io.github.duckysmacky.combatdrones.client.PilotController;
 import io.github.duckysmacky.combatdrones.entity.EntityHandFlownDrone;
 import io.github.duckysmacky.combatdrones.physics.HandFlownFlight;
@@ -116,6 +117,9 @@ public final class FpvFeed {
             if (payload != null) {
                 Ui.labelledRight(type.getPayload() == DroneType.PayloadKind.GRENADE ? OsdFont.Icon.GRENADE : OsdFont.Icon.BOMB, payload,
                         right, top + Ui.LINE * 2, payloadColor);
+            } else if (drone.getLockMaxCharges() > 0) {
+                // Recon Drone: lock-on charges where a payload would be, then the running lock-ons
+                Widgets.lockOns(right, Widgets.lockCharges(drone, right, top + Ui.LINE * 2));
             }
 
             Widgets.ladder(left, centerY, speed * 3.6, Widgets.SPEED_PIXELS, Widgets.SPEED_TICK, true, Ui.TEXT);
@@ -136,9 +140,11 @@ public final class FpvFeed {
             double[] euler = HandFlownFlight.toEuler(view);
             Widgets.horizon(resolution, centerX, centerY, euler[1], euler[2], Ui.TEXT, false);
             Widgets.crosshair(centerX, centerY, Ui.TEXT);
+            Widgets.lock(centerX, centerY);
         }
 
-        int warningY = centerY + 26;
+        // Below the lock-on text while a lock builds
+        int warningY = centerY + 26 + (ClientIntel.getLockProgress() > 0 ? 12 : 0);
         if (pack == null || battery <= 0) {
             warningY = Widgets.warning("hud.combat_drones.warning.battery_empty", centerX, warningY);
         } else if (battery < Widgets.LOW) {

@@ -100,7 +100,10 @@ public final class DroneType {
     private boolean impactDetonates;
     /** False for the recon UAV: no warhead or weapon, never dives or strikes (a crash can still set off its fuel). */
     private boolean armed = true;
-    /** Carries a detection sensor (recon): sweeps for enemies and lets its camera lock targets. */
+    /**
+     * Carries a detection sensor (recon): its camera locks targets. Ramp units also sweep for enemies (tracking dots);
+     * hand-flown ones only lock on. Lock-on settings: [uav] for ramp units, the type's own [<id>] table for hand-flown.
+     */
     private boolean sensor;
 
     /** Parses and validates one type file. Gson's {@code fromJson(Reader)} is lenient, so {@code //} comments are allowed. */

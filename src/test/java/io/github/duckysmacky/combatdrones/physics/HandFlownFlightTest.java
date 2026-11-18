@@ -27,6 +27,16 @@ class HandFlownFlightTest {
     }
 
     @Test
+    void fpvCameraLooksUpFromTheAirframe() {
+        // Level, facing yaw 30: the camera keeps the heading and looks 20 deg up (negative pitch, vanilla convention)
+        double[] level = HandFlownFlight.fpvCameraEuler(HandFlownFlight.fromEuler(30, 0, 0));
+        assertEquals(30, level[0], 1e-6);
+        assertEquals(-20, level[1], 1e-6);
+        // Nose down 20 deg: the camera looks straight ahead
+        assertEquals(0, HandFlownFlight.fpvCameraEuler(HandFlownFlight.fromEuler(30, 20, 0))[1], 1e-6);
+    }
+
+    @Test
     void hoverThrottleHoldsAltitude() {
         State state = run(new State(), input(HOVER_THROTTLE, 0, 0, 0, Mode.ANGLE), 100);
         assertEquals(0, state.position.y, 1e-6);

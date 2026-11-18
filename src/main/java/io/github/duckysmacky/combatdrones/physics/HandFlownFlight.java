@@ -330,6 +330,16 @@ public final class HandFlownFlight {
         return new double[] {yaw, pitch, wrapDegrees(roll)};
     }
 
+    /** Degrees the fixed FPV camera is tilted up from the airframe's forward axis. */
+    public static final double FPV_CAMERA_UPTILT = 20;
+
+    /** {yaw, pitch, roll} of the fixed FPV camera on an airframe with this orientation (see {@link #toEuler}). */
+    public static double[] fpvCameraEuler(Quat4d orientation) {
+        Quat4d view = new Quat4d(orientation);
+        view.mul(fromEuler(0, -FPV_CAMERA_UPTILT, 0));
+        return toEuler(view);
+    }
+
     /** Inverse of {@link #toEuler}. */
     public static Quat4d fromEuler(double yaw, double pitch, double roll) {
         Quat4d result = new Quat4d(0, 0, 0, 1);

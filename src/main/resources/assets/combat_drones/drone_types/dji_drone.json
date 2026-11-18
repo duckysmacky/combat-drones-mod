@@ -15,10 +15,12 @@
   "hitboxWidth": 0.7,
   "hitboxHeight": 0.3,
   "signalRange": 400,
-  "motorSoundRange": 48,
+  "motorSoundRange": 36,
   // Engine loops by distance (fractions of motorSoundRange): close, mid, far
   "sound": {
     "crossfade": 0.2,
+    // Quiet camera quad: hard to hear before it's overhead
+    "volume": 0.75,
     "bands": [
       {"event": "engine.dji.near", "until": 0.3},
       {"event": "engine.dji.mid", "until": 0.65},

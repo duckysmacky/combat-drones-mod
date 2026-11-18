@@ -30,6 +30,8 @@ import java.util.Map;
  * <ul>
  *   <li>{@code [general]}: global server balance knobs.</li>
  *   <li>{@code [uav]}: recon UAV tracking dots and lock-ons (server).</li>
+ *   <li>{@code [<id>]}: a hand-flown drone type's own table (shrapnel, grenade extras, lock-on), one for each such type
+ *       that detonates on impact or carries a sensor (server).</li>
  *   <li>{@code [pilot_detector]}: the Pilot Detector scanner (server).</li>
  *   <li>{@code [stinger]}: the Stinger anti-air launcher and its missile (server).</li>
  *   <li>{@code [emp_station]}: the EMP Field Station (server).</li>
@@ -48,22 +50,30 @@ public final class ModConfig {
     /** Keys from older versions, removed from existing files so they don't look like live settings. */
     private static final String[] RETIRED_KEYS = {"general.bombBlastPower", "missiles.missilePreparingSeconds", "missiles.inboundDelaySeconds",
             "drones.gunship_rocket", "drones.gunship_gun", "weapons.rocketBlastPower",
+            // The racers were renamed and retuned: old tables are dropped, not carried over
+            "drones.racer_micro", "drones.racer_standard", "drones.racer_longrange",
             // Recon settings moved to [uav]
             "general.detectionSweepRadius", "general.detectionDecaySeconds", "general.activeLockRange", "general.lockConeDegrees",
             "general.activeLockHoldTicks", "general.activeLockDurationSeconds", "general.reconIntelForAllies", "general.activeLockForAllies",
             "general.alwaysShowActiveLock",
             // Moved back to [general] (value carried over, see MOVED_KEYS)
-            "uav.ignoredTeams"};
+            "uav.ignoredTeams",
+            // Moved to the drones' own tables: shrapnel values carried over; the grenade bonus default changed (2.5 -> 3), so
+            // not that one
+            "general.grenadeBlastBonus", "general.racerShrapnelDamage", "general.grenadeShrapnelDamage", "general.shrapnelRadius",
+            // Short-lived during the drone rework: a shared [drone] table and lock-on stats in [drones.<id>]
+            "drone", "drones.recon_uav.lockOnHoldSeconds", "drones.recon_uav.lockOnDurationSeconds",
+            "drones.recon_drone.lockOnHoldSeconds", "drones.recon_drone.lockOnDurationSeconds"};
     /** Keys moved to another table: {old, new}. An old value is carried over unless the new key is already set. */
-    private static final String[][] MOVED_KEYS = {{"uav.ignoredTeams", "general.ignoredTeams"}};
+    private static final String[][] MOVED_KEYS = {{"uav.ignoredTeams", "general.ignoredTeams"},
+            {"general.racerShrapnelDamage", "racer_drone.shrapnelDamage"}, {"general.racerShrapnelDamage", "standard_drone.shrapnelDamage"},
+            {"general.racerShrapnelDamage", "recon_drone.shrapnelDamage"}, {"general.shrapnelRadius", "racer_drone.shrapnelRadius"},
+            {"general.shrapnelRadius", "standard_drone.shrapnelRadius"}, {"general.shrapnelRadius", "recon_drone.shrapnelRadius"},
+            {"general.grenadeShrapnelDamage", "standard_drone.grenadeShrapnelDamage"}};
 
     // [general]
     public static boolean blockDamageEnabled = true;
-    public static double grenadeBlastBonus = 2.5;
     public static double droneDamageTakenMultiplier = 1.0;
-    public static double racerShrapnelDamage = 6.0;
-    public static double grenadeShrapnelDamage = 5.0;
-    public static double shrapnelRadius = 7.0;
     public static int maxWaypointsPerRoute = 16;
     public static double maxRouteAltitude = 120.0;
     public static double maxRouteLength = 3000.0;
@@ -71,6 +81,7 @@ public final class ModConfig {
     public static double minLaunchFuel = 0.25;
     public static double lowFuelFraction = 0.15;
     public static double maxMarkDistance = 256.0;
+
     public static double designateRange = 512.0;
     public static double boostSpeedMultiplier = 1.5;
     public static double boostFuelMultiplier = 4.0;
@@ -85,20 +96,10 @@ public final class ModConfig {
     public static double trackingIntervalSeconds = 3.0;
     public static boolean trackingNeedsPilot = true;
     public static boolean trackingDotsForAllies = true;
-    public static boolean lockOnEnabled = true;
-    public static double lockOnRange = 192.0;
-    public static double lockOnConeDegrees = 6.0;
-    public static double lockOnAimMargin = 1.5;
-    public static double lockOnHoldSeconds = 5.0;
-    public static double lockOnDurationSeconds = 60.0;
-    public static int lockOnCharges = 3;
-    public static double lockOnReloadSeconds = 30.0;
-    public static int maxActiveLockOns = 1;
-    public static boolean reloadDuringLockOn = false;
-    public static boolean lockOnForAllies = true;
-    public static boolean lockOnWarning = true;
-    public static boolean lockedWarning = true;
-    public static boolean trackNonPlayers = false;
+    public static LockOnSettings uavLockOn = new LockOnSettings(5.0, 60.0);
+
+    // [<id>] per hand-flown drone type, by type ID
+    private static Map<String, DroneSettings> droneTables = Collections.emptyMap();
 
     // [pilot_detector]
     public static double detectorRange = 32.0;
@@ -193,6 +194,7 @@ public final class ModConfig {
      * this must stay below the fields). "Default: X" comments must record these, not whatever was loaded last.
      */
     private static final Map<Field, Object> COMPILED_DEFAULTS = currentValues();
+    private static final DroneSettings DEFAULT_DRONE_TABLE = new DroneSettings();
     @Nullable
     private static File configDirectory;
 
@@ -203,7 +205,9 @@ public final class ModConfig {
         Map<Field, Object> values = new LinkedHashMap<>();
         for (Field field : ModConfig.class.getDeclaredFields()) {
             int modifiers = field.getModifiers();
-            if (Modifier.isStatic(modifiers) && !Modifier.isFinal(modifiers) && (field.getType().isPrimitive() || field.getType() == List.class || field.getType() == String.class)) {
+            Class<?> type = field.getType();
+            if (Modifier.isStatic(modifiers) && !Modifier.isFinal(modifiers)
+                    && (type.isPrimitive() || type == List.class || type == String.class || type == Map.class || type == LockOnSettings.class)) {
                 try {
                     values.put(field, field.get(null));
                 } catch (IllegalAccessException e) {
@@ -227,8 +231,8 @@ public final class ModConfig {
     /**
      * Re-reads the file in game: back to compiled defaults and bundled drone stats, then load as at startup. If the
      * file can't be read (a TOML syntax error, say), everything goes back to the values in use before and the error
-     * is rethrown for the caller to report. Returns the settings that changed, as "name: old -> new" (drone, battery
-     * and bomb tables aren't listed).
+     * is rethrown for the caller to report. Returns the settings that changed, as "name: old -> new" ([drones.<id>],
+     * battery and bomb tables aren't listed).
      */
     public static List<String> reload() {
         if (configDirectory == null) {
@@ -247,12 +251,35 @@ public final class ModConfig {
         }
         List<String> changes = new ArrayList<>();
         for (Map.Entry<Field, Object> now : currentValues().entrySet()) {
-            Object before = previous.get(now.getKey());
-            if (!now.getValue().equals(before)) {
-                changes.add(now.getKey().getName() + ": " + before + " -> " + now.getValue());
-            }
+            describeChanges(now.getKey().getName(), previous.get(now.getKey()), now.getValue(), changes);
         }
         return changes;
+    }
+
+    /** Adds "name: old -> new" if the value changed; per-drone tables and settings objects are compared key by key. */
+    static void describeChanges(String name, @Nullable Object before, Object now, List<String> changes) {
+        if (now instanceof Map) {
+            Map<?, ?> was = before instanceof Map ? (Map<?, ?>) before : Collections.emptyMap();
+            for (Map.Entry<?, ?> entry : ((Map<?, ?>) now).entrySet()) {
+                describeChanges(String.valueOf(entry.getKey()), was.get(entry.getKey()), entry.getValue(), changes);
+            }
+        } else if (now instanceof LockOnSettings || now instanceof DroneSettings) {
+            for (Field field : now.getClass().getFields()) {
+                try {
+                    describeChanges(name + "." + field.getName(), before == null ? null : field.get(before), field.get(now), changes);
+                } catch (IllegalAccessException e) {
+                    throw new IllegalStateException(e);
+                }
+            }
+        } else if (!now.equals(before)) {
+            changes.add(name + ": " + before + " -> " + now);
+        }
+    }
+
+    /** A hand-flown drone type's own table; compiled defaults for a type without one. */
+    public static DroneSettings droneSettings(@Nullable DroneType type) {
+        DroneSettings settings = type == null ? null : droneTables.get(type.getId());
+        return settings != null ? settings : DEFAULT_DRONE_TABLE;
     }
 
     /**
@@ -301,13 +328,6 @@ public final class ModConfig {
             }
 
             blockDamageEnabled = defaults.get("general.blockDamageEnabled", blockDamageEnabled, "Whether drone and munition explosions break blocks.");
-            grenadeBlastBonus = defaults.number("general.grenadeBlastBonus", grenadeBlastBonus, 0, 20,
-                    "Extra blast power per Fragmentation Grenade attached to a racer (vanilla TNT = 4).");
-            racerShrapnelDamage = defaults.number("general.racerShrapnelDamage", racerShrapnelDamage, 0, 40,
-                    "Shrapnel damage (half-hearts) at point blank when a racer detonates; falls off to 0 at shrapnelRadius, needs line of sight.");
-            grenadeShrapnelDamage = defaults.number("general.grenadeShrapnelDamage", grenadeShrapnelDamage, 0, 40,
-                    "Extra shrapnel damage per Fragmentation Grenade the racer carries.");
-            shrapnelRadius = defaults.number("general.shrapnelRadius", shrapnelRadius, 0, 20, "Reach of racer shrapnel, in blocks.");
             maxWaypointsPerRoute = (int) defaults.number("general.maxWaypointsPerRoute", maxWaypointsPerRoute, 1, 64,
                     "Most waypoints a Mission Planner route may have.");
             maxRouteAltitude = defaults.number("general.maxRouteAltitude", maxRouteAltitude, 10, 250,
@@ -354,34 +374,15 @@ public final class ModConfig {
                             + "enemy in the UAV's sight gets a dot, watched or not.");
             trackingDotsForAllies = defaults.get("uav.trackingDotsForAllies", trackingDotsForAllies,
                     "Owner's vanilla scoreboard teammates also see the tracking dots (and the planner map dots). Off: only the owner.");
-            lockOnEnabled = defaults.get("uav.lockOnEnabled", lockOnEnabled,
-                    "Lock-on from the UAV camera: hold LMB with the crosshair on an enemy for lockOnHoldSeconds to box them through "
-                            + "walls for lockOnDurationSeconds.");
-            lockOnRange = defaults.number("uav.lockOnRange", lockOnRange, 8, 512, "How far the UAV camera can lock on, in blocks.");
-            lockOnConeDegrees = defaults.number("uav.lockOnConeDegrees", lockOnConeDegrees, 0.5, 20,
-                    "How close to the crosshair a target counts as aimed at, in degrees.");
-            lockOnAimMargin = defaults.number("uav.lockOnAimMargin", lockOnAimMargin, 0, 5,
-                    "Blocks added around a target's hitbox when checking whether the crosshair is on it (aim help with a moving camera).");
-            lockOnHoldSeconds = defaults.number("uav.lockOnHoldSeconds", lockOnHoldSeconds, 0.5, 30,
-                    "How long the crosshair must stay on the target, LMB held, to lock on, in seconds.");
-            lockOnDurationSeconds = defaults.number("uav.lockOnDurationSeconds", lockOnDurationSeconds, 1, 600,
-                    "How long a lock-on lasts, in seconds. The target stays boxed even out of the UAV's sight.");
-            lockOnCharges = (int) defaults.number("uav.lockOnCharges", lockOnCharges, 1, 20,
-                    "Lock-on charges a UAV carries. Every attempt uses one, failed or not.");
-            lockOnReloadSeconds = defaults.number("uav.lockOnReloadSeconds", lockOnReloadSeconds, 1, 600,
-                    "Seconds to win back one spent charge (one at a time).");
-            maxActiveLockOns = (int) defaults.number("uav.maxActiveLockOns", maxActiveLockOns, 0, 20,
-                    "Most lock-ons one UAV may have running at once. 0 = no limit.");
-            reloadDuringLockOn = defaults.get("uav.reloadDuringLockOn", reloadDuringLockOn,
-                    "Charges reload while the UAV has a lock-on running. Off: the reload waits until it ends.");
-            lockOnForAllies = defaults.get("uav.lockOnForAllies", lockOnForAllies,
-                    "Owner's vanilla scoreboard teammates also see locked-on targets boxed. Off: only the owner.");
-            lockOnWarning = defaults.get("uav.lockOnWarning", lockOnWarning,
-                    "A player being locked on gets a blinking warning and beeps while the lock-on builds.");
-            lockedWarning = defaults.get("uav.lockedWarning", lockedWarning,
-                    "A locked-on player gets a banner at the top of the screen for as long as the lock-on lasts.");
-            trackNonPlayers = defaults.get("uav.trackNonPlayers", trackNonPlayers,
-                    "Mobs and other living non-players can be tracked and locked on too, shown in yellow. Mostly for testing.");
+            uavLockOn = loadLockOn(defaults, "uav", "UAV", uavLockOn);
+
+            Map<String, DroneSettings> tables = new LinkedHashMap<>();
+            for (DroneType type : DroneTypes.all()) {
+                if (type.getCategory() == DroneType.Category.HAND_FLOWN && (type.isImpactDetonates() || type.isSensor())) {
+                    tables.put(type.getId(), loadDroneTable(defaults, type));
+                }
+            }
+            droneTables = tables;
 
             detectorRange = defaults.number("pilot_detector.range", detectorRange, 4, 256,
                     "How far a scan reaches, in blocks: pilots' stand-in bodies within it get a dot.");
@@ -582,7 +583,8 @@ public final class ModConfig {
                     + "carpetIntervalTicks: ticks between bombs in a carpet run flown by the autopilot.");
             defaults.comment("drones", "Per-drone-type stats. Units: speed in blocks/tick (1 = 72 km/h), acceleration in blocks/tick², "
                     + "capacity (with a Standard pack) and drain in charge units (full-throttle flight time = capacity / drain ticks), blastPower on the vanilla "
-                    + "scale (TNT = 4), maxHP like mob health, signalRange and motorSoundRange in blocks.");
+                    + "scale (TNT = 4), maxHP like mob health, signalRange and motorSoundRange in blocks. Hand-flown types' shrapnel, grenade "
+                    + "and lock-on settings are in their own [<id>] table.");
 
             if (defaults.changed) {
                 config.save();
@@ -617,6 +619,72 @@ public final class ModConfig {
                 "How many drone/plane engines you hear at once: the nearest ones in earshot. Each takes up to 3 sound channels.");
         maxProjectileSounds = (int) defaults.number("client.maxProjectileSounds", (Integer) compiledDefault("maxProjectileSounds"), 1, 32,
                 "How many rockets, shells and bombs in flight you hear at once: the nearest ones in earshot.");
+    }
+
+    /** The lock-on keys of {@code table}; {@code unit} names the vehicle in their comments. */
+    private static LockOnSettings loadLockOn(Defaults defaults, String table, String unit, LockOnSettings fallback) {
+        String key = table + ".";
+        LockOnSettings settings = new LockOnSettings(fallback.lockOnHoldSeconds, fallback.lockOnDurationSeconds);
+        settings.lockOnEnabled = defaults.get(key + "lockOnEnabled", fallback.lockOnEnabled,
+                "Lock-on from the " + unit + " camera: hold LMB with the crosshair on an enemy for lockOnHoldSeconds to box them through "
+                        + "walls for lockOnDurationSeconds.");
+        settings.lockOnRange = defaults.number(key + "lockOnRange", fallback.lockOnRange, 8, 512,
+                "How far the " + unit + " camera can lock on, in blocks.");
+        settings.lockOnConeDegrees = defaults.number(key + "lockOnConeDegrees", fallback.lockOnConeDegrees, 0.5, 20,
+                "How close to the crosshair a target counts as aimed at, in degrees.");
+        settings.lockOnAimMargin = defaults.number(key + "lockOnAimMargin", fallback.lockOnAimMargin, 0, 5,
+                "Blocks added around a target's hitbox when checking whether the crosshair is on it (aim help with a moving camera).");
+        settings.lockOnHoldSeconds = defaults.number(key + "lockOnHoldSeconds", fallback.lockOnHoldSeconds, 0.5, 30,
+                "How long the crosshair must stay on the target, LMB held, to lock on, in seconds.");
+        settings.lockOnDurationSeconds = defaults.number(key + "lockOnDurationSeconds", fallback.lockOnDurationSeconds, 1, 600,
+                "How long a lock-on lasts, in seconds. The target stays boxed even out of the " + unit + "'s sight.");
+        settings.lockOnCharges = (int) defaults.number(key + "lockOnCharges", fallback.lockOnCharges, 1, 20,
+                "Lock-on charges a " + unit + " carries. Every attempt uses one, failed or not.");
+        settings.lockOnReloadSeconds = defaults.number(key + "lockOnReloadSeconds", fallback.lockOnReloadSeconds, 1, 600,
+                "Seconds to win back one spent charge (one at a time).");
+        settings.maxActiveLockOns = (int) defaults.number(key + "maxActiveLockOns", fallback.maxActiveLockOns, 0, 20,
+                "Most lock-ons one " + unit + " may have running at once. 0 = no limit.");
+        settings.reloadDuringLockOn = defaults.get(key + "reloadDuringLockOn", fallback.reloadDuringLockOn,
+                "Charges reload while the " + unit + " has a lock-on running. Off: the reload waits until it ends.");
+        settings.lockOnForAllies = defaults.get(key + "lockOnForAllies", fallback.lockOnForAllies,
+                "Owner's vanilla scoreboard teammates also see locked-on targets boxed. Off: only the owner.");
+        settings.lockOnWarning = defaults.get(key + "lockOnWarning", fallback.lockOnWarning,
+                "A player being locked on gets a blinking warning and beeps while the lock-on builds.");
+        settings.lockedWarning = defaults.get(key + "lockedWarning", fallback.lockedWarning,
+                "A locked-on player gets a banner at the top of the screen for as long as the lock-on lasts.");
+        settings.trackNonPlayers = defaults.get(key + "trackNonPlayers", fallback.trackNonPlayers,
+                "Mobs and other living non-players can be " + ("uav".equals(table) ? "tracked and " : "") + "locked on too, shown in "
+                        + "yellow. Mostly for testing.");
+        return settings;
+    }
+
+    /** A hand-flown type's own table: only the keys that apply to it are read and written. */
+    private static DroneSettings loadDroneTable(Defaults defaults, DroneType type) {
+        String table = type.getId();
+        DroneSettings fallback = new DroneSettings();
+        DroneSettings settings = new DroneSettings();
+        List<String> parts = new ArrayList<>();
+        if (type.isImpactDetonates()) {
+            parts.add("impact shrapnel");
+            settings.shrapnelDamage = defaults.number(table + ".shrapnelDamage", fallback.shrapnelDamage, 0, 40,
+                    "Shrapnel damage (half-hearts) at point blank when it detonates; falls off to 0 at shrapnelRadius, needs line of sight.");
+            settings.shrapnelRadius = defaults.number(table + ".shrapnelRadius", fallback.shrapnelRadius, 0, 20,
+                    "Reach of its shrapnel, in blocks.");
+        }
+        if (type.getPayload() == DroneType.PayloadKind.GRENADE) {
+            parts.add("Fragmentation Grenade extras");
+            settings.grenadeBlastBonus = defaults.number(table + ".grenadeBlastBonus", fallback.grenadeBlastBonus, 0, 20,
+                    "Extra blast power per Fragmentation Grenade attached (vanilla TNT = 4).");
+            settings.grenadeShrapnelDamage = defaults.number(table + ".grenadeShrapnelDamage", fallback.grenadeShrapnelDamage, 0, 40,
+                    "Extra shrapnel damage per Fragmentation Grenade attached.");
+        }
+        if (type.isSensor()) {
+            parts.add("lock-on from its camera (its own settings, apart from the UAV's)");
+            settings.lockOn = loadLockOn(defaults, table, "drone", fallback.lockOn);
+        }
+        defaults.comment(table, "Hand-flown drone " + table + ": " + String.join(", ", parts) + ". Its flight stats are in [drones."
+                + table + "].");
+        return settings;
     }
 
     private static void applyDroneTable(Defaults defaults, DroneType type) {

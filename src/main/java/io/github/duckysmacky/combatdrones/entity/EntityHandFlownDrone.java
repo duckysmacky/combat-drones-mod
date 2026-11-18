@@ -3,6 +3,8 @@ package io.github.duckysmacky.combatdrones.entity;
 import io.github.duckysmacky.combatdrones.CombatDrones;
 import io.github.duckysmacky.combatdrones.ModContent;
 import io.github.duckysmacky.combatdrones.ModSounds;
+import io.github.duckysmacky.combatdrones.config.DroneSettings;
+import io.github.duckysmacky.combatdrones.config.LockOnSettings;
 import io.github.duckysmacky.combatdrones.config.ModConfig;
 import io.github.duckysmacky.combatdrones.item.ItemBattery;
 import io.github.duckysmacky.combatdrones.item.ItemBomb;
@@ -52,7 +54,7 @@ import java.util.UUID;
  * Shared entity for every HAND_FLOWN drone type (FPV racers, DJI drone); behaviour differences come from
  * its {@link DroneType}. The server owns the flight state; the pilot's client predicts it (see client code).
  */
-public class EntityHandFlownDrone extends Entity implements ChunkAnchor.Holder {
+public class EntityHandFlownDrone extends Entity implements ChunkAnchor.Holder, LockOnCarrier {
     /** Impact speed (blocks/tick) below which a collision is a landing, not a crash. */
     static final double ARM_SPEED = 0.25;
     /** Crash damage per block/tick of impact speed for drones that don't detonate. */
@@ -78,10 +80,23 @@ public class EntityHandFlownDrone extends Entity implements ChunkAnchor.Holder {
     private static final DataParameter<Integer> PAYLOAD = EntityDataManager.createKey(EntityHandFlownDrone.class, DataSerializers.VARINT);
     /** Thrust as a fraction of maximum, for motor sound pitch on every client. */
     private static final DataParameter<Float> THRUST = EntityDataManager.createKey(EntityHandFlownDrone.class, DataSerializers.FLOAT);
+    /**
+     * The flight mode ordinal (-1 = never flown with motors on) and stick throttle it last flew with motors on, so a
+     * pilot taking over again carries on in the same mode.
+     */
+    private static final DataParameter<Integer> FLIGHT_MODE = EntityDataManager.createKey(EntityHandFlownDrone.class, DataSerializers.VARINT);
+    private static final DataParameter<Float> FLIGHT_THROTTLE = EntityDataManager.createKey(EntityHandFlownDrone.class, DataSerializers.FLOAT);
+    /** Sensor types (Recon Drone): lock-on charges, synced for the HUD (see SyncedLockCharges). */
+    private static final DataParameter<Integer> LOCK_RELOAD_LENGTH = EntityDataManager.createKey(EntityHandFlownDrone.class, DataSerializers.VARINT);
+    private static final DataParameter<Integer> LOCK_MAX = EntityDataManager.createKey(EntityHandFlownDrone.class, DataSerializers.VARINT);
+    private static final DataParameter<Integer> LOCK_CHARGES = EntityDataManager.createKey(EntityHandFlownDrone.class, DataSerializers.VARINT);
+    private static final DataParameter<Integer> LOCK_READY_TICK = EntityDataManager.createKey(EntityHandFlownDrone.class, DataSerializers.VARINT);
+    private static final SyncedLockCharges.Keys LOCK_KEYS = new SyncedLockCharges.Keys(LOCK_MAX, LOCK_CHARGES, LOCK_READY_TICK, LOCK_RELOAD_LENGTH);
     private static final String OUT_OF_RANGE = "message.combat_drones.out_of_range";
     /** Inputs the server holds ahead of simulation; anything beyond this is dropped (per-drone rate limit). */
     private static final int MAX_QUEUED_INPUTS = 3;
     private final ChunkAnchor anchor = new ChunkAnchor(this);
+    private final SyncedLockCharges lockCharges = new SyncedLockCharges(this, LOCK_KEYS);
 
     protected final HandFlownFlight.State flightState = new HandFlownFlight.State();
     @Nullable
@@ -103,9 +118,10 @@ public class EntityHandFlownDrone extends Entity implements ChunkAnchor.Holder {
     private int triggerCooldown;
     private static final int TRIGGER_COOLDOWN_TICKS = 10;
     /**
-     * Set when the link dropped because the drone flew out of range: it keeps flying on the pilot's last input
-     * instead of hovering, so losing signal is a real risk (a racer just carries on until it hits something).
-     * ponytail: not saved to NBT; a drifting drone that gets unloaded resumes as a normal unattended drone.
+     * Set whenever the pilot leaves (G, out of range, goggles off, remote away, death, logout): it keeps flying on the
+     * pilot's last input instead of hovering, so leaving a drone mid-flight is a real risk (a racer just carries on
+     * until it hits something).
+     * shortcut: not saved to NBT; a drifting drone that gets unloaded resumes in hover hold.
      */
     @Nullable
     private HandFlownFlight.Input driftInput;
@@ -149,8 +165,11 @@ public class EntityHandFlownDrone extends Entity implements ChunkAnchor.Holder {
         dataManager.register(EMP_DISABLED, false);
         dataManager.register(BATTERY_PACK, -1);
         dataManager.register(THRUST, 0.0F);
+        dataManager.register(FLIGHT_MODE, -1);
+        dataManager.register(FLIGHT_THROTTLE, 0.0F);
         dataManager.register(HEALTH_FRACTION, 1.0F);
         dataManager.register(PAYLOAD, 0);
+        LOCK_KEYS.register(dataManager);
     }
 
     public float getHealthFraction() {
@@ -211,6 +230,18 @@ public class EntityHandFlownDrone extends Entity implements ChunkAnchor.Holder {
 
     public int getPilotId() {
         return dataManager.get(PILOT_ID);
+    }
+
+    /** The mode it last flew with motors on, or null if it never has. */
+    @Nullable
+    public HandFlownFlight.Mode getFlightMode() {
+        int ordinal = dataManager.get(FLIGHT_MODE);
+        return ordinal < 0 || ordinal >= HandFlownFlight.Mode.values().length ? null : HandFlownFlight.Mode.values()[ordinal];
+    }
+
+    /** The stick throttle it last flew with motors on. */
+    public double getFlightThrottle() {
+        return dataManager.get(FLIGHT_THROTTLE);
     }
 
     public boolean areMotorsOn() {
@@ -293,6 +324,9 @@ public class EntityHandFlownDrone extends Entity implements ChunkAnchor.Holder {
         if (triggerCooldown > 0) {
             triggerCooldown--;
         }
+        if (type.isSensor()) {
+            lockCharges.tick(getLockOnSettings());
+        }
         if (pilot != null) {
             String problem = checkPilot(pilot);
             if (problem != null) {
@@ -314,6 +348,10 @@ public class EntityHandFlownDrone extends Entity implements ChunkAnchor.Holder {
             }
         }
         dataManager.set(MOTORS_ON, input.motorsOn);
+        if (input.motorsOn) {
+            dataManager.set(FLIGHT_MODE, input.mode.ordinal());
+            dataManager.set(FLIGHT_THROTTLE, (float) input.throttle);
+        }
         // The entity position is the truth: picks up /tp, pistons, or a position set after NBT load
         flightState.position.set(posX, posY, posZ);
         double thrust = HandFlownFlight.step(flightState, input, flightParams(type));
@@ -322,7 +360,7 @@ public class EntityHandFlownDrone extends Entity implements ChunkAnchor.Holder {
             charge = Math.max(0, charge - DroneSystems.drainPerTick(type.getDrainRatePerTick(), thrust));
         }
         applyStepToEntity(type);
-        // While its motors run it stays loaded, so a drone left hovering far away (pilot gone, signal lost) keeps
+        // While its motors run it stays loaded, so a drone left flying far away (pilot gone, signal lost) keeps
         // flying, draining its battery, and stays reachable; once they stop, its chunk can unload normally
         if (input.motorsOn && !isDead) {
             anchor.hold(posX + flightState.velocity.x * 20, posZ + flightState.velocity.z * 20);
@@ -336,7 +374,8 @@ public class EntityHandFlownDrone extends Entity implements ChunkAnchor.Holder {
 
     /**
      * One queued input per tick, in order; if the client fell behind, repeat its last intent. A drone nobody is
-     * flying keeps its motors as they were: running means it holds position in hover, off means it falls.
+     * flying keeps its motors as they were: running means it carries on with its last input (or holds position in
+     * hover if it has none), off means it falls.
      */
     private HandFlownFlight.Input nextInput() {
         if (pilot == null) {
@@ -463,11 +502,11 @@ public class EntityHandFlownDrone extends Entity implements ChunkAnchor.Holder {
     }
 
     private enum LinkLoss {
-        /** The pilot left on purpose (G): hover in place. */
+        /** The pilot left on purpose (G): no message. */
         NONE,
-        /** Flew out of range: keep flying on the last input. */
+        /** Flew out of range: "signal lost". */
         SIGNAL,
-        /** Goggles off, remote put away, death, logout: hover in place. */
+        /** Goggles off, remote put away, death, logout: "link lost". */
         OTHER
     }
 
@@ -476,12 +515,11 @@ public class EntityHandFlownDrone extends Entity implements ChunkAnchor.Holder {
             pilot.sendStatusMessage(new TextComponentTranslation(reason == LinkLoss.SIGNAL
                     ? "message.combat_drones.signal_lost" : "message.combat_drones.link_lost"), true);
         }
-        if (reason == LinkLoss.SIGNAL) {
-            // DJI mouse yaw is a momentary turn, not a held stick: don't let a drifting drone spin forever
-            driftInput = lastInput.mode == HandFlownFlight.Mode.VELOCITY
-                    ? new HandFlownFlight.Input(lastInput.throttle, lastInput.vertical, lastInput.pitch, lastInput.roll, 0, lastInput.mode, lastInput.motorsOn)
-                    : lastInput;
-        }
+        // However the link ends, the drone carries on with the current motion rather than parking in hover.
+        // DJI mouse yaw is a momentary turn, not a held stick: don't let a drifting drone spin forever
+        driftInput = lastInput.mode == HandFlownFlight.Mode.VELOCITY
+                ? new HandFlownFlight.Input(lastInput.throttle, lastInput.vertical, lastInput.pitch, lastInput.roll, 0, lastInput.mode, lastInput.motorsOn)
+                : lastInput;
         EntityPlayerMP former = pilot;
         pilot = null;
         inputQueue.clear();
@@ -491,7 +529,7 @@ public class EntityHandFlownDrone extends Entity implements ChunkAnchor.Holder {
         }
     }
 
-    /** Server: the pilot's session ended elsewhere (death, logout, this drone removed): drop the link, hover in place. */
+    /** Server: the pilot's session ended elsewhere (death, logout, this drone removed): drop the link, keep flying. */
     void releasePilot(EntityPlayerMP player) {
         if (pilot == player) {
             clearPilot(LinkLoss.OTHER);
@@ -626,6 +664,42 @@ public class EntityHandFlownDrone extends Entity implements ChunkAnchor.Holder {
 
     public HandFlownFlight.State getFlightState() {
         return flightState;
+    }
+
+    /** Where the fixed FPV camera points, as {yaw, pitch} in entity degrees (server: aims lock-ons, never the client). */
+    float[] cameraYawPitch() {
+        double[] euler = HandFlownFlight.fpvCameraEuler(flightState.orientation);
+        return new float[] {(float) euler[0], (float) euler[1]};
+    }
+
+    @Override
+    public boolean spendLockCharge() {
+        return lockCharges.spend();
+    }
+
+    @Override
+    public LockOnSettings getLockOnSettings() {
+        return ModConfig.droneSettings(getDroneType()).lockOn;
+    }
+
+    @Override
+    public int getLockMaxCharges() {
+        return lockCharges.max();
+    }
+
+    @Override
+    public int getLockCharges() {
+        return lockCharges.left();
+    }
+
+    @Override
+    public int getLockReloadLeft() {
+        return lockCharges.reloadLeft();
+    }
+
+    @Override
+    public float getLockReloadFraction() {
+        return lockCharges.reloadFraction();
     }
 
     public boolean isLocallyPiloted() {
@@ -773,13 +847,14 @@ public class EntityHandFlownDrone extends Entity implements ChunkAnchor.Holder {
 
     protected void detonate(DroneType type) {
         int grenades = type.getPayload() == DroneType.PayloadKind.GRENADE ? getPayloadCount() : 0;
-        float power = type.getBlastPower() + grenades * (float) ModConfig.grenadeBlastBonus;
+        DroneSettings settings = ModConfig.droneSettings(type);
+        float power = type.getBlastPower() + grenades * (float) settings.grenadeBlastBonus;
         setDead();
         if (power > 0) {
             // Kamikaze racers also throw shrapnel, so a near miss still hurts; each grenade adds more
-            float shrapnel = (float) (ModConfig.racerShrapnelDamage + grenades * ModConfig.grenadeShrapnelDamage);
+            float shrapnel = (float) (settings.shrapnelDamage + grenades * settings.grenadeShrapnelDamage);
             DroneExplosion.detonate((WorldServer) world, this, getBlameTarget(), posX, posY + height / 2, posZ, power,
-                    shrapnel, (float) ModConfig.shrapnelRadius);
+                    shrapnel, (float) settings.shrapnelRadius);
         }
     }
 
@@ -996,6 +1071,7 @@ public class EntityHandFlownDrone extends Entity implements ChunkAnchor.Holder {
     @Override
     protected void writeEntityToNBT(NBTTagCompound compound) {
         compound.setString("Type", dataManager.get(TYPE_ID));
+        lockCharges.write(compound);
         compound.setInteger("EmpTicks", empTicks);
         compound.setFloat("EmpFizzle", empFizzle);
         if (owner != null) {
@@ -1021,7 +1097,8 @@ public class EntityHandFlownDrone extends Entity implements ChunkAnchor.Holder {
 
     @Override
     protected void readEntityFromNBT(NBTTagCompound compound) {
-        dataManager.set(TYPE_ID, compound.getString("Type"));
+        dataManager.set(TYPE_ID, DroneTypes.migrateId(compound.getString("Type")));
+        lockCharges.read(compound);
         empTicks = compound.getInteger("EmpTicks");
         empFizzle = compound.getFloat("EmpFizzle");
         dataManager.set(EMP_DISABLED, empTicks > 0);
@@ -1031,7 +1108,9 @@ public class EntityHandFlownDrone extends Entity implements ChunkAnchor.Holder {
         int count = compound.hasKey("Payload") ? compound.getInteger("Payload") : compound.getInteger("Grenades");
         // Bombs loaded before bomb sizes existed were the medium ones
         BombType bomb = compound.hasKey("PayloadBomb") ? BombType.byIndex(compound.getInteger("PayloadBomb")) : BombType.MEDIUM;
-        setPayload(count, bomb);
+        // A type can lose its slot (the Long-Range Racer became the payload-free Recon Drone)
+        DroneType type = getDroneType();
+        setPayload(type == null ? count : Math.min(count, payloadCapacity(type, bomb)), bomb);
         BatteryPack pack = compound.hasKey("Battery") ? BatteryPack.byIndex(compound.getInteger("Battery")) : null;
         dataManager.set(BATTERY_PACK, pack == null ? -1 : pack.ordinal());
         charge = compound.getDouble("Charge");

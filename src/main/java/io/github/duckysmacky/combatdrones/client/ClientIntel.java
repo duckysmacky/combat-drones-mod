@@ -20,13 +20,13 @@ import java.util.List;
 
 /**
  * What this player's (or their team's) recon UAVs track, as last sent by the server: tracking dots and lock-ons for the
- * planner map and the in-world markers, plus the lock-on progress in the UAV camera.
+ * planner map and the in-world markers, plus the lock-on progress in the UAV or Recon Drone camera.
  */
 @Mod.EventBusSubscriber(modid = CombatDrones.MOD_ID, value = Side.CLIENT)
 public final class ClientIntel {
     private static List<IntelPacket.Entry> marks = Collections.emptyList();
     private static long marksReceived;
-    /** Lock-on progress from the UAV camera, 0..1 (0 = no attempt, 1 = just locked on). */
+    /** Lock-on progress from the UAV or Recon Drone camera, 0..1 (0 = no attempt, 1 = just locked on). */
     private static float lockProgress;
     /** Ticks to the next lock-on beep. */
     private static int beepDelay;
@@ -98,11 +98,16 @@ public final class ClientIntel {
     }
 
     public static float getLockProgress() {
-        return RemoteController.getUnit() == null ? 0 : lockProgress;
+        return inCamera() ? lockProgress : 0;
+    }
+
+    /** Watching a remote unit's camera or flying an FPV drone: where a lock-on can run. */
+    private static boolean inCamera() {
+        return RemoteController.getUnit() != null || PilotController.getPilotedDrone() != null;
     }
 
     static void setLockProgress(float progress) {
-        boolean inCamera = RemoteController.getUnit() != null;
+        boolean inCamera = inCamera();
         if (progress >= 1 && lockProgress < 1) {
             Minecraft.getMinecraft().getSoundHandler().playSound(PositionedSoundRecord.getMasterRecord(ModSounds.DRONE_BEEP, 1.8F));
         } else if (progress <= 0 && lockProgress > 0 && lockProgress < 1 && inCamera) {

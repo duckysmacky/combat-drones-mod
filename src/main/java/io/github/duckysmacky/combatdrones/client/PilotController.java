@@ -7,6 +7,7 @@ import io.github.duckysmacky.combatdrones.config.ModConfig;
 import io.github.duckysmacky.combatdrones.entity.EntityHandFlownDrone;
 import io.github.duckysmacky.combatdrones.network.ControlInputPacket;
 import io.github.duckysmacky.combatdrones.network.ModNetwork;
+import io.github.duckysmacky.combatdrones.network.ReconLookPacket;
 import io.github.duckysmacky.combatdrones.network.TogglePilotPacket;
 import io.github.duckysmacky.combatdrones.network.TriggerPacket;
 import io.github.duckysmacky.combatdrones.physics.DroneSystems;
@@ -26,6 +27,8 @@ import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
 import net.minecraftforge.fml.relauncher.Side;
+
+import org.lwjgl.input.Mouse;
 
 import javax.annotation.Nullable;
 import java.util.Arrays;
@@ -160,6 +163,13 @@ public final class PilotController {
         // Predicted in the drone's own update later this tick, after vanilla saves prevPos for interpolation
         drone.setPredictionInput(sequence, input);
         ModNetwork.CHANNEL.sendToServer(new ControlInputPacket(drone.getEntityId(), sequence, input));
+        if (type != null && type.isSensor() && drone.ticksExisted % 2 == 0) {
+            // Lock-on: whether LMB is held and how much fits on screen; the server aims from the drone's own orientation
+            double halfHeight = Math.toRadians(minecraft.gameSettings.fovSetting / 2);
+            double halfWidth = Math.atan(Math.tan(halfHeight) * minecraft.displayWidth / Math.max(1, minecraft.displayHeight));
+            ModNetwork.CHANNEL.sendToServer(new ReconLookPacket(drone.getEntityId(), 0, 0, (float) Math.toDegrees(halfWidth),
+                    (float) Math.toDegrees(halfHeight), minecraft.currentScreen == null && Mouse.isButtonDown(0)));
+        }
     }
 
     @Nullable
@@ -179,6 +189,7 @@ public final class PilotController {
     private static void start(Minecraft minecraft, EntityPlayerSP player, EntityHandFlownDrone newDrone) {
         drone = newDrone;
         drone.startLocalPiloting();
+        ClientIntel.resetLock();
         Minecraft.getMinecraft().getSoundHandler().playSound(PositionedSoundRecord.getMasterRecord(ModSounds.DRONE_CONNECT, 1.0F));
         minecraft.setRenderViewEntity(drone);
         // Level the body's pitch so mouse deltas never hit vanilla's ±90° clamp
@@ -189,9 +200,11 @@ public final class PilotController {
         stickPitch = 0;
         stickRoll = 0;
         motorsOn = drone.areMotorsOn();
-        // A drone left running is hovering in place: pick it up in Hover so it doesn't drop on takeover
-        mode = isDji() ? HandFlownFlight.Mode.VELOCITY : motorsOn ? HandFlownFlight.Mode.HOVER : HandFlownFlight.Mode.ACRO;
-        throttle = motorsOn ? hoverThrottle() : 0;
+        // Carry on in the mode (and throttle) it was flying in; Acro for a drone that never flew
+        HandFlownFlight.Mode last = drone.getFlightMode();
+        boolean known = last != null && (last == HandFlownFlight.Mode.VELOCITY) == isDji();
+        mode = isDji() ? HandFlownFlight.Mode.VELOCITY : known ? last : HandFlownFlight.Mode.ACRO;
+        throttle = !motorsOn ? 0 : known ? drone.getFlightThrottle() : hoverThrottle();
     }
 
     /** Throttle that exactly cancels gravity for the current drone type. */

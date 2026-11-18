@@ -1,17 +1,17 @@
 {
-  // Standard Racer: balanced kamikaze racer. One Fragmentation Grenade slot boosts the blast.
+  // Standard Drone: balanced kamikaze FPV drone. One Fragmentation Grenade slot boosts the blast.
   "category": "HAND_FLOWN",
   "maxSpeed": 1.75,
   "acceleration": 0.16,
   "batteryOrFuelCapacity": 2400,
   "drainRatePerTick": 1.0,
-  "blastPower": 4.5,
+  "blastPower": 5.0,
   "payloadCapacity": 1,
   "maxHP": 25,
   // Collision box in blocks: the fuselage core, not the wingtips or props
   "hitboxWidth": 0.5,
   "hitboxHeight": 0.25,
-  "signalRange": 250,
+  "signalRange": 320,
   "impactDetonates": true,
   "motorSoundRange": 60,
   // Engine loops by distance (fractions of motorSoundRange): close, mid, far

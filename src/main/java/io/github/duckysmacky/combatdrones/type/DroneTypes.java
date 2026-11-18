@@ -30,6 +30,9 @@ public final class DroneTypes {
     static {
         RENAMED.put("gunship_rocket", "strike_plane");
         RENAMED.put("gunship_gun", "attack_plane");
+        RENAMED.put("racer_micro", "racer_drone");
+        RENAMED.put("racer_standard", "standard_drone");
+        RENAMED.put("racer_longrange", "recon_drone");
     }
 
     // Sorted so item registration and creative-tab order don't depend on filesystem iteration order

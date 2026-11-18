@@ -74,8 +74,8 @@ public final class StaticOverlay {
             alpha = Math.max(alpha, SEEKER_SNOW * Math.min(1, ((EntityCruiseMissile) unit).getHoldTicksLeft() / SEEKER_CLEAR_TICKS));
         }
         if (PilotController.getPilotedDrone() != null) {
-            // Quadratic: faint on a decent link, clearly building from mid-signal (70% -> 8%, 50% -> 22%, 30% -> 44%)
-            alpha = Math.max(alpha, (BASE_ALPHA + Math.pow(1 - PilotController.getSignalQuality(), 2) * MAX_EXTRA_ALPHA) * ModConfig.staticIntensity);
+            // Linear in signal loss, which already grows exponentially past half range (75% range -> ~18%, 90% -> ~49%)
+            alpha = Math.max(alpha, (BASE_ALPHA + (1 - PilotController.getSignalQuality()) * MAX_EXTRA_ALPHA) * ModConfig.staticIntensity);
         }
         if (alpha <= 0.001) {
             return;

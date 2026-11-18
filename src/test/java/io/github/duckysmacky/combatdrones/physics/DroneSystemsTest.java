@@ -6,10 +6,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class DroneSystemsTest {
     @Test
-    void signalIsPerfectUntilFalloffThenLinear() {
+    void signalIsPerfectUntilHalfRangeThenLossGrowsExponentially() {
         assertEquals(1, DroneSystems.signalQuality(0, 100), 1e-9);
-        assertEquals(1, DroneSystems.signalQuality(60, 100), 1e-9);
-        assertEquals(0.5, DroneSystems.signalQuality(80, 100), 1e-9);
+        assertEquals(1, DroneSystems.signalQuality(50, 100), 1e-9);
+        assertEquals(1 - 0.0431, DroneSystems.signalQuality(60, 100), 1e-3);
+        assertEquals(1 - 0.1824, DroneSystems.signalQuality(75, 100), 1e-3);
+        assertEquals(1 - 0.5252, DroneSystems.signalQuality(90, 100), 1e-3);
         assertEquals(0, DroneSystems.signalQuality(100, 100), 1e-9);
         assertEquals(0, DroneSystems.signalQuality(150, 100), 1e-9);
     }

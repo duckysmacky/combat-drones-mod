@@ -34,9 +34,9 @@ Inspired by the [FPV Drones](https://www.curseforge.com/minecraft/mc-mods/fpvdro
 
 | Vehicle | Type | Role |
 |---|---|---|
-| Micro Racer | FPV drone | The fastest and most fragile drone. Explodes on impact |
-| Standard Racer | FPV drone | Balanced kamikaze drone with a grenade slot |
-| Long-Range Racer | FPV drone | Slower, with the longest range and a grenade slot |
+| Racer Drone | FPV drone | The fastest, most agile and most fragile drone. Explodes on impact |
+| Standard Drone | FPV drone | Balanced kamikaze drone with a grenade slot |
+| Recon Drone | FPV drone | Quiet, black long-range scout that locks on to enemies. Small blast, no payload |
 | DJI Drone | Camera quadcopter | Stable and easy to fly. Drops bombs from above |
 | Light Loitering Munition | Ramp-launched munition | Fast guided rocket: click a point on its camera and it strikes there |
 | Heavy Loitering Munition | Ramp-launched munition | Slower, bigger warhead, flown by hand |
@@ -53,12 +53,12 @@ Inspired by the [FPV Drones](https://www.curseforge.com/minecraft/mc-mods/fpvdro
 
 1. Place a drone and right-click it with an **FPV Remote** to link it to you.
 2. Right-click it with a **Battery Pack**. Light packs are fast but run out quickly; heavy packs last long but are
-   slower. Racers can also take a **Fragmentation Grenade**, and the DJI Drone takes **drop bombs**.
+   slower. The Standard Drone can also take a **Fragmentation Grenade**, and the DJI Drone takes **drop bombs**.
 3. Wear the **FPV Goggles**, hold the remote and press **G** to fly.
 
 While you fly, your body stays where you were standing and can still be hit, and other players can hear its radio
-static. Racers explode on any impact. Fly out of signal range and the drone keeps going on your last input. If you
-exit on purpose, it hovers in place until you come back.
+static. FPV drones explode on any impact. Past half of its range the camera feed fills with more and more static.
+However you leave a drone (exit, fly out of range, take off the goggles), it keeps going on your last input. Taking it back picks up in the same flight mode.
 
 ### Ramp-launched units
 
@@ -98,7 +98,7 @@ down on the pad, during the climb and in the dive.
 
 All mod keys can be rebound under Controls -> Combat Drones.
 
-**FPV racers**
+**FPV drones**
 
 | Key | Action |
 |---|---|
@@ -108,7 +108,7 @@ All mod keys can be rebound under Controls -> Combat Drones.
 | W / S | Throttle (climb / descend in Hover mode) |
 | H | Flight mode: Acro, Angle, Hover |
 | N | Motors on / off |
-| LMB | Airburst the grenade |
+| LMB | Airburst the grenade (Standard); hold to lock on (Recon) |
 
 **DJI Drone**
 

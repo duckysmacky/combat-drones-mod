@@ -110,7 +110,7 @@ public final class GeoModels implements IGeoRenderer<Object> {
         if (get(type.getId()) != null) {
             return type.getId();
         }
-        return type.getCategory() == DroneType.Category.HAND_FLOWN ? "racer_standard" : "loitering_light";
+        return type.getCategory() == DroneType.Category.HAND_FLOWN ? "standard_drone" : "loitering_light";
     }
 
     /** Draws a model at the current GL origin, nose along +Z. Returns false if the model isn't loaded. */
