@@ -199,4 +199,19 @@ class HandFlownFlightTest {
         assertTrue(state.position.y < -2);
         assertTrue(state.velocity.y < 0);
     }
+
+    @Test
+    void downedDroneArcsDownAndTumblesOnlyWhenShotDown() {
+        State emped = new State();
+        emped.velocity.set(0, 0, 0.8);
+        State shotDown = emped.copy();
+        for (int tick = 0; tick < 20; tick++) {
+            HandFlownFlight.stepDowned(emped, DownedFall.Params.perSecond(0.2, 4, 12, 0, 0));
+            HandFlownFlight.stepDowned(shotDown, DownedFall.Params.perSecond(0.35, 8, 30, 240, 25));
+        }
+        assertTrue(emped.position.z > 10 && emped.position.y < 0, "glides forward and down");
+        assertTrue(shotDown.position.y < emped.position.y, "a shot-down drone drops faster");
+        assertEquals(1.0, emped.orientation.w, 1e-9); // attitude held
+        assertTrue(Math.abs(shotDown.orientation.w) < 0.99, "tumbling");
+    }
 }

@@ -312,6 +312,9 @@ public class EntityHandFlownDrone extends Entity implements ChunkAnchor.Holder, 
             if (isEmpDisabled() && rand.nextInt(3) == 0) {
                 Emp.crackle(this);
             }
+            if (isShotDown()) {
+                DamageEffects.burningTrail(this);
+            }
             return;
         }
         DroneType type = getDroneType();
@@ -645,7 +648,7 @@ public class EntityHandFlownDrone extends Entity implements ChunkAnchor.Holder, 
             impactSpeed = speedBefore;
         }
         syncRotation();
-        if (impactSpeed >= ARM_SPEED) {
+        if (impactSpeed >= ARM_SPEED || (isShotDown() && (impactSpeed > 1e-3 || onGround || isInWater()))) {
             onImpact(type, impactSpeed);
         }
     }
@@ -810,7 +813,14 @@ public class EntityHandFlownDrone extends Entity implements ChunkAnchor.Holder, 
     }
 
     private void onImpact(DroneType type, double impactSpeed) {
-        if (isEmpDisabled() && type.isImpactDetonates()) {
+        if (isShotDown()) {
+            // Going down: whatever it hits ends it, as if flown into the ground
+            if (type.isImpactDetonates()) {
+                detonate(type);
+            } else {
+                destroy();
+            }
+        } else if (isEmpDisabled() && type.isImpactDetonates()) {
             empDestroy((float) ModConfig.empedCrashBlastPower); // its fuze is dead: only the small blast
         } else if (type.isImpactDetonates()) {
             detonate(type);
@@ -840,8 +850,17 @@ public class EntityHandFlownDrone extends Entity implements ChunkAnchor.Holder, 
         shotDown();
     }
 
-    /** Server: knocked out (shot down, or fried by an EMP). A kamikaze in the air goes off; anything else is destroyed. */
+    /**
+     * Server: knocked out (shot down, or fried by an EMP). In the air, where {@code [state.shot_down] drones} allows it,
+     * it first goes down burning (also from an EMP's fall). Otherwise, or shot again on the way down, a kamikaze in the
+     * air goes off; anything else is destroyed.
+     */
     void shotDown() {
+        DroneType kind = getDroneType();
+        if (kind != null && !isShotDown() && !onGround && ModConfig.isShotDownEnabled(kind.getKind())) {
+            goDown();
+            return;
+        }
         if (isEmpDisabled()) {
             empDestroy((float) ModConfig.empedCrashBlastPower);
             return;
@@ -852,6 +871,14 @@ public class EntityHandFlownDrone extends Entity implements ChunkAnchor.Holder, 
         } else {
             destroy();
         }
+    }
+
+    /** Server: shot down: motors dead, tumbling down out of control with {@code fallingHP} left; the pilot stays on. */
+    private void goDown() {
+        setState(VehicleState.SHOT_DOWN);
+        empTicks = 0;
+        setHealth((float) ModConfig.shotDownFallingHP);
+        DamageEffects.goingDown(this);
     }
 
     protected void detonate(DroneType type) {
