@@ -97,8 +97,6 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder, LockOn
     private static final DataParameter<Boolean> BOOSTING = EntityDataManager.createKey(EntityRampUnit.class, DataSerializers.BOOLEAN);
     /** {@link VehicleState}: flying, knocked out by an EMP, or shot down; the last two fall with nobody in control. */
     private static final DataParameter<Byte> STATE = EntityDataManager.createKey(EntityRampUnit.class, DataSerializers.BYTE);
-    /** While EMP-disabled: forward speed kept per tick (about 5% left after 1.5 s), gravity (blocks/tick^2) and the fastest fall (blocks/tick). */
-    private static final DownedFall.Params EMP_FALL = new DownedFall.Params(0.905, 0.05, 1.5, 0, 0);
     private static final DataParameter<Boolean> STRIKING = EntityDataManager.createKey(EntityRampUnit.class, DataSerializers.BOOLEAN);
     // Loadout, synced for the HUD: rounds or rockets left per weapon station, and the rocket size in the pod
     private static final DataParameter<Integer> AMMO = EntityDataManager.createKey(EntityRampUnit.class, DataSerializers.VARINT);
@@ -165,9 +163,8 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder, LockOn
     /** A point picked from the camera (click-designate scheme): overrides the route with a strike. */
     @Nullable
     private Vec3d designatedTarget;
-    /** Ticks left EMP-disabled, and the blast it gives if it hits something meanwhile. */
+    /** Ticks left EMP-disabled. */
     private int empTicks;
-    protected float empFizzle;
     private int designateCooldown;
     /** Sensor units: lock-on charges. */
     private final SyncedLockCharges lockCharges = new SyncedLockCharges(this, LOCK_KEYS);
@@ -963,26 +960,25 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder, LockOn
     }
 
     /**
-     * Server: an EMP disables it for {@code ticks} (topped up while it stays in the field): whoever flies or watches it
-     * is sent back, its motors cut out and it falls; hitting anything meanwhile destroys it with {@code fizzlePower}.
+     * Server: an EMP disables it for {@code ticks} (topped up while it stays in the field): its motors cut out and it
+     * glides down with nobody in control; whoever flies or watches it stays on. Hitting anything meanwhile destroys it
+     * with only {@code [state.emped] crashBlastPower}.
      */
-    void empDisable(int ticks, float fizzlePower) {
+    void empDisable(int ticks) {
         if (isShotDown()) {
             return; // going down for good anyway
         }
         if (!isEmpDisabled()) {
-            RemoteSessions.endOn(this, "message.combat_drones.emp.link_lost");
             flight.velocity.set(posX - prevPosX, posY - prevPosY, posZ - prevPosZ);
             setState(VehicleState.EMPED);
             dataManager.set(BOOSTING, false);
         }
         empTicks = Math.max(empTicks, ticks);
-        empFizzle = fizzlePower;
     }
 
-    /** Server: hit something while EMP-disabled: only the fizzle blast. */
+    /** Server: hit something while EMP-disabled: only the small crash blast. */
     protected void empCrash(DroneType type) {
-        empDestroy(empFizzle);
+        empDestroy((float) ModConfig.empedCrashBlastPower);
     }
 
     /**
@@ -1001,7 +997,7 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder, LockOn
             setState(VehicleState.FLYING);
         }
         DownedFall.Attitude attitude = DownedFall.step(flight.velocity, flight.heading, flight.bank,
-                state == VehicleState.SHOT_DOWN ? ModConfig.shotDownFall() : EMP_FALL);
+                state == VehicleState.SHOT_DOWN ? ModConfig.shotDownFall() : ModConfig.empedFall());
         double wantedX = flight.velocity.x;
         double wantedY = flight.velocity.y;
         double wantedZ = flight.velocity.z;
@@ -1062,7 +1058,7 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder, LockOn
             return;
         }
         if (isEmpDisabled()) {
-            empDestroy(empFizzle);
+            empDestroy((float) ModConfig.empedCrashBlastPower);
             return;
         }
         if (type != null && type.getBlastPower() > 0) {
@@ -1154,7 +1150,6 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder, LockOn
     protected void writeEntityToNBT(NBTTagCompound compound) {
         compound.setString("Type", dataManager.get(TYPE_ID));
         compound.setInteger("EmpTicks", empTicks);
-        compound.setFloat("EmpFizzle", empFizzle);
         compound.setBoolean("ShotDown", isShotDown());
         compound.setDouble("VelocityX", flight.velocity.x);
         compound.setDouble("VelocityY", flight.velocity.y);
@@ -1186,7 +1181,6 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder, LockOn
     protected void readEntityFromNBT(NBTTagCompound compound) {
         dataManager.set(TYPE_ID, DroneTypes.migrateId(compound.getString("Type")));
         empTicks = compound.getInteger("EmpTicks");
-        empFizzle = compound.getFloat("EmpFizzle");
         setState(compound.getBoolean("ShotDown") ? VehicleState.SHOT_DOWN : empTicks > 0 ? VehicleState.EMPED : VehicleState.FLYING);
         flight.velocity.set(compound.getDouble("VelocityX"), compound.getDouble("VelocityY"), compound.getDouble("VelocityZ"));
         owner = compound.hasUniqueId("Owner") ? compound.getUniqueId("Owner") : null;

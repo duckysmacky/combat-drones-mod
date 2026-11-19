@@ -151,6 +151,18 @@ public final class HandFlownFlight {
         return thrust / params.thrustAccel;
     }
 
+    /**
+     * One tick of an uncontrolled fall ({@link DownedFall}): motors dead, the drone arcs down. With a roll rate (shot
+     * down) it tumbles about its forward and side axes; without (EMP) its attitude stays as it was.
+     */
+    public static void stepDowned(State state, DownedFall.Params params) {
+        DownedFall.step(state.velocity, 0, 0, params);
+        state.position.add(state.velocity);
+        rotateBody(state.orientation, FORWARD, params.rollRate);
+        rotateBody(state.orientation, RIGHT, params.rollRate * 0.6);
+        state.orientation.normalize();
+    }
+
     private static void updateAttitude(Quat4d orientation, Input input) {
         if (input.mode == Mode.ACRO) {
             rotateBody(orientation, RIGHT, -input.pitch * ACRO_RATE_DEG);

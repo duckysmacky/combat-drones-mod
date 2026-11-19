@@ -5,6 +5,7 @@ import io.github.duckysmacky.combatdrones.Fx;
 import io.github.duckysmacky.combatdrones.config.ModConfig;
 import io.github.duckysmacky.combatdrones.network.EffectPacket;
 import io.github.duckysmacky.combatdrones.physics.FieldContact;
+import io.github.duckysmacky.combatdrones.type.DroneType;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.util.math.AxisAlignedBB;
@@ -18,8 +19,9 @@ import java.util.UUID;
 /**
  * EMP fields (the station's and the blast gadget's): every flying drone, ramp unit or missile whose hitbox touches the
  * sphere is either destroyed with a small blast (no warhead, bombs or fuel going off) or disabled for a while (motors
- * off, falling, nobody flying, viewing or re-routing it), per the field's {@link Rules}. A hand-flown drone sitting
- * on the ground isn't flying and is left alone.
+ * off, gliding down out of control, see {@code [state.emped]}), per the field's {@link Rules}. A kind that
+ * {@code [state.emped]} leaves out is destroyed instead. A hand-flown drone sitting on the ground isn't flying and is
+ * left alone.
  */
 public final class Emp {
     private Emp() {
@@ -30,13 +32,13 @@ public final class Emp {
         final String spares;
         final boolean disable;
         final int disableTicks;
-        final float fizzlePower;
+        final float destroyBlastPower;
 
-        private Rules(String spares, String onContact, double disableSeconds, double fizzlePower) {
+        private Rules(String spares, String onContact, double disableSeconds, double destroyBlastPower) {
             this.spares = spares;
             this.disable = "disable".equals(onContact);
             this.disableTicks = (int) Math.round(disableSeconds * 20);
-            this.fizzlePower = (float) fizzlePower;
+            this.destroyBlastPower = (float) destroyBlastPower;
         }
 
         public static Rules station() {
@@ -57,23 +59,26 @@ public final class Emp {
                     || spared(fieldOwner, ownerOf(entity), rules.spares)) {
                 continue;
             }
-            boolean fresh = !(entity instanceof EntityRampUnit ? ((EntityRampUnit) entity).isEmpDisabled() : ((EntityHandFlownDrone) entity).isEmpDisabled());
-            if (!rules.disable || fresh) {
+            boolean ramp = entity instanceof EntityRampUnit;
+            boolean fresh = !(ramp ? ((EntityRampUnit) entity).isEmpDisabled() : ((EntityHandFlownDrone) entity).isEmpDisabled());
+            DroneType type = ramp ? ((EntityRampUnit) entity).getDroneType() : ((EntityHandFlownDrone) entity).getDroneType();
+            boolean disable = rules.disable && type != null && ModConfig.isEmpedEnabled(type.getKind());
+            if (!disable || fresh) {
                 EffectPacket.empZap(world, new Vec3d(entity.posX, entity.posY + entity.height / 2, entity.posZ), Math.max(entity.width, entity.height));
             }
             if (entity instanceof EntityRampUnit) {
                 EntityRampUnit unit = (EntityRampUnit) entity;
-                if (rules.disable) {
-                    unit.empDisable(rules.disableTicks, rules.fizzlePower);
+                if (disable) {
+                    unit.empDisable(rules.disableTicks);
                 } else {
-                    unit.empDestroy(rules.fizzlePower);
+                    unit.empDestroy(rules.destroyBlastPower);
                 }
             } else {
                 EntityHandFlownDrone drone = (EntityHandFlownDrone) entity;
-                if (rules.disable) {
-                    drone.empDisable(rules.disableTicks, rules.fizzlePower);
+                if (disable) {
+                    drone.empDisable(rules.disableTicks);
                 } else {
-                    drone.empDestroy(rules.fizzlePower);
+                    drone.empDestroy(rules.destroyBlastPower);
                 }
             }
         }

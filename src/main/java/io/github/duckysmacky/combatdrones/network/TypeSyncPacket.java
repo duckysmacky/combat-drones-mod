@@ -36,6 +36,7 @@ public class TypeSyncPacket implements IMessage {
     private final double[][] aerialStats = new double[AerialBombType.values().length][3];
     private boolean worldBorderCollision;
     private double steerConeDegrees;
+    private double[] fall = new double[8];
 
     public TypeSyncPacket() {
     }
@@ -63,6 +64,7 @@ public class TypeSyncPacket implements IMessage {
         }
         worldBorderCollision = ModConfig.worldBorderCollision;
         steerConeDegrees = ModConfig.steerConeDegrees;
+        fall = ModConfig.syncedFall();
     }
 
     /** Client side: adopt the server's battery pack and bomb values and synced settings. */
@@ -82,6 +84,7 @@ public class TypeSyncPacket implements IMessage {
         }
         ModConfig.worldBorderCollision = worldBorderCollision;
         ModConfig.steerConeDegrees = steerConeDegrees;
+        ModConfig.applySyncedFall(fall);
     }
 
     public Map<String, String> getTypesJson() {
@@ -115,6 +118,9 @@ public class TypeSyncPacket implements IMessage {
         }
         worldBorderCollision = buf.readBoolean();
         steerConeDegrees = Math.max(0, Math.min(60, buf.readDouble()));
+        for (int index = 0; index < fall.length; index++) {
+            fall[index] = buf.readDouble();
+        }
     }
 
     @Override
@@ -145,6 +151,9 @@ public class TypeSyncPacket implements IMessage {
         }
         buf.writeBoolean(worldBorderCollision);
         buf.writeDouble(steerConeDegrees);
+        for (double value : fall) {
+            buf.writeDouble(value);
+        }
     }
 
     public static class Handler implements IMessageHandler<TypeSyncPacket, IMessage> {

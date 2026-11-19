@@ -88,7 +88,7 @@ public final class ModConfig {
             {"missiles.missileBoostMultiplier", "missiles.boostMultiplier"},
             {"missiles.missileShrapnelDamage", "missiles.shrapnelDamage"},
             {"missiles.missileShrapnelRadius", "missiles.shrapnelRadius"},
-            {"emp_station.fizzlePower", "emp_station.destroyBlastPower"},
+            {"emp_station.fizzlePower", "emp_station.destroyBlastPower"}, {"emp_station.fizzlePower", "state.emped.crashBlastPower"},
             {"emp_blast.fizzlePower", "emp_blast.destroyBlastPower"}};
 
     // [general]
@@ -159,6 +159,16 @@ public final class ModConfig {
     public static double shotDownMaxFallSpeed = 30.0;
     public static double shotDownRollDegreesPerSecond = 240.0;
     public static double shotDownTurnDegreesPerSecond = 25.0;
+
+    // [state.emped]
+    public static boolean empedPlanes = true;
+    public static boolean empedDrones = true;
+    public static boolean empedMunitions = true;
+    public static boolean empedMissiles = true;
+    public static double empedDrag = 0.2;
+    public static double empedFallAcceleration = 4.0;
+    public static double empedMaxFallSpeed = 12.0;
+    public static double empedCrashBlastPower = 5.0;
 
     // [stinger]
     public static double stingerDamage = 100.0;
@@ -321,6 +331,47 @@ public final class ModConfig {
         }
     }
 
+    /** Whether a vehicle of this kind is EMP-disabled by a disable-mode field ({@code [state.emped]}) rather than destroyed. */
+    public static boolean isEmpedEnabled(DroneType.Kind kind) {
+        switch (kind) {
+            case PLANE:
+                return empedPlanes;
+            case DRONE:
+                return empedDrones;
+            case MUNITION:
+                return empedMunitions;
+            default:
+                return empedMissiles;
+        }
+    }
+
+    /** How an EMP-disabled vehicle falls: no roll, no spiral. */
+    public static DownedFall.Params empedFall() {
+        return DownedFall.Params.perSecond(empedDrag, empedFallAcceleration, empedMaxFallSpeed, 0, 0);
+    }
+
+    /** The fall settings clients need to predict a hand-flown drone going down, as synced by {@code TypeSyncPacket}. */
+    public static double[] syncedFall() {
+        return new double[]{shotDownDrag, shotDownFallAcceleration, shotDownMaxFallSpeed, shotDownRollDegreesPerSecond,
+                shotDownTurnDegreesPerSecond, empedDrag, empedFallAcceleration, empedMaxFallSpeed};
+    }
+
+    /** Client: adopts the server's {@link #syncedFall}, kept inside the config bounds. */
+    public static void applySyncedFall(double[] fall) {
+        shotDownDrag = clamp(fall[0], 0, 0.99);
+        shotDownFallAcceleration = clamp(fall[1], 0.5, 40);
+        shotDownMaxFallSpeed = clamp(fall[2], 2, 80);
+        shotDownRollDegreesPerSecond = clamp(fall[3], 0, 1440);
+        shotDownTurnDegreesPerSecond = clamp(fall[4], 0, 180);
+        empedDrag = clamp(fall[5], 0, 0.99);
+        empedFallAcceleration = clamp(fall[6], 0.5, 40);
+        empedMaxFallSpeed = clamp(fall[7], 2, 80);
+    }
+
+    private static double clamp(double value, double min, double max) {
+        return Double.isFinite(value) ? Math.max(min, Math.min(max, value)) : min;
+    }
+
     /** How a shot-down vehicle falls. */
     public static DownedFall.Params shotDownFall() {
         return DownedFall.Params.perSecond(shotDownDrag, shotDownFallAcceleration, shotDownMaxFallSpeed, shotDownRollDegreesPerSecond,
@@ -457,13 +508,13 @@ public final class ModConfig {
                             + "scoreboard teammates, see general.ignoredTeams).");
             stationOnContact = defaults.choice("emp_station.onContact", stationOnContact, ON_CONTACT,
                     "What the field does to a flying vehicle it touches: destroy (it's knocked out with only a destroyBlastPower blast: "
-                            + "no warhead, bombs or fuel going off) or disable (for disableSeconds its motors cut out and it falls, nobody "
-                            + "can fly, view or re-route it; hitting anything meanwhile destroys it with the same destroyBlastPower blast, except a cruise "
-                            + "missile, whose warhead still goes off).");
+                            + "no warhead, bombs or fuel going off) or disable (for disableSeconds its motors cut out and it glides down out "
+                            + "of control, see [state.emped]).");
             stationDisableSeconds = defaults.number("emp_station.disableSeconds", stationDisableSeconds, 0.5, 120,
                     "How long a vehicle stays disabled (onContact = disable), in seconds, counted from when it last touched the field.");
             stationDestroyBlastPower = defaults.number("emp_station.destroyBlastPower", stationDestroyBlastPower, 0, 10,
-                    "Blast power of a vehicle the field knocks out, or of a disabled one crashing (vanilla TNT = 4). 0 = no blast, just a wreck.");
+                    "Blast power of a vehicle the field destroys (onContact = destroy, or a kind [state.emped] leaves out). Vanilla TNT = 4; "
+                            + "0 = no blast, just a wreck.");
 
             blastRadius = defaults.number("emp_blast.radius", blastRadius, 1, 32, "Radius the EMP blast grows to, in blocks.");
             blastCharges = (int) defaults.number("emp_blast.charges", blastCharges, 1, 20, "Blasts the gadget holds. Each use takes one.");
@@ -480,13 +531,13 @@ public final class ModConfig {
                             + "see general.ignoredTeams).");
             blastOnContact = defaults.choice("emp_blast.onContact", blastOnContact, ON_CONTACT,
                     "What the blast does to a flying vehicle it touches: destroy (it's knocked out with only a destroyBlastPower blast: "
-                            + "no warhead, bombs or fuel going off) or disable (for disableSeconds its motors cut out and it falls, nobody "
-                            + "can fly, view or re-route it; hitting anything meanwhile destroys it with the same destroyBlastPower blast, except a cruise "
-                            + "missile, whose warhead still goes off).");
+                            + "no warhead, bombs or fuel going off) or disable (for disableSeconds its motors cut out and it glides down out "
+                            + "of control, see [state.emped]).");
             blastDisableSeconds = defaults.number("emp_blast.disableSeconds", blastDisableSeconds, 0.5, 120,
                     "How long a vehicle stays disabled (onContact = disable), in seconds, counted from when it last touched the blast.");
             blastDestroyBlastPower = defaults.number("emp_blast.destroyBlastPower", blastDestroyBlastPower, 0, 10,
-                    "Blast power of a vehicle the blast knocks out, or of a disabled one crashing (vanilla TNT = 4). 0 = no blast, just a wreck.");
+                    "Blast power of a vehicle the blast destroys (onContact = destroy, or a kind [state.emped] leaves out). Vanilla TNT = 4; "
+                            + "0 = no blast, just a wreck.");
 
             shotDownPlanes = defaults.get("state.shot_down.planes", shotDownPlanes,
                     "Planes (Strike and Attack Plane, Gunship, Stealth Bomber, Recon UAV) shot to 0 HP go down burning instead of "
@@ -507,6 +558,22 @@ public final class ModConfig {
                     "How fast a plane going down rolls over, in degrees/s (0 = no roll). The pilot's camera rolls with it.");
             shotDownTurnDegreesPerSecond = defaults.number("state.shot_down.turnDegreesPerSecond", shotDownTurnDegreesPerSecond, 0, 180,
                     "How fast its path curls into a spiral, in degrees/s (0 = straight on).");
+
+            empedPlanes = defaults.get("state.emped.planes", empedPlanes,
+                    "Planes an EMP field disables (onContact = disable) glide down out of control and recover when it wears off. Off: "
+                            + "the field destroys them instead (destroyBlastPower).");
+            empedDrones = defaults.get("state.emped.drones", empedDrones, "The same for hand-flown drones.");
+            empedMunitions = defaults.get("state.emped.munitions", empedMunitions, "The same for loitering munitions.");
+            empedMissiles = defaults.get("state.emped.missiles", empedMissiles, "The same for the cruise missile.");
+            empedDrag = defaults.number("state.emped.drag", empedDrag, 0, 0.99,
+                    "Share of its forward speed an EMP-disabled vehicle loses per second.");
+            empedFallAcceleration = defaults.number("state.emped.fallAcceleration", empedFallAcceleration, 0.5, 40,
+                    "How fast an EMP-disabled vehicle picks up its fall, in blocks/s^2.");
+            empedMaxFallSpeed = defaults.number("state.emped.maxFallSpeed", empedMaxFallSpeed, 2, 80,
+                    "Fastest an EMP-disabled vehicle falls, in blocks/s.");
+            empedCrashBlastPower = defaults.number("state.emped.crashBlastPower", empedCrashBlastPower, 0, 10,
+                    "Blast of an EMP-disabled vehicle hitting anything (its warhead, bombs and fuel stay dead; a cruise missile's warhead "
+                            + "still goes off). Vanilla TNT = 4; 0 = no blast, just a wreck.");
 
             stingerDamage = defaults.number("stinger.damage", stingerDamage, 0, 1000,
                     "Damage a Stinger missile does to the aircraft it hits, on top of its blast (compare the maxHP of [drones.*]; "
@@ -641,6 +708,8 @@ public final class ModConfig {
             defaults.comment("state.shot_down", "Shot down (0 HP): the vehicle loses all control and goes down in a burning, spinning arc; "
                     + "whoever flies or watches it rides it out. It explodes on impact with its own blastPower ([drones.<id>]), as if flown "
                     + "into the ground.");
+            defaults.comment("state.emped", "EMP-disabled (an EMP field with onContact = disable): motors off, the vehicle glides down out of "
+                    + "control for the field's disableSeconds; whoever flies or watches it stays on and gets control back when it wears off.");
             defaults.comment("stinger", "Stinger: a shoulder-fired launcher whose missile homes in on a locked aircraft (drones, munitions, "
                     + "planes, missiles in flight). Never locks on to players.");
             defaults.comment("weapons", "Armed plane weapons, fired only under manual control.");
