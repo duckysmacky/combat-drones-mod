@@ -18,6 +18,7 @@ import net.minecraft.util.math.RayTraceResult;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.util.text.TextComponentTranslation;
 import net.minecraft.world.World;
+import net.minecraft.world.WorldServer;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -74,7 +75,17 @@ public final class PlannerServer {
             if (entity instanceof EntityLaunchRamp && !entity.isDead) {
                 EntityLaunchRamp ramp = (EntityLaunchRamp) entity;
                 if (ramp.isLinked() && ramp.isOwnedBy(player)) {
-                    packet.units.add(rampView(ramp));
+                    if (ramp.isLoaded()) {
+                        packet.units.add(rampView(ramp));
+                    }
+                    if (ramp instanceof EntityRunway) {
+                        PlannerOpenPacket.RunwayView runway = new PlannerOpenPacket.RunwayView();
+                        runway.entityId = ramp.getEntityId();
+                        runway.runway = ((EntityRunway) ramp).geometry();
+                        runway.kind = ramp.getKind().ordinal();
+                        runway.free = !ramp.isLoaded();
+                        packet.runways.add(runway);
+                    }
                 }
                 continue;
             }
@@ -99,6 +110,8 @@ public final class PlannerServer {
             view.originY = unit.getLaunchY();
             view.route = unit.getRoute();
             view.allowedTerminals = allowedTerminals(type);
+            view.homeRunway = unit.getHomeRunway();
+            view.recalling = unit.isRecalling();
             packet.units.add(view);
         }
         ModNetwork.CHANNEL.sendTo(packet, player);
@@ -119,6 +132,7 @@ public final class PlannerServer {
         view.originY = view.y;
         view.route = ramp.getRoute();
         view.allowedTerminals = allowedTerminals(type);
+        view.homeRunway = ramp instanceof EntityRunway ? ((EntityRunway) ramp).geometry() : null;
         return view;
     }
 
@@ -153,7 +167,7 @@ public final class PlannerServer {
         if (fly && type.getControlScheme() != DroneType.ControlScheme.STICK) {
             return; // the GUI never offers it for these
         }
-        Route route = prepare(player.world, type, packet.route);
+        Route route = prepare(player, type, packet.route);
         if (!(fly && route.size() == 0)) {
             String problem = RouteValidator.validate(route, ramp.posX, ramp.posZ, ModConfig.routeLimits(), allowedTerminals(type));
             if (problem != null) {
@@ -200,7 +214,12 @@ public final class PlannerServer {
             status(player, unit.disabledMessage());
             return;
         }
-        Route route = prepare(player.world, type, packet.route);
+        if (packet.recall) {
+            status(player, unit.recall() ? "message.combat_drones.planner.returning" : "message.combat_drones.planner.no_runway");
+            openAll(player, -1);
+            return;
+        }
+        Route route = prepare(player, type, packet.route);
         String problem = RouteValidator.validate(route, unit.posX, unit.posZ, ModConfig.routeLimits(), allowedTerminals(type));
         if (problem != null) {
             status(player, problem);
@@ -213,12 +232,31 @@ public final class PlannerServer {
 
     /**
      * A submitted route made fit for the unit, the way the planner shows it: target on the ground, orbit at the type's
-     * minimums, drop points only for a bomb bay and no longer than the carpet limit. Never a reason to reject.
+     * minimums, drop points only for a bomb bay and no longer than the carpet limit, the runway to land on checked.
+     * Never a reason to reject.
      */
-    private static Route prepare(World world, DroneType type, Route route) {
+    private static Route prepare(EntityPlayer player, DroneType type, Route route) {
         boolean bomber = type.stationOf(DroneType.WeaponType.BOMB_BAY) >= 0;
-        return resolveTarget(world, route).withLoiterMinimums(type.getMinLoiterAltitude(), type.getMinLoiterRadius())
+        return resolveRunway(player, type, resolveTarget(player.world, route))
+                .withLoiterMinimums(type.getMinLoiterAltitude(), type.getMinLoiterRadius())
                 .withDropLimit(bomber ? ModConfig.maxCarpetLength : Route.NO_DROP);
+    }
+
+    /**
+     * The runway a route lands on, as the server knows it: one of the player's that takes this type, with its real
+     * position. Anything else is dropped, so the plane lands where it took off.
+     */
+    private static Route resolveRunway(EntityPlayer player, DroneType type, Route route) {
+        Route.Runway picked = route.getRunway();
+        if (picked == null || picked.id == null) {
+            return route.withRunway(null);
+        }
+        Entity entity = player.world instanceof WorldServer ? ((WorldServer) player.world).getEntityFromUuid(picked.id) : null;
+        if (!(entity instanceof EntityRunway) || entity.isDead || !((EntityRunway) entity).isOwnedBy(player)
+                || !((EntityRunway) entity).getKind().accepts(type)) {
+            return route.withRunway(null);
+        }
+        return route.withRunway(((EntityRunway) entity).geometry());
     }
 
     /** A target picked on the map has no height yet: put it on the ground there. */

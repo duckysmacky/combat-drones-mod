@@ -5,6 +5,7 @@ import io.github.duckysmacky.combatdrones.client.hud.Ui;
 import io.github.duckysmacky.combatdrones.client.hud.UiButton;
 import io.github.duckysmacky.combatdrones.item.ItemDrone;
 import io.github.duckysmacky.combatdrones.type.Loadout;
+import io.github.duckysmacky.combatdrones.entity.EntityLaunchRamp;
 import io.github.duckysmacky.combatdrones.entity.EntityRampUnit;
 import io.github.duckysmacky.combatdrones.network.IntelPacket;
 import io.github.duckysmacky.combatdrones.network.ModNetwork;
@@ -84,6 +85,9 @@ public class GuiMissionPlanner extends GuiScreen {
     private static final int BUTTON_CONTROL = 11;
     private static final int BUTTON_MARK = 12;
     private static final int BUTTON_LAUNCH_FLY = 13;
+    private static final int BUTTON_RETURN = 14;
+    private static final int RUNWAY_COLOR = 0xC0E8E8E8;
+    private static final int RUNWAY_TAKEN = 0x80808890;
     private static final int TARGET_COLOR = Ui.DANGER;
     private static final int BORDER_COLOR = 0xC0D94F3C;
     private static final int DROP_FAINT = 0x90D94F3C;
@@ -101,6 +105,8 @@ public class GuiMissionPlanner extends GuiScreen {
     private double loiterRadius = Route.DEFAULT_LOITER_RADIUS;
     /** Destroy target; its Y is NaN when picked on the map (the server finds the ground). */
     private Route.Target target;
+    /** Runway picked to land on ("Land here"), or null for the unit's home runway. */
+    private Route.Runway runway;
     /** Set once the player edits, so live refreshes don't overwrite their unsent changes. */
     private boolean dirty;
     private int selectedWaypoint = -1;
@@ -133,6 +139,7 @@ public class GuiMissionPlanner extends GuiScreen {
     private GuiButton viewButton;
     private GuiButton controlButton;
     private GuiButton markButton;
+    private GuiButton returnButton;
 
     public GuiMissionPlanner(PlannerOpenPacket view) {
         this.view = view;
@@ -197,6 +204,7 @@ public class GuiMissionPlanner extends GuiScreen {
         terminal = unit.allowedTerminals.contains(unit.route.getTerminal()) ? unit.route.getTerminal() : firstAllowed(unit);
         loiterRadius = unit.route.getLoiterRadius();
         target = unit.route.getTarget();
+        runway = unit.route.getRunway();
         if (selectedWaypoint >= waypoints.size()) {
             selectedWaypoint = -1;
         }
@@ -225,15 +233,30 @@ public class GuiMissionPlanner extends GuiScreen {
         mapBottom = height - 44;
         int y = height - 26;
         int x = mapLeft;
-        addButton(new UiButton(BUTTON_CLEAR, x, y, 50, 20, I18n.format("gui.combat_drones.planner.clear")));
-        x += 54;
-        addButton(new UiButton(BUTTON_SEND, x, y, 60, 20, I18n.format("gui.combat_drones.planner.apply")));
-        x += 64;
-        // Same slot, swapped by refreshButtons: Launch / Launch & Fly for a grounded unit, View / Take control in flight
-        launchButton = addButton(new UiButton(BUTTON_LAUNCH, x, y, 60, 20, I18n.format("gui.combat_drones.planner.launch")));
-        launchFlyButton = addButton(new UiButton(BUTTON_LAUNCH_FLY, x + 64, y, 80, 20, I18n.format("gui.combat_drones.planner.launch_fly")));
-        viewButton = addButton(new UiButton(BUTTON_VIEW, x, y, 50, 20, I18n.format("gui.combat_drones.planner.view")));
-        controlButton = addButton(new UiButton(BUTTON_CONTROL, x + 54, y, 80, 20, I18n.format("gui.combat_drones.planner.take_control")));
+        // Sized to their labels, so the row still fits the map's width on a small screen
+        String clear = I18n.format("gui.combat_drones.planner.clear");
+        addButton(new UiButton(BUTTON_CLEAR, x, y, fit(clear), 20, clear));
+        x += fit(clear) + 4;
+        String apply = I18n.format("gui.combat_drones.planner.apply");
+        addButton(new UiButton(BUTTON_SEND, x, y, fit(apply), 20, apply));
+        x += fit(apply) + 4;
+        // Same slot, swapped by refreshButtons: Launch / Launch & Fly for a grounded unit, View / Take control /
+        // Return to runway in flight
+        String launch = I18n.format("gui.combat_drones.planner.launch");
+        String launchFly = I18n.format("gui.combat_drones.planner.launch_fly");
+        launchButton = addButton(new UiButton(BUTTON_LAUNCH, x, y, fit(launch), 20, launch));
+        launchFlyButton = addButton(new UiButton(BUTTON_LAUNCH_FLY, x + fit(launch) + 4, y, fit(launchFly), 20, launchFly));
+        String viewLabel = I18n.format("gui.combat_drones.planner.view");
+        String control = I18n.format("gui.combat_drones.planner.take_control");
+        viewButton = addButton(new UiButton(BUTTON_VIEW, x, y, fit(viewLabel), 20, viewLabel));
+        x += fit(viewLabel) + 4;
+        controlButton = addButton(new UiButton(BUTTON_CONTROL, x, y, fit(control), 20, control));
+        x += fit(control) + 4;
+        String returnLabel = I18n.format("gui.combat_drones.planner.return_runway");
+        if (x + fit(returnLabel) > mapRight) {
+            returnLabel = I18n.format("gui.combat_drones.planner.return_short");
+        }
+        returnButton = addButton(new UiButton(BUTTON_RETURN, x, y, Math.min(fit(returnLabel), mapRight - x), 20, returnLabel));
         addButton(new UiButton(BUTTON_CLOSE, width - MARGIN - 50, 5, 50, 18, I18n.format("gui.done")));
 
         int panelY = height - 26;
@@ -245,6 +268,11 @@ public class GuiMissionPlanner extends GuiScreen {
         markButton = addButton(new UiButton(BUTTON_MARK, MARGIN, panelY - 22, PANEL_WIDTH, 20, I18n.format("gui.combat_drones.planner.mark")));
         terminalButton = addButton(new UiButton(BUTTON_TERMINAL, MARGIN, panelY - 44, PANEL_WIDTH, 20, ""));
         refreshButtons();
+    }
+
+    /** Button width for a label: the text plus padding. */
+    private int fit(String label) {
+        return fontRenderer.getStringWidth(label) + 12;
     }
 
     private void refreshButtons() {
@@ -271,10 +299,17 @@ public class GuiMissionPlanner extends GuiScreen {
         controlButton.enabled = viewButton.enabled && type != null && type.getControlScheme() != null && type.getControlScheme().isFlyable();
         boolean fueled = grounded && unit.fuelFraction >= view.minLaunchFuel;
         launchButton.visible = grounded;
-        launchButton.enabled = fueled && !waypoints.isEmpty();
+        launchButton.enabled = fueled && (!waypoints.isEmpty() || terminal == Route.TerminalAction.RETURN);
         // Hand-flown straight off the ramp: only stick types, which need no route (without one they fly straight on)
         launchFlyButton.visible = grounded && type != null && type.getControlScheme() == DroneType.ControlScheme.STICK;
         launchFlyButton.enabled = fueled;
+        returnButton.visible = !grounded && unit != null && unit.allowedTerminals.contains(Route.TerminalAction.RETURN);
+        returnButton.enabled = returnButton.visible && !unit.recalling && landingRunway(unit) != null;
+    }
+
+    /** Where the selected route's Return lands: the runway picked on the map, else the unit's own. */
+    private Route.Runway landingRunway(PlannerOpenPacket.UnitView unit) {
+        return runway != null ? runway : unit.homeRunway;
     }
 
     @Override
@@ -343,7 +378,8 @@ public class GuiMissionPlanner extends GuiScreen {
         }
         for (int index = 0; index < view.units.size(); index++) {
             PlannerOpenPacket.UnitView unit = view.units.get(index);
-            String tag = unit.isGrounded() ? I18n.format("gui.combat_drones.planner.on_ramp") + " " : "";
+            String tag = unit.isGrounded() ? I18n.format("gui.combat_drones.planner.on_ramp") + " "
+                    : unit.recalling ? I18n.format("gui.combat_drones.planner.returning") + " " : "";
             String line = tag + fontRenderer.trimStringToWidth(unitName(unit), PANEL_WIDTH - 34 - fontRenderer.getStringWidth(tag)) + " "
                     + percent(unit.fuelFraction) + "%";
             int color = index == selectedUnit ? Ui.SELECT : unit.isGrounded() ? Ui.FRIENDLY : Ui.TEXT;
@@ -404,6 +440,7 @@ public class GuiMissionPlanner extends GuiScreen {
         buffer.begin(GL11.GL_LINES, DefaultVertexFormats.POSITION_COLOR);
         drawGrid(buffer);
         drawWorldBorder(buffer);
+        drawRunways(buffer, unit);
         if (unit != null) {
             drawRoute(buffer, unit);
             drawDrops(buffer, unit);
@@ -639,6 +676,77 @@ public class GuiMissionPlanner extends GuiScreen {
         }
     }
 
+    /**
+     * The player's runways, outlined to scale with a tick across the threshold (taken ones dimmer), and for a route
+     * that ends in Return a faint leg from the last waypoint (or the unit, when recalled) out to the runway's approach
+     * and down the final.
+     */
+    private void drawRunways(BufferBuilder buffer, PlannerOpenPacket.UnitView unit) {
+        Route.Runway landing = unit == null ? null : landingRunway(unit);
+        for (PlannerOpenPacket.RunwayView view : this.view.runways) {
+            Route.Runway strip = view.runway;
+            boolean target = landing != null && strip.id.equals(landing.id) && terminal == Route.TerminalAction.RETURN;
+            int color = target ? Ui.SELECT : view.free ? RUNWAY_COLOR : RUNWAY_TAKEN;
+            // At least a few pixels wide, so a runway still shows zoomed out
+            double half = Math.max(strip.width / 2, 2 / scale);
+            double length = Math.max(strip.length, 6 / scale);
+            double[][] corners = {{0, -half}, {length, -half}, {length, half}, {0, half}};
+            for (int corner = 0; corner < 4; corner++) {
+                double[] from = corners[corner];
+                double[] to = corners[(corner + 1) % 4];
+                clippedLine(buffer, strip.pointX(from[0], from[1]), strip.pointZ(from[0], from[1]), strip.pointX(to[0], to[1]),
+                        strip.pointZ(to[0], to[1]), color);
+            }
+        }
+        if (landing == null || terminal != Route.TerminalAction.RETURN && !unit.recalling) {
+            return;
+        }
+        double fromX = unit.x;
+        double fromZ = unit.z;
+        if (!unit.recalling && !waypoints.isEmpty()) {
+            fromX = waypoints.get(waypoints.size() - 1).x;
+            fromZ = waypoints.get(waypoints.size() - 1).z;
+        }
+        double fixX = landing.pointX(-40, 0);
+        double fixZ = landing.pointZ(-40, 0);
+        clippedLine(buffer, fromX, fromZ, fixX, fixZ, ROUTE_FAINT);
+        clippedLine(buffer, fixX, fixZ, landing.x, landing.z, ROUTE_FAINT);
+    }
+
+    /** The runway under the cursor, or null. */
+    private PlannerOpenPacket.RunwayView runwayAt(int screenX, int screenY) {
+        double worldX = toWorldX(screenX);
+        double worldZ = toWorldZ(screenY);
+        double slack = PICK_RADIUS_PX / scale;
+        for (PlannerOpenPacket.RunwayView view : this.view.runways) {
+            double along = view.runway.along(worldX, worldZ);
+            if (along > -slack && along < view.runway.length + slack && Math.abs(view.runway.cross(worldX, worldZ)) < view.runway.width / 2 + slack) {
+                return view;
+            }
+        }
+        return null;
+    }
+
+    /** Right-click on a runway: land the selected plane there at the end of its route. */
+    private PlannerContextMenu runwayMenu(PlannerOpenPacket.RunwayView picked, int mouseX, int mouseY) {
+        PlannerContextMenu runwayMenu = new PlannerContextMenu(mouseX, mouseY);
+        EntityLaunchRamp.Kind kind = EntityLaunchRamp.Kind.values()[Math.min(picked.kind, EntityLaunchRamp.Kind.values().length - 1)];
+        runwayMenu.row(PlannerContextMenu.Segment.label(() -> I18n.format("item.combat_drones." + kind.getName() + ".name")));
+        PlannerOpenPacket.UnitView unit = currentUnit();
+        DroneType type = currentType();
+        if (unit == null || type == null || !unit.allowedTerminals.contains(Route.TerminalAction.RETURN)) {
+            return runwayMenu;
+        }
+        if (!kind.accepts(type)) {
+            return runwayMenu.row(PlannerContextMenu.Segment.label(() -> I18n.format("gui.combat_drones.planner.menu.too_small")));
+        }
+        return runwayMenu.row(PlannerContextMenu.Segment.command(() -> I18n.format("gui.combat_drones.planner.menu.land_here"), () -> {
+            runway = picked.runway;
+            terminal = Route.TerminalAction.RETURN;
+            dirty = true;
+        }));
+    }
+
     /** Interpolated live positions for units the client is tracking, smoother than the packet refresh. */
     private void followTrackedUnits(float partialTicks) {
         for (PlannerOpenPacket.UnitView unit : view.units) {
@@ -829,9 +937,12 @@ public class GuiMissionPlanner extends GuiScreen {
                 panning = true;
             }
         } else if (button == 1) {
+            PlannerOpenPacket.RunwayView runwayHit = hit >= 0 ? null : runwayAt(mouseX, mouseY);
             if (hit >= 0) {
                 selectedWaypoint = hit;
                 menu = waypointMenu(hit, mouseX, mouseY);
+            } else if (runwayHit != null) {
+                menu = runwayMenu(runwayHit, mouseX, mouseY);
             } else {
                 menu = addMenu(toWorldX(mouseX), toWorldZ(mouseY), mouseX, mouseY);
             }
@@ -1091,6 +1202,12 @@ public class GuiMissionPlanner extends GuiScreen {
                 }
                 mc.displayGuiScreen(null);
                 return;
+            case BUTTON_RETURN:
+                if (currentUnit() != null) {
+                    // The route on screen stays as it is: Apply sends it again and the plane takes it back up
+                    ModNetwork.CHANNEL.sendToServer(PlannerSubmitPacket.forRecall(currentUnit().entityId));
+                }
+                break;
             case BUTTON_VIEW:
             case BUTTON_CONTROL:
                 if (currentUnit() != null) {
@@ -1161,7 +1278,7 @@ public class GuiMissionPlanner extends GuiScreen {
     }
 
     private Route currentRoute() {
-        return new Route(waypoints, terminal, loiterRadius, target);
+        return new Route(waypoints, terminal, loiterRadius, target, runway);
     }
 
     private void send(boolean launch, boolean fly) {

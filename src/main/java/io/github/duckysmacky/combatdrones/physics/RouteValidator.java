@@ -35,7 +35,8 @@ public final class RouteValidator {
     }
 
     public static String validate(Route route, double startX, double startZ, Limits limits, Set<Route.TerminalAction> allowedTerminals) {
-        if (route.size() == 0) {
+        // A Return with nothing on the way (a ferry to another runway) needs no waypoints
+        if (route.size() == 0 && route.getTerminal() != Route.TerminalAction.RETURN) {
             return "message.combat_drones.route.empty";
         }
         if (route.size() > limits.maxWaypoints) {

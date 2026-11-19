@@ -8,7 +8,10 @@ import net.minecraftforge.fml.common.network.simpleimpl.IMessage;
 import net.minecraftforge.fml.common.network.simpleimpl.IMessageHandler;
 import net.minecraftforge.fml.common.network.simpleimpl.MessageContext;
 
-/** Client to server: a route for a ramp's unit (optionally launching it, or launching and flying it) or for an airborne unit. Validated server-side. */
+/**
+ * Client to server: a route for a ramp's unit (optionally launching it, or launching and flying it) or for an airborne
+ * unit, or an airborne plane's "Return to runway". Validated server-side.
+ */
 public class PlannerSubmitPacket implements IMessage {
     int rampId = -1;
     int unitId = -1;
@@ -16,6 +19,8 @@ public class PlannerSubmitPacket implements IMessage {
     boolean launch;
     /** With launch: take manual control the moment it leaves the ramp. */
     boolean fly;
+    /** "Return to runway" for an airborne unit: no route, it sets its own aside and lands. */
+    boolean recall;
 
     public PlannerSubmitPacket() {
     }
@@ -26,6 +31,12 @@ public class PlannerSubmitPacket implements IMessage {
         packet.route = route;
         packet.launch = launch;
         packet.fly = fly;
+        return packet;
+    }
+
+    public static PlannerSubmitPacket forRecall(int unitId) {
+        PlannerSubmitPacket packet = forUnit(unitId, Route.empty(Route.TerminalAction.RETURN));
+        packet.recall = true;
         return packet;
     }
 
@@ -42,6 +53,7 @@ public class PlannerSubmitPacket implements IMessage {
         buf.writeInt(unitId);
         buf.writeBoolean(launch);
         buf.writeBoolean(fly);
+        buf.writeBoolean(recall);
         RouteCodec.write(buf, route);
     }
 
@@ -51,6 +63,7 @@ public class PlannerSubmitPacket implements IMessage {
         unitId = buf.readInt();
         launch = buf.readBoolean();
         fly = buf.readBoolean();
+        recall = buf.readBoolean();
         route = RouteCodec.read(buf);
     }
 

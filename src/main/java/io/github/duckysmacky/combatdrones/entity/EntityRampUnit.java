@@ -511,6 +511,12 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder, LockOn
         return route.getRunway() != null ? route.getRunway() : homeRunway;
     }
 
+    /** The runway it took off from, or null. */
+    @Nullable
+    public Route.Runway getHomeRunway() {
+        return homeRunway;
+    }
+
     /** "Return to runway" was pressed: flying back to land, the route set aside until the next Apply. */
     public boolean isRecalling() {
         return recalling;

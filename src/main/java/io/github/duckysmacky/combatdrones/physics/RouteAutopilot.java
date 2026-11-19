@@ -107,7 +107,8 @@ public final class RouteAutopilot {
 
     public static Command guide(FixedWingFlight.State state, Route route, int waypointIndex, Situation situation, FixedWingFlight.Params params) {
         if (route.size() == 0) {
-            return new Command(hold(state, situation, params), waypointIndex, Phase.ROUTE);
+            return route.getTerminal() == Route.TerminalAction.RETURN ? returnToRunway(state, situation, params, waypointIndex)
+                    : new Command(hold(state, situation, params), waypointIndex, Phase.ROUTE);
         }
         int index = Math.min(waypointIndex, route.size());
         if (index < route.size()) {

@@ -27,6 +27,8 @@ class RouteValidatorTest {
     @Test
     void rejectsEmptyAndOversizedRoutes() {
         assertEquals("message.combat_drones.route.empty", RouteValidator.validate(Route.empty(TerminalAction.LOITER), 0, 0, LIMITS, MUNITION));
+        // Straight back to land on a runway needs no waypoints
+        assertNull(RouteValidator.validate(Route.empty(TerminalAction.RETURN), 0, 0, LIMITS, RouteValidator.allowedTerminals(true, true)));
         Waypoint point = new Waypoint(10, 10, 30);
         assertEquals("message.combat_drones.route.too_many_waypoints", validate(TerminalAction.LOITER, point, point, point, point));
     }
