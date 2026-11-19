@@ -40,11 +40,11 @@ public final class Emp {
         }
 
         public static Rules station() {
-            return new Rules(ModConfig.stationSpares, ModConfig.stationOnContact, ModConfig.stationDisableSeconds, ModConfig.stationFizzlePower);
+            return new Rules(ModConfig.stationSpares, ModConfig.stationOnContact, ModConfig.stationDisableSeconds, ModConfig.stationDestroyBlastPower);
         }
 
         public static Rules blast() {
-            return new Rules(ModConfig.blastSpares, ModConfig.blastOnContact, ModConfig.blastDisableSeconds, ModConfig.blastFizzlePower);
+            return new Rules(ModConfig.blastSpares, ModConfig.blastOnContact, ModConfig.blastDisableSeconds, ModConfig.blastDestroyBlastPower);
         }
     }
 

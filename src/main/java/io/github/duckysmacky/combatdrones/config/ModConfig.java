@@ -63,13 +63,32 @@ public final class ModConfig {
             "general.grenadeBlastBonus", "general.racerShrapnelDamage", "general.grenadeShrapnelDamage", "general.shrapnelRadius",
             // Short-lived during the drone rework: a shared [drone] table and lock-on stats in [drones.<id>]
             "drone", "drones.recon_uav.lockOnHoldSeconds", "drones.recon_uav.lockOnDurationSeconds",
-            "drones.recon_drone.lockOnHoldSeconds", "drones.recon_drone.lockOnDurationSeconds"};
+            "drones.recon_drone.lockOnHoldSeconds", "drones.recon_drone.lockOnDurationSeconds",
+            // Renamed (values carried over, see MOVED_KEYS)
+            "missiles.missileIgnitionSeconds", "missiles.missileLiftoffSeconds", "missiles.missileSlowClimbSeconds",
+            "missiles.missileFastClimbSeconds", "missiles.missileLiftoffSpeed", "missiles.missileSlowClimbSpeed", "missiles.missileFastClimbSpeed",
+            "missiles.missileSteerRateDegrees", "missiles.missileBoostMultiplier", "missiles.missileShrapnelDamage",
+            "missiles.missileShrapnelRadius", "emp_station.fizzlePower", "emp_blast.fizzlePower"};
     /** Keys moved to another table: {old, new}. An old value is carried over unless the new key is already set. */
     private static final String[][] MOVED_KEYS = {{"uav.ignoredTeams", "general.ignoredTeams"},
             {"general.racerShrapnelDamage", "racer_drone.shrapnelDamage"}, {"general.racerShrapnelDamage", "standard_drone.shrapnelDamage"},
             {"general.racerShrapnelDamage", "recon_drone.shrapnelDamage"}, {"general.shrapnelRadius", "racer_drone.shrapnelRadius"},
             {"general.shrapnelRadius", "standard_drone.shrapnelRadius"}, {"general.shrapnelRadius", "recon_drone.shrapnelRadius"},
-            {"general.grenadeShrapnelDamage", "standard_drone.grenadeShrapnelDamage"}};
+            {"general.grenadeShrapnelDamage", "standard_drone.grenadeShrapnelDamage"},
+            // Renamed: [missiles] lost its redundant prefix, the EMP blast keys say what they are
+            {"missiles.missileIgnitionSeconds", "missiles.ignitionSeconds"},
+            {"missiles.missileLiftoffSeconds", "missiles.liftoffSeconds"},
+            {"missiles.missileSlowClimbSeconds", "missiles.slowClimbSeconds"},
+            {"missiles.missileFastClimbSeconds", "missiles.fastClimbSeconds"},
+            {"missiles.missileLiftoffSpeed", "missiles.liftoffSpeed"},
+            {"missiles.missileSlowClimbSpeed", "missiles.slowClimbSpeed"},
+            {"missiles.missileFastClimbSpeed", "missiles.fastClimbSpeed"},
+            {"missiles.missileSteerRateDegrees", "missiles.steerRateDegrees"},
+            {"missiles.missileBoostMultiplier", "missiles.boostMultiplier"},
+            {"missiles.missileShrapnelDamage", "missiles.shrapnelDamage"},
+            {"missiles.missileShrapnelRadius", "missiles.shrapnelRadius"},
+            {"emp_station.fizzlePower", "emp_station.destroyBlastPower"},
+            {"emp_blast.fizzlePower", "emp_blast.destroyBlastPower"}};
 
     // [general]
     public static boolean blockDamageEnabled = true;
@@ -115,7 +134,7 @@ public final class ModConfig {
     public static String stationSpares = "owner";
     public static String stationOnContact = "disable";
     public static double stationDisableSeconds = 5.0;
-    public static double stationFizzlePower = 5.0;
+    public static double stationDestroyBlastPower = 5.0;
 
     // [emp_blast]
     public static double blastRadius = 18.0;
@@ -127,7 +146,7 @@ public final class ModConfig {
     public static String blastSpares = "owner";
     public static String blastOnContact = "disable";
     public static double blastDisableSeconds = 5.0;
-    public static double blastFizzlePower = 5.0;
+    public static double blastDestroyBlastPower = 5.0;
 
     // [stinger]
     public static double stingerDamage = 100.0;
@@ -405,13 +424,13 @@ public final class ModConfig {
                     "Whose vehicles the field leaves alone: none, owner (whoever placed the station) or team (the owner and their "
                             + "scoreboard teammates, see general.ignoredTeams).");
             stationOnContact = defaults.choice("emp_station.onContact", stationOnContact, ON_CONTACT,
-                    "What the field does to a flying vehicle it touches: destroy (it's knocked out with only a fizzlePower blast: "
+                    "What the field does to a flying vehicle it touches: destroy (it's knocked out with only a destroyBlastPower blast: "
                             + "no warhead, bombs or fuel going off) or disable (for disableSeconds its motors cut out and it falls, nobody "
-                            + "can fly, view or re-route it; hitting anything meanwhile destroys it with the same fizzlePower blast, except a cruise "
+                            + "can fly, view or re-route it; hitting anything meanwhile destroys it with the same destroyBlastPower blast, except a cruise "
                             + "missile, whose warhead still goes off).");
             stationDisableSeconds = defaults.number("emp_station.disableSeconds", stationDisableSeconds, 0.5, 120,
                     "How long a vehicle stays disabled (onContact = disable), in seconds, counted from when it last touched the field.");
-            stationFizzlePower = defaults.number("emp_station.fizzlePower", stationFizzlePower, 0, 10,
+            stationDestroyBlastPower = defaults.number("emp_station.destroyBlastPower", stationDestroyBlastPower, 0, 10,
                     "Blast power of a vehicle the field knocks out, or of a disabled one crashing (vanilla TNT = 4). 0 = no blast, just a wreck.");
 
             blastRadius = defaults.number("emp_blast.radius", blastRadius, 1, 32, "Radius the EMP blast grows to, in blocks.");
@@ -428,13 +447,13 @@ public final class ModConfig {
                     "Whose vehicles the blast leaves alone: none, owner (the user) or team (the user and their scoreboard teammates, "
                             + "see general.ignoredTeams).");
             blastOnContact = defaults.choice("emp_blast.onContact", blastOnContact, ON_CONTACT,
-                    "What the blast does to a flying vehicle it touches: destroy (it's knocked out with only a fizzlePower blast: "
+                    "What the blast does to a flying vehicle it touches: destroy (it's knocked out with only a destroyBlastPower blast: "
                             + "no warhead, bombs or fuel going off) or disable (for disableSeconds its motors cut out and it falls, nobody "
-                            + "can fly, view or re-route it; hitting anything meanwhile destroys it with the same fizzlePower blast, except a cruise "
+                            + "can fly, view or re-route it; hitting anything meanwhile destroys it with the same destroyBlastPower blast, except a cruise "
                             + "missile, whose warhead still goes off).");
             blastDisableSeconds = defaults.number("emp_blast.disableSeconds", blastDisableSeconds, 0.5, 120,
                     "How long a vehicle stays disabled (onContact = disable), in seconds, counted from when it last touched the blast.");
-            blastFizzlePower = defaults.number("emp_blast.fizzlePower", blastFizzlePower, 0, 10,
+            blastDestroyBlastPower = defaults.number("emp_blast.destroyBlastPower", blastDestroyBlastPower, 0, 10,
                     "Blast power of a vehicle the blast knocks out, or of a disabled one crashing (vanilla TNT = 4). 0 = no blast, just a wreck.");
 
             stingerDamage = defaults.number("stinger.damage", stingerDamage, 0, 1000,
@@ -488,19 +507,19 @@ public final class ModConfig {
             gunHitMargin = defaults.number("weapons.gunHitMargin", gunHitMargin, 0, 2,
                     "Blocks added around targets' hitboxes for gun rounds, so fast passes still connect.");
 
-            missileIgnitionSeconds = defaults.number("missiles.missileIgnitionSeconds", missileIgnitionSeconds, 0, 60,
+            missileIgnitionSeconds = defaults.number("missiles.ignitionSeconds", missileIgnitionSeconds, 0, 60,
                     "Cruise missile launch: seconds the engine burns on the pad before it lifts off.");
-            missileLiftoffSeconds = defaults.number("missiles.missileLiftoffSeconds", missileLiftoffSeconds, 0.5, 60,
+            missileLiftoffSeconds = defaults.number("missiles.liftoffSeconds", missileLiftoffSeconds, 0.5, 60,
                     "Seconds of the slow rise off the pad.");
-            missileSlowClimbSeconds = defaults.number("missiles.missileSlowClimbSeconds", missileSlowClimbSeconds, 0.5, 60,
+            missileSlowClimbSeconds = defaults.number("missiles.slowClimbSeconds", missileSlowClimbSeconds, 0.5, 60,
                     "Seconds of the slow climb (still easy to hit).");
-            missileFastClimbSeconds = defaults.number("missiles.missileFastClimbSeconds", missileFastClimbSeconds, 0.5, 60,
+            missileFastClimbSeconds = defaults.number("missiles.fastClimbSeconds", missileFastClimbSeconds, 0.5, 60,
                     "Seconds of the fast climb, after which the missile is out of sight and ready to strike.");
-            missileLiftoffSpeed = defaults.number("missiles.missileLiftoffSpeed", missileLiftoffSpeed, 0.01, 2,
+            missileLiftoffSpeed = defaults.number("missiles.liftoffSpeed", missileLiftoffSpeed, 0.01, 2,
                     "Climb speed reached at the end of liftoff, in blocks/tick.");
-            missileSlowClimbSpeed = defaults.number("missiles.missileSlowClimbSpeed", missileSlowClimbSpeed, 0.01, 4,
+            missileSlowClimbSpeed = defaults.number("missiles.slowClimbSpeed", missileSlowClimbSpeed, 0.01, 4,
                     "Climb speed reached at the end of the slow climb, in blocks/tick.");
-            missileFastClimbSpeed = defaults.number("missiles.missileFastClimbSpeed", missileFastClimbSpeed, 0.01, 8,
+            missileFastClimbSpeed = defaults.number("missiles.fastClimbSpeed", missileFastClimbSpeed, 0.01, 8,
                     "Climb speed reached at the end of the fast climb, in blocks/tick.");
             strikeRange = defaults.number("missiles.strikeRange", strikeRange, 16, 20000,
                     "How far from its pad a cruise missile can strike, in blocks.");
@@ -510,16 +529,16 @@ public final class ModConfig {
                     "Blocks above the ground at the strike point where the dive starts.");
             steerConeDegrees = defaults.number("missiles.steerConeDegrees", steerConeDegrees, 0, 60,
                     "How far from straight down the pilot can steer the dive, in degrees.");
-            missileSteerRateDegrees = defaults.number("missiles.missileSteerRateDegrees", missileSteerRateDegrees, 0.1, 10,
+            missileSteerRateDegrees = defaults.number("missiles.steerRateDegrees", missileSteerRateDegrees, 0.1, 10,
                     "Fastest the dive can be turned, in degrees per tick.");
-            missileBoostMultiplier = defaults.number("missiles.missileBoostMultiplier", missileBoostMultiplier, 1, 5,
+            missileBoostMultiplier = defaults.number("missiles.boostMultiplier", missileBoostMultiplier, 1, 5,
                     "Dive speed multiplier while the pilot holds boost (Space).");
             fuelBlastPower = defaults.number("missiles.fuelBlastPower", fuelBlastPower, 0, 20,
                     "Blast when a cruise missile is shot down or crashes before its dive (its fuel; the warhead only goes off on impact "
                             + "in the dive). Vanilla TNT = 4.");
-            missileShrapnelDamage = defaults.number("missiles.missileShrapnelDamage", missileShrapnelDamage, 0, 60,
-                    "Shrapnel damage (half-hearts) at point blank from a warhead impact, falling off to 0 at missileShrapnelRadius.");
-            missileShrapnelRadius = defaults.number("missiles.missileShrapnelRadius", missileShrapnelRadius, 0, 64,
+            missileShrapnelDamage = defaults.number("missiles.shrapnelDamage", missileShrapnelDamage, 0, 60,
+                    "Shrapnel damage (half-hearts) at point blank from a warhead impact, falling off to 0 at shrapnelRadius.");
+            missileShrapnelRadius = defaults.number("missiles.shrapnelRadius", missileShrapnelRadius, 0, 64,
                     "Reach of warhead shrapnel, in blocks.");
             strikeAlertRadius = defaults.number("missiles.strikeAlertRadius", strikeAlertRadius, 0, 1024,
                     "Players within this many blocks of the strike point get the INBOUND alarm when the dive starts (0 = nobody).");
