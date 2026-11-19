@@ -77,7 +77,7 @@ class AssetsTest {
 
     @Test
     void everyModelTextureExists() throws IOException {
-        for (String folder : new String[]{"models/item", "models/block"}) {
+        for (String folder : new String[]{"models/item"}) {
             for (Path model : list(folder, ".json")) {
                 JsonObject textures = json(model).getAsJsonObject("textures");
                 if (textures == null) {

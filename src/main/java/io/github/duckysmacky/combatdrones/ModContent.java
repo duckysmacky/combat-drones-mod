@@ -11,7 +11,6 @@ import io.github.duckysmacky.combatdrones.entity.EntityPilotBody;
 import io.github.duckysmacky.combatdrones.entity.EntityRampUnit;
 import io.github.duckysmacky.combatdrones.entity.EntityRocket;
 import io.github.duckysmacky.combatdrones.item.ItemBattery;
-import io.github.duckysmacky.combatdrones.item.ItemBlockWithTooltip;
 import io.github.duckysmacky.combatdrones.item.ItemBomb;
 import io.github.duckysmacky.combatdrones.item.ItemDrone;
 import io.github.duckysmacky.combatdrones.item.ItemEmpBlast;
@@ -32,7 +31,6 @@ import io.github.duckysmacky.combatdrones.type.DroneType;
 import io.github.duckysmacky.combatdrones.type.DroneTypes;
 import io.github.duckysmacky.combatdrones.type.RocketType;
 import net.minecraft.block.Block;
-import net.minecraft.block.material.Material;
 import net.minecraft.creativetab.CreativeTabs;
 import net.minecraft.init.SoundEvents;
 import net.minecraft.item.Item;
@@ -79,7 +77,7 @@ public final class ModContent {
 
     /**
      * Creative tab position: FPV gear (0+), hand-flown drones (100+), batteries and payloads (200+), ramp gear (400+),
-     * ramp units (500+), their ammo (600+), anti-drone gear (700+), anything else (800), the not yet functional Rearm Station last.
+     * ramp units (500+), their ammo (600+), anti-drone gear (700+), anything else (800).
      */
     private static int tabRank(ItemStack stack) {
         Item item = stack.getItem();
@@ -102,7 +100,7 @@ public final class ModContent {
                 return bases[group] + index;
             }
         }
-        return item == Item.getItemFromBlock(rearmStation) ? 900 : 800;
+        return 800;
     }
 
     /** Cosmetic helmet: no protection, never wears out. Wearing it is what lets a player enter FPV. */
@@ -116,7 +114,6 @@ public final class ModContent {
     public static Item planeRamp;
     public static Item missilePad;
     public static Item missileTablet;
-    public static Block rearmStation;
 
     public static Item lightBattery;
     public static Item standardBattery;
@@ -147,17 +144,9 @@ public final class ModContent {
     }
 
     @SubscribeEvent
-    public static void registerBlocks(RegistryEvent.Register<Block> event) {
-        rearmStation = simpleBlock("rearm_station");
-        event.getRegistry().registerAll(rearmStation);
-    }
-
-    // Forge fires the block registry event before the item one, so the blocks exist here
-    @SubscribeEvent
     public static void registerItems(RegistryEvent.Register<Item> event) {
         launchRamp = register(event, named(new ItemLaunchRamp(EntityLaunchRamp.Kind.MUNITION), EntityLaunchRamp.Kind.MUNITION.getName()));
         planeRamp = register(event, named(new ItemLaunchRamp(EntityLaunchRamp.Kind.PLANE), EntityLaunchRamp.Kind.PLANE.getName()));
-        register(event, new ItemBlockWithTooltip(rearmStation));
         fpvRemote = register(event, named(new ItemRemote(), "fpv_remote"));
         fpvGoggles = register(event, named(new ItemGoggles(GOGGLES_MATERIAL), "fpv_goggles"));
         missionPlanner = register(event, named(new ItemMissionPlanner(), "mission_planner"));
@@ -190,11 +179,15 @@ public final class ModContent {
         }
     }
 
-    /** The Launch Ramp used to be a block; worlds from before it became an entity just drop the old blocks. */
+    /**
+     * Retired blocks just disappear from old worlds: the Launch Ramp (now an entity) and the never functional Rearm
+     * Station.
+     */
     @SubscribeEvent
     public static void dropRetiredBlocks(RegistryEvent.MissingMappings<Block> event) {
         for (RegistryEvent.MissingMappings.Mapping<Block> mapping : event.getAllMappings()) {
-            if (mapping.key.equals(new ResourceLocation(CombatDrones.MOD_ID, "launch_ramp"))) {
+            if (mapping.key.equals(new ResourceLocation(CombatDrones.MOD_ID, "launch_ramp"))
+                    || mapping.key.equals(new ResourceLocation(CombatDrones.MOD_ID, "rearm_station"))) {
                 mapping.ignore();
             }
         }
@@ -203,10 +196,17 @@ public final class ModContent {
     /**
      * Renamed items carry over: the Missile Control Tablet was briefly the Strike Laptop (link and all), and the
      * Strike and Attack Planes were the two Gunship Planes (fuel and ammo kept), the FPV drones were the three racers.
+     * Retired items (the Rearm Station) just disappear.
      */
+    private static final List<String> RETIRED_ITEMS = Arrays.asList("rearm_station");
+
     @SubscribeEvent
     public static void remapRenamedItems(RegistryEvent.MissingMappings<Item> event) {
         for (RegistryEvent.MissingMappings.Mapping<Item> mapping : event.getAllMappings()) {
+            if (RETIRED_ITEMS.contains(mapping.key.getPath()) && mapping.key.getNamespace().equals(CombatDrones.MOD_ID)) {
+                mapping.ignore();
+                continue;
+            }
             if (mapping.key.equals(new ResourceLocation(CombatDrones.MOD_ID, "strike_laptop"))) {
                 mapping.remap(missileTablet);
                 continue;
@@ -323,14 +323,6 @@ public final class ModContent {
             default:
                 return lightBattery;
         }
-    }
-
-    private static Block simpleBlock(String name) {
-        return named(new Block(Material.IRON).setHardness(3.0F).setResistance(10.0F), name);
-    }
-
-    private static Block named(Block block, String name) {
-        return block.setRegistryName(CombatDrones.MOD_ID, name).setTranslationKey(CombatDrones.MOD_ID + "." + name).setCreativeTab(TAB);
     }
 
     private static Item simpleItem(String name) {
