@@ -140,9 +140,6 @@ public final class RemoteSessions {
         if (control && (type.getControlScheme() == null || !type.getControlScheme().isFlyable())) {
             return "message.combat_drones.remote.not_flyable";
         }
-        if (unit.isDisabled()) {
-            return unit.disabledMessage();
-        }
         Session other = sessionOf(unit);
         if (other != null && other.player != player) {
             return "message.combat_drones.remote.busy";
@@ -172,9 +169,6 @@ public final class RemoteSessions {
     public static String startMissile(EntityPlayerMP player, EntityCruiseMissile missile) {
         if (missile.getPadId() == null || !ItemMissileTablet.isHoldingLinked(player, missile.getPadId())) {
             return "message.combat_drones.tablet.unguided";
-        }
-        if (missile.isEmpDisabled()) {
-            return "message.combat_drones.emp.disabled";
         }
         if (SESSIONS.containsKey(player.getUniqueID())) {
             end(player, null);

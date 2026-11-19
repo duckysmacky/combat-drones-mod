@@ -573,7 +573,7 @@ public class EntityHandFlownDrone extends Entity implements ChunkAnchor.Holder, 
             drone.clearPilot(LinkLoss.NONE);
             return;
         }
-        String problem = drone.isDisabled() ? "message.combat_drones.emp.disabled" : drone.checkPilot(player);
+        String problem = drone.checkPilot(player);
         if (problem != null) {
             player.sendStatusMessage(new TextComponentTranslation(problem), true);
             return;
