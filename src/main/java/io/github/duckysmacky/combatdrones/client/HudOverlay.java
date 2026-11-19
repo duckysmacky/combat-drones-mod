@@ -47,7 +47,7 @@ public final class HudOverlay {
     private static final int GOING_DOWN_ALARM_TICKS = 9;
     private static final int EMP_ALARM_TICKS = 12;
     private static int alarmDelay;
-    /** How far the Stinger has to be raised ({@code StingerController.scopeAmount}) before its scope fills the screen. */
+    /** How far the Stinger has to be raised ({@code LauncherController.scopeAmount}) before its scope fills the screen. */
     private static final float SCOPE_SHOWN = 0.5F;
     /** What the current feed is looking through, and when it came up (for the flight timer and the link-up static). */
     private static Entity session;
@@ -90,7 +90,7 @@ public final class HudOverlay {
             event.setCanceled(true);
         }
         // Through the Stinger's scope: its reticle is the crosshair
-        if (event.getType() == ElementType.CROSSHAIRS && StingerController.scopeAmount(event.getPartialTicks()) > SCOPE_SHOWN) {
+        if (event.getType() == ElementType.CROSSHAIRS && LauncherController.scopeAmount(event.getPartialTicks()) > SCOPE_SHOWN) {
             event.setCanceled(true);
         }
     }
@@ -117,7 +117,7 @@ public final class HudOverlay {
             FpvFeed.draw(resolution, drone, drone.getDroneType(), feed, flown, event.getPartialTicks());
         }
         if (feed == null) {
-            if (StingerController.scopeAmount(event.getPartialTicks()) > SCOPE_SHOWN) {
+            if (LauncherController.scopeAmount(event.getPartialTicks()) > SCOPE_SHOWN) {
                 StingerScope.draw(resolution, event.getPartialTicks());
             } else {
                 StingerScope.drawHip(resolution, event.getPartialTicks());

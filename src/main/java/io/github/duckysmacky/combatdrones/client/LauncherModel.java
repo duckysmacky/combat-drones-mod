@@ -14,16 +14,16 @@ import javax.vecmath.Matrix4f;
 import java.util.List;
 
 /**
- * The Stinger's item model: its flat sprite in the inventory and in item frames, its 3D geo model (drawn by
+ * A launcher's item model: its flat sprite in the inventory and in item frames, its 3D geo model (drawn by
  * {@link GeoModels.ItemRenderer}) everywhere else. Remembers which view was asked for last, so the renderer knows
  * when it is drawing the first-person view.
  */
-final class StingerModel implements IBakedModel {
+final class LauncherModel implements IBakedModel {
     private static ItemCameraTransforms.TransformType lastView = ItemCameraTransforms.TransformType.NONE;
     private final IBakedModel held;
     private final IBakedModel icon;
 
-    StingerModel(IBakedModel held, IBakedModel icon) {
+    LauncherModel(IBakedModel held, IBakedModel icon) {
         this.held = held;
         this.icon = icon;
     }

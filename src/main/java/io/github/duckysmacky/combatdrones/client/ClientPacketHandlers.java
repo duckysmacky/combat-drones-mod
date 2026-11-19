@@ -109,7 +109,7 @@ public final class ClientPacketHandlers {
     }
 
     public static void onStingerState(StingerStatePacket packet) {
-        StingerController.onState(packet.getTargetId(), packet.getProgress());
+        LauncherController.onState(packet.getTargetId(), packet.getProgress());
     }
 
     public static void onDroneState(DroneStatePacket packet) {

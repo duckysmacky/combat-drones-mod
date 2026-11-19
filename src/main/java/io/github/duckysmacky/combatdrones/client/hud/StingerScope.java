@@ -1,7 +1,7 @@
 package io.github.duckysmacky.combatdrones.client.hud;
 
 import io.github.duckysmacky.combatdrones.client.DroneKeys;
-import io.github.duckysmacky.combatdrones.client.StingerController;
+import io.github.duckysmacky.combatdrones.client.LauncherController;
 import io.github.duckysmacky.combatdrones.client.Tooltips;
 import io.github.duckysmacky.combatdrones.config.ModConfig;
 import io.github.duckysmacky.combatdrones.item.ItemStinger;
@@ -35,13 +35,13 @@ public final class StingerScope {
 
     /** Not aiming: a reminder under the crosshair when the tube is empty. */
     public static void drawHip(ScaledResolution resolution, float partialTicks) {
-        ItemStack stack = StingerController.held();
+        ItemStack stack = LauncherController.held();
         if (stack.isEmpty() || ItemStinger.isLoaded(stack)) {
             return;
         }
         int centerX = resolution.getScaledWidth() / 2;
         int y = resolution.getScaledHeight() / 2 + 14;
-        float reload = StingerController.reloadProgress(partialTicks);
+        float reload = LauncherController.reloadProgress(partialTicks);
         if (reload > 0) {
             Ui.textCentered(I18n.format("hud.combat_drones.stinger.reloading"), centerX, y, Ui.WARN);
             Ui.bar(centerX - 20, y + 11, 40, 2, reload, Ui.WARN);
@@ -56,9 +56,9 @@ public final class StingerScope {
         double centerX = width / 2.0;
         double centerY = height / 2.0;
         double optic = Math.min(width, height) * 0.46;
-        float progress = StingerController.getProgress();
+        float progress = LauncherController.getProgress();
         boolean locked = progress >= 1;
-        boolean loaded = ItemStinger.isLoaded(StingerController.held());
+        boolean loaded = ItemStinger.isLoaded(LauncherController.held());
         int tone = locked ? Ui.DANGER : progress > 0 ? Ui.WARN : Ui.HUD_GREEN;
 
         // Glass: a faint cold tint, then everything outside the optic blacked out with a soft inner edge
@@ -104,7 +104,7 @@ public final class StingerScope {
         }
 
         int textY = (int) (centerY + seeker + 10);
-        float reload = StingerController.reloadProgress(partialTicks);
+        float reload = LauncherController.reloadProgress(partialTicks);
         String status = reload > 0 ? I18n.format("hud.combat_drones.stinger.reloading")
                 : !loaded ? I18n.format("hud.combat_drones.stinger.empty", Tooltips.keyName(DroneKeys.RELOAD))
                 : locked ? I18n.format("hud.combat_drones.stinger.locked")
@@ -116,7 +116,7 @@ public final class StingerScope {
         if (reload > 0) {
             Ui.bar((int) centerX - 24, textY + 11, 48, 2, reload, Ui.WARN);
         }
-        Entity target = StingerController.getTarget();
+        Entity target = LauncherController.getTarget();
         Entity viewer = Minecraft.getMinecraft().getRenderViewEntity();
         if (target != null && viewer != null) {
             Ui.textCentered(target.getName(), (float) centerX, (int) (centerY - seeker - 22), tone);
@@ -125,7 +125,7 @@ public final class StingerScope {
         }
         Ui.text(I18n.format(loaded ? "hud.combat_drones.stinger.ready" : "hud.combat_drones.stinger.no_missile"),
                 (float) (centerX - optic * 0.62), (float) (centerY + optic * 0.55), loaded ? Ui.HUD_GREEN : Ui.DANGER);
-        Ui.textRight(I18n.format("hud.combat_drones.stinger.zoom", StingerController.ZOOM), (float) (centerX + optic * 0.62),
+        Ui.textRight(I18n.format("hud.combat_drones.stinger.zoom", LauncherController.zoom()), (float) (centerX + optic * 0.62),
                 (float) (centerY + optic * 0.55), Ui.DIM);
     }
 

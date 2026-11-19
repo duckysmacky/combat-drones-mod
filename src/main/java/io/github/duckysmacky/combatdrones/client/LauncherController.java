@@ -1,12 +1,11 @@
 package io.github.duckysmacky.combatdrones.client;
 
 import io.github.duckysmacky.combatdrones.CombatDrones;
-import io.github.duckysmacky.combatdrones.ModContent;
 import io.github.duckysmacky.combatdrones.client.hud.UiSounds;
-import io.github.duckysmacky.combatdrones.entity.StingerServer;
+import io.github.duckysmacky.combatdrones.item.ItemLauncher;
 import io.github.duckysmacky.combatdrones.item.ItemStinger;
 import io.github.duckysmacky.combatdrones.network.ModNetwork;
-import io.github.duckysmacky.combatdrones.network.StingerInputPacket;
+import io.github.duckysmacky.combatdrones.network.LauncherInputPacket;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.audio.ISound;
 import net.minecraft.client.audio.PositionedSoundRecord;
@@ -25,14 +24,13 @@ import net.minecraftforge.fml.relauncher.Side;
 import javax.annotation.Nullable;
 
 /**
- * The Stinger in this player's hands: sends the trigger (attack key) and the reload key to the server, keeps what the
- * server says the seeker is doing, and plays its tones (beeps quickening as the lock builds, a steady tone once
- * locked). Aiming itself is vanilla item use; {@link #scopeAmount} eases the scope in and out for the camera.
+ * The launcher ({@link ItemLauncher}) in this player's hands: sends the trigger (attack key, pressed and released) and
+ * the reload key to the server. For the Stinger it also keeps what the server says the seeker is doing, and plays its
+ * tones (beeps quickening as the lock builds, a steady tone once locked). Raising it is vanilla item use;
+ * {@link #scopeAmount} eases the sight in and out for the camera.
  */
 @Mod.EventBusSubscriber(modid = CombatDrones.MOD_ID, value = Side.CLIENT)
-public final class StingerController {
-    /** How much the scope magnifies. */
-    public static final float ZOOM = 2.5F;
+public final class LauncherController {
     /** Ticks the scope takes to come up or down. */
     private static final float SCOPE_TICKS = 4;
     /** Seek beeps come this many ticks apart at first, then faster as the lock builds. */
@@ -49,14 +47,20 @@ public final class StingerController {
     @Nullable
     private static ISound lockTone;
 
-    private StingerController() {
+    private LauncherController() {
     }
 
     /** The launcher in the main hand, or an empty stack. */
     public static ItemStack held() {
         EntityPlayerSP player = Minecraft.getMinecraft().player;
         ItemStack stack = player == null ? ItemStack.EMPTY : player.getHeldItemMainhand();
-        return stack.getItem() instanceof ItemStinger ? stack : ItemStack.EMPTY;
+        return stack.getItem() instanceof ItemLauncher ? stack : ItemStack.EMPTY;
+    }
+
+    /** How much the held launcher's sight magnifies (1 with none). */
+    public static float zoom() {
+        ItemStack stack = held();
+        return stack.isEmpty() ? 1 : ((ItemLauncher) stack.getItem()).zoom();
     }
 
     /** Holding the launcher up (right-click held), in any view. */
@@ -74,13 +78,14 @@ public final class StingerController {
     /** 0..1 through a reload (0 when not reloading). */
     public static float reloadProgress(float partialTicks) {
         EntityPlayerSP player = Minecraft.getMinecraft().player;
-        float left = player == null ? 0 : player.getCooldownTracker().getCooldown(ModContent.stinger, partialTicks);
+        ItemStack stack = held();
+        float left = stack.isEmpty() ? 0 : player.getCooldownTracker().getCooldown(stack.getItem(), partialTicks);
         return left <= 0 ? 0 : 1 - left;
     }
 
-    /** 0 = the seeker has nothing, up to 1 = locked. */
+    /** The Stinger's seeker: 0 = it has nothing, up to 1 = locked. */
     public static float getProgress() {
-        return held().isEmpty() ? 0 : progress;
+        return held().getItem() instanceof ItemStinger ? progress : 0;
     }
 
     /** The aircraft the seeker is on, if this client can see it. */
@@ -113,15 +118,15 @@ public final class StingerController {
         // Edge-detected on the key state: vanilla swallows attack clicks while an item is in use
         boolean fire = holding && minecraft.gameSettings.keyBindAttack.isKeyDown();
         boolean reload = holding && DroneKeys.RELOAD.isKeyDown();
-        if (fire && !fireHeld) {
-            ModNetwork.CHANNEL.sendToServer(new StingerInputPacket(StingerServer.ACTION_FIRE));
+        if (fire != fireHeld) {
+            ModNetwork.CHANNEL.sendToServer(new LauncherInputPacket(fire ? LauncherInputPacket.ACTION_PRESS : LauncherInputPacket.ACTION_RELEASE));
         }
         if (reload && !reloadHeld) {
-            ModNetwork.CHANNEL.sendToServer(new StingerInputPacket(StingerServer.ACTION_RELOAD));
+            ModNetwork.CHANNEL.sendToServer(new LauncherInputPacket(LauncherInputPacket.ACTION_RELOAD));
         }
         fireHeld = fire;
         reloadHeld = reload;
-        tones(minecraft, holding && isAiming() ? progress : 0);
+        tones(minecraft, holding && isAiming() ? getProgress() : 0);
     }
 
     private static void tones(Minecraft minecraft, float lock) {

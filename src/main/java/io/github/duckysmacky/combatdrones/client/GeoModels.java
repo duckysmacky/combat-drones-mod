@@ -1,6 +1,7 @@
 package io.github.duckysmacky.combatdrones.client;
 
 import io.github.duckysmacky.combatdrones.CombatDrones;
+import io.github.duckysmacky.combatdrones.item.ItemLauncher;
 import io.github.duckysmacky.combatdrones.item.ItemStinger;
 import io.github.duckysmacky.combatdrones.type.DroneType;
 import io.github.duckysmacky.combatdrones.type.DroneTypes;
@@ -372,8 +373,8 @@ public final class GeoModels implements IGeoRenderer<Object> {
             GlStateManager.pushMatrix();
             GlStateManager.translate(0.5F, 0.5F, 0.5F);
             spinProps(name, 0, 0);
-            if (stack.getItem() instanceof ItemStinger) {
-                poseStinger(name, stack);
+            if (stack.getItem() instanceof ItemLauncher) {
+                poseLauncher(name, stack, stack.getItem() instanceof ItemStinger ? "missile" : "cell");
             }
             GlStateManager.scale(scale, scale, scale);
             GlStateManager.translate(-(box[0] + box[3]) / 2, -(box[1] + box[4]) / 2, -(box[2] + box[5]) / 2);
@@ -382,13 +383,13 @@ public final class GeoModels implements IGeoRenderer<Object> {
         }
 
         /**
-         * The Stinger's round shows in the muzzle only while one is loaded. Reloading, in first person: the tube tips
+         * A launcher's round ({@code bone}) shows only while one is loaded. Reloading, in first person: the tube tips
          * nose-down, the new round slides in from the breech, the tube comes back up.
          */
-        private static void poseStinger(String name, ItemStack stack) {
-            boolean loaded = ItemStinger.isLoaded(stack);
-            float reload = loaded || !StingerModel.isFirstPerson() ? 0 : StingerController.reloadProgress(Minecraft.getMinecraft().getRenderPartialTicks());
-            show(name, "missile", loaded || reload >= RELOAD_TIP);
+        private static void poseLauncher(String name, ItemStack stack, String bone) {
+            boolean loaded = ItemLauncher.isLoaded(stack);
+            float reload = loaded || !LauncherModel.isFirstPerson() ? 0 : LauncherController.reloadProgress(Minecraft.getMinecraft().getRenderPartialTicks());
+            show(name, bone, loaded || reload >= RELOAD_TIP);
             if (reload <= 0) {
                 return;
             }
@@ -396,7 +397,7 @@ public final class GeoModels implements IGeoRenderer<Object> {
             GlStateManager.translate(0, -0.12F * tip, 0);
             GlStateManager.rotate(50 * tip, 1, 0, 0);
             float seated = ease((reload - RELOAD_TIP) / (1 - 2 * RELOAD_TIP - 0.1F));
-            offset(name, "missile", 0, 0, 24 * (1 - seated));
+            offset(name, bone, 0, 0, 24 * (1 - seated));
         }
 
         private static float ease(float amount) {

@@ -6,6 +6,7 @@ import io.github.duckysmacky.combatdrones.ModSounds;
 import io.github.duckysmacky.combatdrones.config.ModConfig;
 import io.github.duckysmacky.combatdrones.item.ItemStinger;
 import io.github.duckysmacky.combatdrones.network.EffectPacket;
+import io.github.duckysmacky.combatdrones.network.LauncherInputPacket;
 import io.github.duckysmacky.combatdrones.network.LockWarningPacket;
 import io.github.duckysmacky.combatdrones.network.ModNetwork;
 import io.github.duckysmacky.combatdrones.network.StingerStatePacket;
@@ -38,8 +39,6 @@ import java.util.UUID;
  */
 @Mod.EventBusSubscriber(modid = CombatDrones.MOD_ID)
 public final class StingerServer {
-    public static final int ACTION_FIRE = 0;
-    public static final int ACTION_RELOAD = 1;
     /** Ticks the target may slip out of the circle (or behind something) before the seeker gives up. */
     private static final int GRACE_TICKS = 5;
     private static final int WARNING_INTERVAL_TICKS = 5;
@@ -90,7 +89,7 @@ public final class StingerServer {
             STATES.put(player.getUniqueID(), state);
         }
         if (state.reloading > 0 && --state.reloading == 0) {
-            finishReload(player, stack);
+            LauncherReload.finish(player, stack);
         }
         boolean aiming = state.reloading == 0 && ItemStinger.isLoaded(stack) && player.isHandActive() && player.getActiveHand() == EnumHand.MAIN_HAND;
         seek(player, state, aiming);
@@ -109,7 +108,7 @@ public final class StingerServer {
     private static void putDown(EntityPlayerMP player, State state) {
         STATES.remove(player.getUniqueID());
         if (state.reloading > 0) {
-            player.getCooldownTracker().removeCooldown(ModContent.stinger);
+            LauncherReload.cancel(player, (ItemStinger) ModContent.stinger);
         }
         warn(state, null, false, 0);
         if (state.sentTarget >= 0 || state.sentProgress > 0) {
@@ -196,17 +195,17 @@ public final class StingerServer {
         return server == null || owner == null ? null : server.getPlayerList().getPlayerByUUID(owner);
     }
 
-    /** From the client: the trigger or the reload key. */
+    /** From the client: the trigger (pressed) or the reload key. */
     public static void onInput(EntityPlayerMP player, int action) {
         ItemStack stack = player.getHeldItemMainhand();
         State state = STATES.get(player.getUniqueID());
         if (!(stack.getItem() instanceof ItemStinger) || state == null || state.reloading > 0 || !player.isEntityAlive()) {
             return;
         }
-        if (action == ACTION_FIRE) {
+        if (action == LauncherInputPacket.ACTION_PRESS) {
             fire(player, state, stack);
-        } else if (action == ACTION_RELOAD) {
-            startReload(player, state, stack);
+        } else if (action == LauncherInputPacket.ACTION_RELOAD) {
+            state.reloading = Math.max(0, LauncherReload.start(player, stack));
         }
     }
 
@@ -229,33 +228,6 @@ public final class StingerServer {
         state.locked = -1;
         player.world.playSound(null, player.posX, player.posY + player.getEyeHeight(), player.posZ, ModSounds.STINGER_FIRE, SoundCategory.PLAYERS, 4.0F, 1.0F);
         EffectPacket.stingerLaunch(player.world, muzzle, look);
-    }
-
-    private static void startReload(EntityPlayerMP player, State state, ItemStack stack) {
-        if (ItemStinger.isLoaded(stack)) {
-            return;
-        }
-        if (!player.capabilities.isCreativeMode && !player.inventory.hasItemStack(new ItemStack(ModContent.stingerMissile))) {
-            player.sendStatusMessage(new TextComponentTranslation("message.combat_drones.stinger.no_missiles"), true);
-            Feedback.deny(player);
-            return;
-        }
-        player.resetActiveHand();
-        state.reloading = (int) Math.round(ModConfig.stingerReloadSeconds * 20);
-        player.world.playSound(null, player.posX, player.posY + player.getEyeHeight(), player.posZ, ModSounds.STINGER_RELOAD, SoundCategory.PLAYERS, 1.0F, 1.0F);
-        if (state.reloading == 0) {
-            finishReload(player, stack);
-        } else {
-            // The sweep over the icon, and what the client times its reload animation by
-            player.getCooldownTracker().setCooldown(ModContent.stinger, state.reloading);
-        }
-    }
-
-    private static void finishReload(EntityPlayerMP player, ItemStack stack) {
-        // Checked again: the missile may have been dropped meanwhile
-        if (player.capabilities.isCreativeMode || player.inventory.clearMatchingItems(ModContent.stingerMissile, -1, 1, null) > 0) {
-            ItemStinger.setLoaded(stack, true);
-        }
     }
 
     /** A flying vehicle this player's launcher will go for. */

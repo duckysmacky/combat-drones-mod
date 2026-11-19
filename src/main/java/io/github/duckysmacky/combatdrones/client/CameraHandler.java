@@ -88,9 +88,9 @@ public final class CameraHandler {
             event.setFOV(event.getFOV() / RemoteController.getZoom());
         }
         // Through the Stinger's scope, easing in as it comes up
-        float scope = StingerController.scopeAmount((float) event.getRenderPartialTicks());
+        float scope = LauncherController.scopeAmount((float) event.getRenderPartialTicks());
         if (scope > 0) {
-            event.setFOV(event.getFOV() / (1 + (StingerController.ZOOM - 1) * scope));
+            event.setFOV(event.getFOV() / (1 + (LauncherController.zoom() - 1) * scope));
         }
         StingerScope.setFov(event.getFOV());
     }
@@ -113,7 +113,7 @@ public final class CameraHandler {
 
     @SubscribeEvent
     public static void onRenderHand(RenderHandEvent event) {
-        if (PilotController.getPilotedDrone() != null || RemoteController.isActive() || StingerController.scopeAmount(event.getPartialTicks()) > 0.5F) {
+        if (PilotController.getPilotedDrone() != null || RemoteController.isActive() || LauncherController.scopeAmount(event.getPartialTicks()) > 0.5F) {
             event.setCanceled(true);
         }
     }
