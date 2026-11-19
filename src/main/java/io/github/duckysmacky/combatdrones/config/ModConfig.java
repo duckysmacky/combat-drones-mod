@@ -153,9 +153,9 @@ public final class ModConfig {
     public static boolean shotDownPlanes = true;
     public static boolean shotDownDrones = false;
     public static boolean shotDownMunitions = false;
-    public static double shotDownFallingHP = 20.0;
-    public static double shotDownDrag = 0.15;
-    public static double shotDownFallAcceleration = 5.0;
+    public static double shotDownFallingHP = 40.0;
+    public static double shotDownDrag = 0.08;
+    public static double shotDownFallAcceleration = 4.0;
     public static double shotDownMaxFallSpeed = 25.0;
     public static double shotDownRollDegreesPerSecond = 90.0;
     public static double shotDownTurnDegreesPerSecond = 12.0;
