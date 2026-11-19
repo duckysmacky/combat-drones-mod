@@ -97,6 +97,8 @@ public class EntityLaunchRamp extends Entity implements ChunkAnchor.Holder {
     private static final DataParameter<Integer> KIND = EntityDataManager.createKey(EntityLaunchRamp.class, DataSerializers.VARINT);
     private static final DataParameter<String> UNIT_TYPE = EntityDataManager.createKey(EntityLaunchRamp.class, DataSerializers.STRING);
     private static final DataParameter<Float> FUEL_FRACTION = EntityDataManager.createKey(EntityLaunchRamp.class, DataSerializers.FLOAT);
+    /** Knocked out by an EMP field: nothing launches from it until it wears off. */
+    private static final DataParameter<Boolean> EMP_DISABLED = EntityDataManager.createKey(EntityLaunchRamp.class, DataSerializers.BOOLEAN);
 
     @Nullable
     private UUID owner;
@@ -106,6 +108,8 @@ public class EntityLaunchRamp extends Entity implements ChunkAnchor.Holder {
     /** Linked to its owner's Mission Planner; cleared whenever the unit leaves the ramp. */
     private boolean linked;
     private final ChunkAnchor anchor = new ChunkAnchor(this);
+    /** Ticks left EMP-disabled. */
+    private int empTicks;
 
     public EntityLaunchRamp(World world) {
         super(world);
@@ -123,6 +127,7 @@ public class EntityLaunchRamp extends Entity implements ChunkAnchor.Holder {
         dataManager.register(KIND, 0);
         dataManager.register(UNIT_TYPE, "");
         dataManager.register(FUEL_FRACTION, 0.0F);
+        dataManager.register(EMP_DISABLED, false);
     }
 
     public Kind getKind() {
@@ -143,7 +148,16 @@ public class EntityLaunchRamp extends Entity implements ChunkAnchor.Holder {
     public void onUpdate() {
         // Static: no gravity or motion; only vanilla bookkeeping (prev positions etc.)
         super.onUpdate();
-        if (!world.isRemote && ticksExisted % 20 == 0) {
+        if (world.isRemote) {
+            if (isEmpDisabled() && rand.nextInt(3) == 0) {
+                Emp.crackle(this);
+            }
+            return;
+        }
+        if (empTicks > 0 && --empTicks == 0) {
+            dataManager.set(EMP_DISABLED, false);
+        }
+        if (ticksExisted % 20 == 0) {
             if (isLinked()) {
                 anchor.hold(posX, posZ);
             } else {
@@ -174,6 +188,12 @@ public class EntityLaunchRamp extends Entity implements ChunkAnchor.Holder {
 
     public boolean isLoaded() {
         return getUnitType() != null;
+    }
+
+    /** The loaded unit's owner, or null with none aboard. */
+    @Nullable
+    public UUID getOwner() {
+        return owner;
     }
 
     public boolean isOwnedBy(EntityPlayer player) {
@@ -407,6 +427,16 @@ public class EntityLaunchRamp extends Entity implements ChunkAnchor.Holder {
         return stack;
     }
 
+    public boolean isEmpDisabled() {
+        return dataManager.get(EMP_DISABLED);
+    }
+
+    /** Server: an EMP field knocks it out for {@code ticks} (topped up while it stays in the field): no launches meanwhile. */
+    void empDisable(int ticks) {
+        empTicks = Math.max(empTicks, ticks);
+        dataManager.set(EMP_DISABLED, true);
+    }
+
     /** Server: launches the unit from the end of the rail along the ramp's heading; returns it, or null if empty. */
     @Nullable
     public EntityRampUnit launch() {
@@ -504,6 +534,7 @@ public class EntityLaunchRamp extends Entity implements ChunkAnchor.Holder {
         ItemDrone.writeLoadout(compound, loadout);
         compound.setTag("Route", RouteCodec.toNbt(route));
         compound.setBoolean("Linked", linked);
+        compound.setInteger("EmpTicks", empTicks);
     }
 
     @Override
@@ -515,5 +546,7 @@ public class EntityLaunchRamp extends Entity implements ChunkAnchor.Holder {
         loadout = ItemDrone.readLoadout(compound);
         route = RouteCodec.fromNbt(compound.getCompoundTag("Route"), Route.TerminalAction.LOITER);
         linked = compound.getBoolean("Linked");
+        empTicks = compound.getInteger("EmpTicks");
+        dataManager.set(EMP_DISABLED, empTicks > 0);
     }
 }

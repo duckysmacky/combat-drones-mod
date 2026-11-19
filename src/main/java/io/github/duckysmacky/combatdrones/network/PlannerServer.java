@@ -166,6 +166,11 @@ public final class PlannerServer {
             openAll(player, ramp.getEntityId());
             return;
         }
+        if (ramp.isEmpDisabled()) {
+            status(player, "message.combat_drones.ramp.emp_disabled");
+            openAll(player, ramp.getEntityId());
+            return;
+        }
         if (ramp.getFuelFraction() < ModConfig.minLaunchFuel) {
             status(player, "message.combat_drones.planner.low_fuel");
             openAll(player, ramp.getEntityId());

@@ -17,8 +17,8 @@ import javax.annotation.Nullable;
 import java.util.UUID;
 
 /**
- * EMP fields (the station's and the blast gadget's): every flying drone, ramp unit or missile whose hitbox touches the
- * sphere is either destroyed with a small blast (no warhead, bombs or fuel going off) or disabled for a while (motors
+ * EMP fields (the station's and the blast gadget's): a launch ramp the field touches can't launch until it wears off
+ * (whatever onContact says). Every flying drone, ramp unit or missile whose hitbox touches the sphere is either destroyed with a small blast (no warhead, bombs or fuel going off) or disabled for a while (motors
  * off, gliding down out of control, see {@code [state.emped]}), per the field's {@link Rules}. A kind that
  * {@code [state.emped]} leaves out is destroyed instead. A hand-flown drone sitting on the ground isn't flying and is
  * left alone.
@@ -53,10 +53,18 @@ public final class Emp {
     /** Server, every tick a field is up. */
     public static void fry(World world, Vec3d centre, double radius, @Nullable UUID fieldOwner, Rules rules) {
         AxisAlignedBB reach = new AxisAlignedBB(centre.x, centre.y, centre.z, centre.x, centre.y, centre.z).grow(radius + 4);
-        for (Entity entity : world.getEntitiesWithinAABB(Entity.class, reach, entity -> entity != null && !entity.isDead && isVehicle(entity))) {
+        for (Entity entity : world.getEntitiesWithinAABB(Entity.class, reach, entity -> entity != null && !entity.isDead && (isVehicle(entity) || entity instanceof EntityLaunchRamp))) {
             AxisAlignedBB box = entity.getEntityBoundingBox();
             if (!FieldContact.touches(centre.x, centre.y, centre.z, radius, box.minX, box.minY, box.minZ, box.maxX, box.maxY, box.maxZ)
                     || spared(fieldOwner, ownerOf(entity), rules.spares)) {
+                continue;
+            }
+            if (entity instanceof EntityLaunchRamp) {
+                EntityLaunchRamp launcher = (EntityLaunchRamp) entity;
+                if (!launcher.isEmpDisabled()) {
+                    EffectPacket.empZap(world, new Vec3d(entity.posX, entity.posY + entity.height / 2, entity.posZ), Math.max(entity.width, entity.height));
+                }
+                launcher.empDisable(rules.disableTicks);
                 continue;
             }
             boolean ramp = entity instanceof EntityRampUnit;
@@ -107,6 +115,9 @@ public final class Emp {
 
     @Nullable
     static UUID ownerOf(Entity entity) {
+        if (entity instanceof EntityLaunchRamp) {
+            return ((EntityLaunchRamp) entity).getOwner();
+        }
         return entity instanceof EntityRampUnit ? ((EntityRampUnit) entity).getOwner() : ((EntityHandFlownDrone) entity).getOwner();
     }
 
