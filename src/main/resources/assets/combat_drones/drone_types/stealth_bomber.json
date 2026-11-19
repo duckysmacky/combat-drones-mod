@@ -8,6 +8,8 @@
   "batteryOrFuelCapacity": 7200,
   "drainRatePerTick": 1.0,
   "blastPower": 5.0,
+  // Too big for the Light Runway
+  "heavyRunway": true,
   // Bomb bay units: 96 small, 48 medium or 24 large bombs, one size at a time (see [aerial_bombs.*] bayUnits)
   "payloadCapacity": 96,
   "maxHP": 200,

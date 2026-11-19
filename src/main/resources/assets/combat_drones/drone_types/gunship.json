@@ -9,6 +9,8 @@
   "batteryOrFuelCapacity": 7200,
   "drainRatePerTick": 1.0,
   "blastPower": 5.0,
+  // Too big for the Light Runway
+  "heavyRunway": true,
   // Cannon shells (Cannon Shell items, one each)
   "payloadCapacity": 128,
   "maxHP": 250,

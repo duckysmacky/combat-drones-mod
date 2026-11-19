@@ -90,6 +90,18 @@ class DroneTypeTest {
         assertEquals(DroneType.WeaponType.NONE, type.getWeaponType());
         assertTrue(type.isImpactDetonates());
         assertTrue(type.isArmed());
+        assertFalse(type.isHeavyRunway());
+        assertTrue(parse(RACER.replace("\"impactDetonates\": true", "\"heavyRunway\": true")).isHeavyRunway());
+    }
+
+    /** The big planes need the Heavy Runway; everything else that lands fits the Light one. */
+    @Test
+    void bundledHeavyRunwayTypes() throws IOException {
+        for (String id : new String[]{"gunship", "stealth_bomber", "strike_plane", "attack_plane", "recon_uav"}) {
+            try (Reader reader = Files.newBufferedReader(Paths.get("src/main/resources/assets/combat_drones/drone_types/" + id + ".json"))) {
+                assertEquals(id.equals("gunship") || id.equals("stealth_bomber"), DroneType.parse(id, reader).isHeavyRunway(), id);
+            }
+        }
     }
 
     @Test

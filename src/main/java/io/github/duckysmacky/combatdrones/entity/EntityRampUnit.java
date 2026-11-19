@@ -16,6 +16,7 @@ import io.github.duckysmacky.combatdrones.physics.FixedWingFlight;
 import io.github.duckysmacky.combatdrones.physics.HandFlownFlight;
 import io.github.duckysmacky.combatdrones.physics.Route;
 import io.github.duckysmacky.combatdrones.physics.RouteAutopilot;
+import io.github.duckysmacky.combatdrones.physics.RunwayOps;
 import io.github.duckysmacky.combatdrones.type.AerialBombType;
 import io.github.duckysmacky.combatdrones.type.DroneType;
 import io.github.duckysmacky.combatdrones.type.DroneTypes;
@@ -138,6 +139,14 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder, LockOn
     private double homeZ = Double.NaN;
     protected double fuel;
     protected float health;
+    /** The runway it took off from: where it goes back to land. Null for units summoned without one. */
+    @Nullable
+    private Route.Runway homeRunway;
+    /** On the runway's deck: rolling for takeoff (no flight model, no collisions), or flying. */
+    private boolean takingOff;
+    private int takeoffTicks;
+    /** Just lifted off: climbing straight ahead to {@link RunwayOps#CLIMB_OUT_HEIGHT} before turning onto the route. */
+    private boolean climbingOut;
     // Manual control ("Take control"): the controller's latest input, and when it arrived
     private double manualPitch;
     private double manualRoll;
@@ -214,6 +223,16 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder, LockOn
         flight.pitch = -10;
         flight.speed = type.getMaxSpeed() * 0.8;
         rotationYaw = heading;
+        syncPresentation();
+    }
+
+    /** Server, before spawning: start on {@code runway}'s deck, standing, and roll out from there. */
+    void startTakeoff(Route.Runway runway) {
+        homeRunway = runway;
+        takingOff = true;
+        takeoffTicks = 0;
+        flight.speed = 0;
+        flight.pitch = 0;
         syncPresentation();
     }
 
@@ -373,6 +392,10 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder, LockOn
 
     /** Server tick of a unit with a known type: route autopilot or manual flight, fuel, movement and collisions. */
     protected void serverUpdate(DroneType type) {
+        if (takingOff) {
+            takeoffRoll(type);
+            return;
+        }
         if (downedFall(type)) {
             return;
         }
@@ -404,6 +427,13 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder, LockOn
             bombRun = 0; // hands on the controls end a carpet run
         } else if (bombRun > 0) {
             controls = flyBombRun(type, params);
+        }
+        if (climbingOut && homeRunway != null) {
+            double climbOutY = homeRunway.y + RunwayOps.CLIMB_OUT_HEIGHT;
+            climbingOut = posY < climbOutY;
+            if (controls == null && climbingOut) {
+                controls = RouteAutopilot.holdCourse(flight, homeRunway.heading, climbOutY + 2, Route.Speed.FAST.fraction, params, fuel > 0);
+            }
         }
         if (controls == null) {
             RouteAutopilot.Command command = autopilotCommand(type, params);
@@ -440,6 +470,28 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder, LockOn
         }
         ReconIntel.sweep(this, type);
         anchor.hold(posX + flight.velocity.x * 20, posZ + flight.velocity.z * 20);
+    }
+
+    /**
+     * Server tick of the takeoff run: spool up, roll down the centreline (moved directly: the deck was checked clear
+     * when the runway went down), and lift off into the climb-out. Nobody's input counts until it's airborne.
+     */
+    private void takeoffRoll(DroneType type) {
+        flight.position.set(posX, posY, posZ);
+        boolean airborne = RunwayOps.takeoffRoll(flight, homeRunway, type.getMaxSpeed(), takeoffTicks++);
+        fuel = Math.max(0, fuel - DroneSystems.drainPerTick(type.getDrainRatePerTick(), 1));
+        setPosition(flight.position.x, flight.position.y, flight.position.z);
+        syncPresentation();
+        anchor.hold(posX + flight.velocity.x * 20, posZ + flight.velocity.z * 20);
+        if (airborne) {
+            takingOff = false;
+            climbingOut = true;
+        }
+    }
+
+    /** On the ground at the start of its takeoff run. */
+    public boolean isTakingOff() {
+        return takingOff;
     }
 
     /** The route (and its terminal action) on autopilot. */
@@ -1162,6 +1214,12 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder, LockOn
         compound.setDouble("LaunchY", launchY);
         compound.setDouble("HomeX", homeX);
         compound.setDouble("HomeZ", homeZ);
+        if (homeRunway != null) {
+            compound.setTag("HomeRunway", RouteCodec.runwayToNbt(homeRunway));
+        }
+        compound.setBoolean("TakingOff", takingOff);
+        compound.setInteger("TakeoffTicks", takeoffTicks);
+        compound.setBoolean("ClimbingOut", climbingOut);
         compound.setDouble("Fuel", fuel);
         compound.setFloat("Health", health);
         lockCharges.write(compound);
@@ -1189,6 +1247,10 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder, LockOn
         launchY = compound.hasKey("LaunchY") ? compound.getDouble("LaunchY") : posY;
         homeX = compound.hasKey("HomeX") ? compound.getDouble("HomeX") : Double.NaN;
         homeZ = compound.hasKey("HomeZ") ? compound.getDouble("HomeZ") : Double.NaN;
+        homeRunway = RouteCodec.runwayFromNbt(compound.getCompoundTag("HomeRunway"));
+        takingOff = homeRunway != null && compound.getBoolean("TakingOff");
+        takeoffTicks = compound.getInteger("TakeoffTicks");
+        climbingOut = compound.getBoolean("ClimbingOut");
         fuel = compound.getDouble("Fuel");
         setHealth(compound.getFloat("Health"));
         lockCharges.read(compound);

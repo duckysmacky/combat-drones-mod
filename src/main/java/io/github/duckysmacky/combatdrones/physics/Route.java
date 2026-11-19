@@ -3,6 +3,7 @@ package io.github.duckysmacky.combatdrones.physics;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * A planned flight for a ramp-launched unit: waypoints (absolute X/Z, altitude above the launch point) plus what to do
@@ -96,11 +97,66 @@ public final class Route {
         }
     }
 
+    /**
+     * A runway to land on (Return). Coordinates are the threshold: the centre of the tail end, at deck height. Planes
+     * take off and land along {@link #heading}, from the threshold toward the far end.
+     */
+    public static final class Runway {
+        public final UUID id;
+        public final double x;
+        public final double y;
+        public final double z;
+        /** Vanilla yaw, a multiple of 90. */
+        public final double heading;
+        public final double length;
+        public final double width;
+
+        public Runway(UUID id, double x, double y, double z, double heading, double length, double width) {
+            this.id = id;
+            this.x = x;
+            this.y = y;
+            this.z = z;
+            this.heading = heading;
+            this.length = length;
+            this.width = width;
+        }
+
+        /** Unit vector along the runway (x, z). */
+        public double dirX() {
+            return -Math.sin(Math.toRadians(heading));
+        }
+
+        public double dirZ() {
+            return Math.cos(Math.toRadians(heading));
+        }
+
+        /** Distance of (px, pz) past the threshold along the runway (negative: before it). */
+        public double along(double px, double pz) {
+            return (px - x) * dirX() + (pz - z) * dirZ();
+        }
+
+        /** Signed distance of (px, pz) from the centreline (positive: to the right, looking along the runway). */
+        public double cross(double px, double pz) {
+            return (px - x) * -dirZ() + (pz - z) * dirX();
+        }
+
+        /** World x / z of the point {@code along} blocks past the threshold and {@code cross} to the right. */
+        public double pointX(double along, double cross) {
+            return x + dirX() * along - dirZ() * cross;
+        }
+
+        public double pointZ(double along, double cross) {
+            return z + dirZ() * along + dirX() * cross;
+        }
+    }
+
     private final List<Waypoint> waypoints;
     private final TerminalAction terminal;
     /** Orbit radius around the last waypoint for LOITER / LOOP endings, in blocks. */
     private final double loiterRadius;
     private final Target target;
+    /** Where Return lands, or null for the unit's home runway. */
+    private final Runway runway;
 
     public Route(List<Waypoint> waypoints, TerminalAction terminal) {
         this(waypoints, terminal, DEFAULT_LOITER_RADIUS);
@@ -111,10 +167,15 @@ public final class Route {
     }
 
     public Route(List<Waypoint> waypoints, TerminalAction terminal, double loiterRadius, Target target) {
+        this(waypoints, terminal, loiterRadius, target, null);
+    }
+
+    public Route(List<Waypoint> waypoints, TerminalAction terminal, double loiterRadius, Target target, Runway runway) {
         this.waypoints = Collections.unmodifiableList(new ArrayList<>(waypoints));
         this.terminal = terminal;
         this.loiterRadius = loiterRadius;
         this.target = target;
+        this.runway = runway;
     }
 
     /** Strike point for Destroy, or null if none is marked. */
@@ -123,7 +184,16 @@ public final class Route {
     }
 
     public Route withTarget(Target newTarget) {
-        return new Route(waypoints, terminal, loiterRadius, newTarget);
+        return new Route(waypoints, terminal, loiterRadius, newTarget, runway);
+    }
+
+    /** Runway Return lands on, or null for the unit's home runway. */
+    public Runway getRunway() {
+        return runway;
+    }
+
+    public Route withRunway(Runway newRunway) {
+        return new Route(waypoints, terminal, loiterRadius, target, newRunway);
     }
 
     public double getLoiterRadius() {
@@ -143,7 +213,7 @@ public final class Route {
             Waypoint last = raised.get(raised.size() - 1);
             raised.set(raised.size() - 1, last.withAltitude(Math.max(last.altitude, minAltitude)));
         }
-        return new Route(raised, terminal, Math.max(loiterRadius, minRadius), target);
+        return new Route(raised, terminal, Math.max(loiterRadius, minRadius), target, runway);
     }
 
     /**
@@ -156,7 +226,7 @@ public final class Route {
             boolean drops = maxCarpetLength >= 0 && waypoint.dropLength >= 0; // false for NaN too
             limited.add(waypoint.withDrop(drops ? Math.min(waypoint.dropLength, maxCarpetLength) : NO_DROP));
         }
-        return new Route(limited, terminal, loiterRadius, target);
+        return new Route(limited, terminal, loiterRadius, target, runway);
     }
 
     public static Route empty(TerminalAction terminal) {

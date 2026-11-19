@@ -2,6 +2,8 @@ package io.github.duckysmacky.combatdrones.client;
 
 import io.github.duckysmacky.combatdrones.entity.Feedback;
 import io.github.duckysmacky.combatdrones.entity.EntityLaunchRamp;
+import io.github.duckysmacky.combatdrones.entity.EntityRunway;
+import io.github.duckysmacky.combatdrones.physics.RunwayOps;
 import io.github.duckysmacky.combatdrones.type.DroneType;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.client.renderer.entity.Render;
@@ -15,7 +17,10 @@ import java.util.WeakHashMap;
 
 import javax.annotation.Nullable;
 
-/** Catapult rail ({@code geo/launch_ramp} or {@code geo/plane_ramp}) with the loaded unit sitting on its carriage. */
+/**
+ * Catapult rail ({@code geo/launch_ramp}) with the loaded unit sitting on its carriage, or a runway
+ * ({@code geo/light_runway}, {@code geo/heavy_runway}) with its plane parked level on the deck.
+ */
 public class RenderLaunchRamp extends Render<EntityLaunchRamp> {
     private static final float PIXEL = 1.0F / 16.0F;
     /** Rail incline, nose up (degrees). Must match the rail bone in launch_ramp.geo.json. */
@@ -51,6 +56,12 @@ public class RenderLaunchRamp extends Render<EntityLaunchRamp> {
         GlStateManager.scale(1 + settle * 0.02F, 1 - settle * 0.05F, 1 + settle * 0.02F);
         EntityLaunchRamp.Kind kind = ramp.getKind();
         DroneType unit = ramp.getUnitType();
+        if (ramp instanceof EntityRunway) {
+            renderRunway((EntityRunway) ramp, kind, unit, partialTicks);
+            GlStateManager.popMatrix();
+            super.doRender(ramp, x, y, z, entityYaw, partialTicks);
+            return;
+        }
         GeoModels.reset(kind.getName());
         GeoModels.show(kind.getName(), "glow_ready", unit != null);
         GeoModels.offset(kind.getName(), "carriage", 0, 0, -CARRIAGE_TRAVEL * kind.railScale() * carriageRun(ramp, partialTicks));
@@ -68,6 +79,31 @@ public class RenderLaunchRamp extends Render<EntityLaunchRamp> {
         GlStateManager.popMatrix();
         super.doRender(ramp, x, y, z, entityYaw, partialTicks);
     }
+
+    /**
+     * The strip, lamps lit, and the parked plane on its seat. Just after a landing the plane taxis back to the seat
+     * from where its roll-out stopped.
+     */
+    private static void renderRunway(EntityRunway runway, EntityLaunchRamp.Kind kind, @Nullable DroneType unit, float partialTicks) {
+        GeoModels.reset(kind.getName());
+        GeoModels.show(kind.getName(), "glow_edge", true);
+        GeoModels.show(kind.getName(), "glow_screen", true);
+        GeoModels.show(kind.getName(), "glow_ready", unit != null);
+        GeoModels.render(kind.getName(), 1.0F, 1.0F, 1.0F);
+        if (unit == null) {
+            return;
+        }
+        double length = kind.getLengthBlocks();
+        double seat = RunwayOps.seat(runway.geometry());
+        double taxi = Math.min(1, (runway.ticksExisted + partialTicks - runway.dockedAt) / TAXI_TICKS);
+        double eased = taxi * taxi * (3 - 2 * taxi);
+        double along = (length - 1) + (seat - (length - 1)) * eased;
+        GlStateManager.translate(0, EntityRunway.DECK_HEIGHT - GeoModels.bounds(GeoModels.nameFor(unit))[1], -length / 2 + along);
+        RenderRampUnit.renderStill(unit);
+    }
+
+    /** Ticks a landed plane takes to taxi back from the far end to its seat. */
+    private static final float TAXI_TICKS = 60.0F;
 
     /** A catapult shot went off at this point: the nearest ramp's carriage runs down its rail. */
     static void launched(World world, Vec3d at) {

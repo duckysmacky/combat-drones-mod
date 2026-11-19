@@ -9,6 +9,7 @@ import io.github.duckysmacky.combatdrones.entity.EntityLaunchRamp;
 import io.github.duckysmacky.combatdrones.entity.EntityMissilePad;
 import io.github.duckysmacky.combatdrones.entity.EntityPilotBody;
 import io.github.duckysmacky.combatdrones.entity.EntityRampUnit;
+import io.github.duckysmacky.combatdrones.entity.EntityRunway;
 import io.github.duckysmacky.combatdrones.entity.EntityRocket;
 import io.github.duckysmacky.combatdrones.item.ItemBattery;
 import io.github.duckysmacky.combatdrones.item.ItemBomb;
@@ -91,7 +92,7 @@ public final class ModContent {
         List<List<Item>> groups = Arrays.asList(
                 Arrays.asList(fpvRemote, fpvGoggles),
                 Arrays.asList(lightBattery, standardBattery, heavyBattery, fragGrenade, bombLight, bomb, bombHeavy),
-                Arrays.asList(launchRamp, planeRamp, missionPlanner, fuelCan, missilePad, missileTablet),
+                Arrays.asList(launchRamp, lightRunway, heavyRunway, missionPlanner, fuelCan, missilePad, missileTablet),
                 Arrays.asList(rocket, rocketHeavy, rifleRounds, cannonShell, howitzerShell, aerialBombSmall, aerialBombMedium, aerialBombLarge),
                 Arrays.asList(pilotDetector, empStation, empBlast, stinger, stingerMissile));
         for (int group = 0; group < groups.size(); group++) {
@@ -111,7 +112,8 @@ public final class ModContent {
     public static final List<Item> ITEMS = new ArrayList<>();
 
     public static Item launchRamp;
-    public static Item planeRamp;
+    public static Item lightRunway;
+    public static Item heavyRunway;
     public static Item missilePad;
     public static Item missileTablet;
 
@@ -146,7 +148,8 @@ public final class ModContent {
     @SubscribeEvent
     public static void registerItems(RegistryEvent.Register<Item> event) {
         launchRamp = register(event, named(new ItemLaunchRamp(EntityLaunchRamp.Kind.MUNITION), EntityLaunchRamp.Kind.MUNITION.getName()));
-        planeRamp = register(event, named(new ItemLaunchRamp(EntityLaunchRamp.Kind.PLANE), EntityLaunchRamp.Kind.PLANE.getName()));
+        lightRunway = register(event, named(new ItemLaunchRamp(EntityLaunchRamp.Kind.LIGHT_RUNWAY), EntityLaunchRamp.Kind.LIGHT_RUNWAY.getName()));
+        heavyRunway = register(event, named(new ItemLaunchRamp(EntityLaunchRamp.Kind.HEAVY_RUNWAY), EntityLaunchRamp.Kind.HEAVY_RUNWAY.getName()));
         fpvRemote = register(event, named(new ItemRemote(), "fpv_remote"));
         fpvGoggles = register(event, named(new ItemGoggles(GOGGLES_MATERIAL), "fpv_goggles"));
         missionPlanner = register(event, named(new ItemMissionPlanner(), "mission_planner"));
@@ -196,9 +199,9 @@ public final class ModContent {
     /**
      * Renamed items carry over: the Missile Control Tablet was briefly the Strike Laptop (link and all), and the
      * Strike and Attack Planes were the two Gunship Planes (fuel and ammo kept), the FPV drones were the three racers.
-     * Retired items (the Rearm Station) just disappear.
+     * Retired items (the Rearm Station, the Plane Ramp) just disappear.
      */
-    private static final List<String> RETIRED_ITEMS = Arrays.asList("rearm_station");
+    private static final List<String> RETIRED_ITEMS = Arrays.asList("rearm_station", "plane_ramp");
 
     @SubscribeEvent
     public static void remapRenamedItems(RegistryEvent.MissingMappings<Item> event) {
@@ -248,6 +251,12 @@ public final class ModContent {
                 .id(new ResourceLocation(CombatDrones.MOD_ID, "launch_ramp"), 3)
                 .name(CombatDrones.MOD_ID + ".launch_ramp")
                 .tracker(128, 20, false)
+                .build());
+        event.getRegistry().register(EntityEntryBuilder.create()
+                .entity(EntityRunway.class)
+                .id(new ResourceLocation(CombatDrones.MOD_ID, "runway"), 10)
+                .name(CombatDrones.MOD_ID + ".runway")
+                .tracker(192, 20, false)
                 .build());
         // Stands still; equipment changes go out with the regular living-entity updates
         event.getRegistry().register(EntityEntryBuilder.create()
@@ -303,7 +312,7 @@ public final class ModContent {
     }
 
     public static Item rampItem(EntityLaunchRamp.Kind kind) {
-        return kind == EntityLaunchRamp.Kind.PLANE ? planeRamp : launchRamp;
+        return kind == EntityLaunchRamp.Kind.LIGHT_RUNWAY ? lightRunway : kind == EntityLaunchRamp.Kind.HEAVY_RUNWAY ? heavyRunway : launchRamp;
     }
 
     public static Item rocketItem(RocketType kind) {

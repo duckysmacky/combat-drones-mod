@@ -40,8 +40,8 @@ import javax.annotation.Nullable;
 import java.util.UUID;
 
 /**
- * Launch Ramp: a rail placed facing exactly where its placer looks, so units can be aimed at any heading. Two sizes: a
- * short Munition Ramp for loitering munitions and a long Plane Ramp for planes and the recon UAV.
+ * Launch Ramp: a rail placed facing exactly where its placer looks, so loitering munitions can be aimed at any
+ * heading. Planes and the recon UAV use runways instead ({@link EntityRunway}), which share all of this.
  * Holds at most one ramp-launched unit (type, owner, fuel) plus the route planned for it; the unit only becomes an
  * {@link EntityRampUnit} when it launches. Left-click (attack) knocks the ramp down, dropping it and its unit.
  * Once its owner links it with a Mission Planner, the unit shows in their planner from anywhere and the ramp keeps
@@ -50,21 +50,41 @@ import java.util.UUID;
 public class EntityLaunchRamp extends Entity implements ChunkAnchor.Holder {
     /** Which ramp it is. The rail geometry scales with the length (the 4-block original is scale 1). */
     public enum Kind {
-        // Ramps placed before the split default to MUNITION (ordinal 0)
-        MUNITION("launch_ramp", 3, 1.6F, 1.7F),
-        PLANE("plane_ramp", 5, 2.2F, 2.3F);
+        // Ramps placed before the split default to MUNITION (ordinal 0); ordinal 1 was the retired Plane Ramp
+        MUNITION("launch_ramp", 3, 1, 1.6F, 1.7F),
+        LIGHT_RUNWAY("light_runway", 6, 2, 2.0F, 1.0F),
+        HEAVY_RUNWAY("heavy_runway", 10, 3, 3.0F, 1.0F);
 
         private final String name;
         private final int lengthBlocks;
+        private final int widthBlocks;
+        /** Runways: their width across the strip (their hitbox is a rectangle, see EntityRunway). */
         private final float hitboxWidth;
-        /** Tall enough to take in the unit sitting on the raised rail, so clicking the unit reaches its ramp. */
+        /** Tall enough to take in the unit sitting on it, so clicking the unit reaches its ramp or runway. */
         private final float hitboxHeight;
 
-        Kind(String name, int lengthBlocks, float hitboxWidth, float hitboxHeight) {
+        Kind(String name, int lengthBlocks, int widthBlocks, float hitboxWidth, float hitboxHeight) {
             this.name = name;
             this.lengthBlocks = lengthBlocks;
+            this.widthBlocks = widthBlocks;
             this.hitboxWidth = hitboxWidth;
             this.hitboxHeight = hitboxHeight;
+        }
+
+        public boolean isRunway() {
+            return this != MUNITION;
+        }
+
+        public int getLengthBlocks() {
+            return lengthBlocks;
+        }
+
+        public int getWidthBlocks() {
+            return widthBlocks;
+        }
+
+        public float getHitboxHeight() {
+            return hitboxHeight;
         }
 
         /** Item registry name, also its geo model. */
@@ -77,9 +97,15 @@ public class EntityLaunchRamp extends Entity implements ChunkAnchor.Holder {
             return lengthBlocks / 4.0F;
         }
 
-        /** Munitions go on the Munition Ramp; everything else that lands (planes, recon UAV) on the Plane Ramp. */
+        /** Munitions go on the Munition Ramp; everything else (planes, recon UAV) on a runway, the big planes a heavy one. */
         public static Kind forUnit(DroneType type) {
-            return type.isImpactDetonates() ? MUNITION : PLANE;
+            return type.isImpactDetonates() ? MUNITION : type.isHeavyRunway() ? HEAVY_RUNWAY : LIGHT_RUNWAY;
+        }
+
+        /** Takes this unit: its own kind, and the Heavy Runway also takes what fits the light one. */
+        public boolean accepts(DroneType type) {
+            Kind needed = forUnit(type);
+            return needed == this || (this == HEAVY_RUNWAY && needed == LIGHT_RUNWAY);
         }
 
         static Kind byIndex(int index) {
@@ -101,12 +127,12 @@ public class EntityLaunchRamp extends Entity implements ChunkAnchor.Holder {
     private static final DataParameter<Boolean> EMP_DISABLED = EntityDataManager.createKey(EntityLaunchRamp.class, DataSerializers.BOOLEAN);
 
     @Nullable
-    private UUID owner;
+    protected UUID owner;
     private double fuel;
     private Loadout loadout = new Loadout();
     private Route route = Route.empty(Route.TerminalAction.LOITER);
-    /** Linked to its owner's Mission Planner; cleared whenever the unit leaves the ramp. */
-    private boolean linked;
+    /** Linked to its owner's Mission Planner; a ramp's link is cleared whenever the unit leaves it, a runway's stays. */
+    protected boolean linked;
     private final ChunkAnchor anchor = new ChunkAnchor(this);
     /** Ticks left EMP-disabled. */
     private int empTicks;
@@ -200,14 +226,14 @@ public class EntityLaunchRamp extends Entity implements ChunkAnchor.Holder {
         return player.getUniqueID().equals(owner);
     }
 
-    /** Linked to its owner's Mission Planner, with a unit on it. */
+    /** Linked to its owner's Mission Planner, with a unit on it (a runway stays linked while its plane is out). */
     public boolean isLinked() {
-        return linked && isLoaded();
+        return linked && (isLoaded() || getKind().isRunway());
     }
 
     /** Server: links the ramp to {@code player}'s Mission Planner. Returns false (with a message) if they can't. */
     public boolean link(EntityPlayer player) {
-        if (!isLoaded()) {
+        if (!isLoaded() && !getKind().isRunway()) {
             refuse(player, "message.combat_drones.ramp.empty");
             return false;
         }
@@ -219,7 +245,7 @@ public class EntityLaunchRamp extends Entity implements ChunkAnchor.Holder {
             linked = true;
             anchor.hold(posX, posZ);
             world.playSound(null, posX, posY, posZ, ModSounds.DRONE_LINK, SoundCategory.BLOCKS, 1.0F, 1.0F);
-            status(player, "message.combat_drones.ramp.linked");
+            status(player, getKind().isRunway() ? "message.combat_drones.runway.linked" : "message.combat_drones.ramp.linked");
         }
         return true;
     }
@@ -240,7 +266,7 @@ public class EntityLaunchRamp extends Entity implements ChunkAnchor.Holder {
         this.route = route;
     }
 
-    private void setFuel(double value) {
+    protected void setFuel(double value) {
         fuel = value;
         DroneType type = getUnitType();
         dataManager.set(FUEL_FRACTION, type == null ? 0 : (float) Math.min(1, value / type.getBatteryOrFuelCapacity()));
@@ -284,12 +310,18 @@ public class EntityLaunchRamp extends Entity implements ChunkAnchor.Holder {
             refuse(player, "message.combat_drones.ramp.not_ramp_unit");
             return;
         }
-        if (Kind.forUnit(type) != getKind()) {
-            refuse(player, Kind.forUnit(type) == Kind.PLANE ? "message.combat_drones.ramp.needs_plane_ramp" : "message.combat_drones.ramp.needs_munition_ramp");
+        if (!getKind().accepts(type)) {
+            Kind needed = Kind.forUnit(type);
+            refuse(player, needed == Kind.MUNITION ? "message.combat_drones.ramp.needs_munition_ramp"
+                    : needed == Kind.HEAVY_RUNWAY ? "message.combat_drones.ramp.needs_heavy_runway" : "message.combat_drones.ramp.needs_runway");
             return;
         }
         if (isLoaded()) {
             refuse(player, "message.combat_drones.ramp.occupied");
+            return;
+        }
+        if (owner != null && !isOwnedBy(player)) { // a runway belongs to whoever placed it
+            refuse(player, "message.combat_drones.ramp.not_owner");
             return;
         }
         dataManager.set(UNIT_TYPE, type.getId());
@@ -437,6 +469,20 @@ public class EntityLaunchRamp extends Entity implements ChunkAnchor.Holder {
         dataManager.set(EMP_DISABLED, true);
     }
 
+    /** The unit's state on the ramp, for subclasses that launch it their own way. */
+    protected double getFuel() {
+        return fuel;
+    }
+
+    /** Server: puts a unit (back) on it as if installed: a runway taking a plane that just landed. */
+    protected void putUnit(DroneType type, UUID unitOwner, double unitFuel, Loadout unitLoadout, Route unitRoute) {
+        dataManager.set(UNIT_TYPE, type.getId());
+        owner = unitOwner;
+        setFuel(Math.min(unitFuel, type.getBatteryOrFuelCapacity()));
+        loadout = unitLoadout.clampTo(type);
+        route = unitRoute;
+    }
+
     /** Server: launches the unit from the end of the rail along the ramp's heading; returns it, or null if empty. */
     @Nullable
     public EntityRampUnit launch() {
@@ -457,10 +503,13 @@ public class EntityLaunchRamp extends Entity implements ChunkAnchor.Holder {
         return unit;
     }
 
-    private void clearUnit() {
+    /** Empties it. A runway keeps its owner and link: it stays its owner's, on their map, for the plane to come back. */
+    protected void clearUnit() {
         dataManager.set(UNIT_TYPE, "");
-        owner = null;
-        linked = false;
+        if (!getKind().isRunway()) {
+            owner = null;
+            linked = false;
+        }
         setFuel(0);
         loadout = new Loadout();
         route = Route.empty(Route.TerminalAction.LOITER);
@@ -548,5 +597,8 @@ public class EntityLaunchRamp extends Entity implements ChunkAnchor.Holder {
         linked = compound.getBoolean("Linked");
         empTicks = compound.getInteger("EmpTicks");
         dataManager.set(EMP_DISABLED, empTicks > 0);
+        if (getClass() == EntityLaunchRamp.class && getKind() != Kind.MUNITION) {
+            setDead(); // a retired Plane Ramp: gone, unit and all
+        }
     }
 }

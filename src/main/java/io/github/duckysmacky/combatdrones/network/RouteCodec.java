@@ -6,8 +6,10 @@ import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
 import net.minecraftforge.common.util.Constants;
 
+import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 /** Route (de)serialization for NBT (ramps, flying units) and packets (Mission Planner). */
 public final class RouteCodec {
@@ -42,6 +44,18 @@ public final class RouteCodec {
             targetTag.setDouble("Z", target.z);
             tag.setTag("Target", targetTag);
         }
+        Route.Runway runway = route.getRunway();
+        if (runway != null) {
+            NBTTagCompound runwayTag = new NBTTagCompound();
+            runwayTag.setUniqueId("Id", runway.id);
+            runwayTag.setDouble("X", runway.x);
+            runwayTag.setDouble("Y", runway.y);
+            runwayTag.setDouble("Z", runway.z);
+            runwayTag.setDouble("Heading", runway.heading);
+            runwayTag.setDouble("Length", runway.length);
+            runwayTag.setDouble("Width", runway.width);
+            tag.setTag("Runway", runwayTag);
+        }
         return tag;
     }
 
@@ -65,7 +79,20 @@ public final class RouteCodec {
             NBTTagCompound targetTag = tag.getCompoundTag("Target");
             target = new Route.Target(targetTag.getDouble("X"), targetTag.getDouble("Y"), targetTag.getDouble("Z"));
         }
-        return new Route(waypoints, terminal, radius, target);
+        return new Route(waypoints, terminal, radius, target, runwayFromNbt(tag.getCompoundTag("Runway")));
+    }
+
+    @Nullable
+    public static Route.Runway runwayFromNbt(NBTTagCompound tag) {
+        if (!tag.hasUniqueId("Id")) {
+            return null;
+        }
+        return new Route.Runway(tag.getUniqueId("Id"), tag.getDouble("X"), tag.getDouble("Y"), tag.getDouble("Z"),
+                tag.getDouble("Heading"), tag.getDouble("Length"), tag.getDouble("Width"));
+    }
+
+    public static NBTTagCompound runwayToNbt(@Nullable Route.Runway runway) {
+        return toNbt(Route.empty(Route.TerminalAction.RETURN).withRunway(runway)).getCompoundTag("Runway");
     }
 
     private static Route.Speed speedOf(String name) {
@@ -95,6 +122,30 @@ public final class RouteCodec {
             buf.writeDouble(target.y);
             buf.writeDouble(target.z);
         }
+        writeRunway(buf, route.getRunway());
+    }
+
+    public static void writeRunway(ByteBuf buf, @Nullable Route.Runway runway) {
+        buf.writeBoolean(runway != null);
+        if (runway != null) {
+            buf.writeLong(runway.id.getMostSignificantBits());
+            buf.writeLong(runway.id.getLeastSignificantBits());
+            buf.writeDouble(runway.x);
+            buf.writeDouble(runway.y);
+            buf.writeDouble(runway.z);
+            buf.writeDouble(runway.heading);
+            buf.writeDouble(runway.length);
+            buf.writeDouble(runway.width);
+        }
+    }
+
+    @Nullable
+    public static Route.Runway readRunway(ByteBuf buf) {
+        if (!buf.readBoolean()) {
+            return null;
+        }
+        UUID id = new UUID(buf.readLong(), buf.readLong());
+        return new Route.Runway(id, buf.readDouble(), buf.readDouble(), buf.readDouble(), buf.readDouble(), buf.readDouble(), buf.readDouble());
     }
 
     public static Route read(ByteBuf buf) {
@@ -113,6 +164,6 @@ public final class RouteCodec {
             waypoints.add(new Route.Waypoint(x, z, altitude, speedIndex < speeds.length ? speeds[speedIndex] : Route.Speed.FAST, buf.readFloat()));
         }
         Route.Target target = buf.readBoolean() ? new Route.Target(buf.readDouble(), buf.readDouble(), buf.readDouble()) : null;
-        return new Route(waypoints, terminal, loiterRadius, target);
+        return new Route(waypoints, terminal, loiterRadius, target, readRunway(buf));
     }
 }

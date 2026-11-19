@@ -101,6 +101,8 @@ public final class DroneType {
     private double rocketCooldownTicks;
     /** Detonates on any collision (racer family). */
     private boolean impactDetonates;
+    /** Planes too big for the Light Runway: they take off from and land on a Heavy Runway. */
+    private boolean heavyRunway;
     /** False for the recon UAV: no warhead or weapon, never dives or strikes (a crash can still set off its fuel). */
     private boolean armed = true;
     /**
@@ -373,6 +375,10 @@ public final class DroneType {
 
     public boolean isImpactDetonates() {
         return impactDetonates;
+    }
+
+    public boolean isHeavyRunway() {
+        return heavyRunway;
     }
 
     public boolean isSensor() {

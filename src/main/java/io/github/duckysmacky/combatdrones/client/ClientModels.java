@@ -26,7 +26,7 @@ public final class ClientModels {
     @SubscribeEvent
     public static void registerModels(ModelRegistryEvent event) {
         for (Item item : ModContent.ITEMS) {
-            if (item instanceof ItemDrone || item == ModContent.launchRamp || item == ModContent.planeRamp || item == ModContent.missilePad
+            if (item instanceof ItemDrone || item == ModContent.launchRamp || item == ModContent.lightRunway || item == ModContent.heavyRunway || item == ModContent.missilePad
                     || item == ModContent.empStation || item == ModContent.stinger) {
                 item.setTileEntityItemStackRenderer(GeoModels.ItemRenderer.INSTANCE);
             }

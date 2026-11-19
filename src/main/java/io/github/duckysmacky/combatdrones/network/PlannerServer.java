@@ -3,6 +3,7 @@ package io.github.duckysmacky.combatdrones.network;
 import io.github.duckysmacky.combatdrones.config.ModConfig;
 import io.github.duckysmacky.combatdrones.entity.EntityCruiseMissile;
 import io.github.duckysmacky.combatdrones.entity.EntityLaunchRamp;
+import io.github.duckysmacky.combatdrones.entity.EntityRunway;
 import io.github.duckysmacky.combatdrones.entity.EntityRampUnit;
 import io.github.duckysmacky.combatdrones.entity.Raytrace;
 import io.github.duckysmacky.combatdrones.entity.RemoteSessions;
@@ -110,7 +111,7 @@ public final class PlannerServer {
         view.rampId = ramp.getEntityId();
         view.typeId = type.getId();
         view.x = ramp.posX;
-        view.y = ramp.posY + 1;
+        view.y = ramp instanceof EntityRunway ? ((EntityRunway) ramp).geometry().y : ramp.posY + 1; // where it takes off
         view.z = ramp.posZ;
         view.heading = ramp.rotationYaw;
         view.fuelFraction = ramp.getFuelFraction();

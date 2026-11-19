@@ -15,6 +15,7 @@ import io.github.duckysmacky.combatdrones.entity.EntityMissilePad;
 import io.github.duckysmacky.combatdrones.entity.EntityPilotBody;
 import io.github.duckysmacky.combatdrones.entity.EntityRocket;
 import io.github.duckysmacky.combatdrones.entity.EntityRampUnit;
+import io.github.duckysmacky.combatdrones.entity.EntityRunway;
 import net.minecraft.client.settings.KeyBinding;
 import net.minecraft.entity.Entity;
 import net.minecraftforge.event.entity.EntityEvent;
@@ -32,6 +33,7 @@ public class ClientProxy extends CommonProxy {
         RenderingRegistry.registerEntityRenderingHandler(EntityBomb.class, RenderProjectile::bomb);
         RenderingRegistry.registerEntityRenderingHandler(EntityRampUnit.class, RenderRampUnit::new);
         RenderingRegistry.registerEntityRenderingHandler(EntityLaunchRamp.class, RenderLaunchRamp::new);
+        RenderingRegistry.registerEntityRenderingHandler(EntityRunway.class, RenderLaunchRamp::new);
         RenderingRegistry.registerEntityRenderingHandler(EntityMissilePad.class, RenderMissilePad::new);
         RenderingRegistry.registerEntityRenderingHandler(EntityEmpStation.class, RenderEmpStation::new);
         RenderingRegistry.registerEntityRenderingHandler(EntityEmpBlast.class, RenderEmpBlast::new);
