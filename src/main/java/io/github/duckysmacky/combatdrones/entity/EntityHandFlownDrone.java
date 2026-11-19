@@ -862,6 +862,15 @@ public class EntityHandFlownDrone extends Entity implements ChunkAnchor.Holder, 
         return dataManager.get(EMP_DISABLED);
     }
 
+    @Override
+    public boolean isDisabled() {
+        return isEmpDisabled();
+    }
+
+    public VehicleState getState() {
+        return isEmpDisabled() ? VehicleState.EMPED : VehicleState.FLYING;
+    }
+
     /** Server: an EMP knocks it out for good: only a small blast, no grenade or bombs going off. */
     void empDestroy(float fizzlePower) {
         setDead();

@@ -190,8 +190,8 @@ public final class PlannerServer {
         if (type == null) {
             return;
         }
-        if (unit.isEmpDisabled()) {
-            status(player, "message.combat_drones.emp.disabled");
+        if (unit.isDisabled()) {
+            status(player, unit.disabledMessage());
             return;
         }
         Route route = prepare(player.world, type, packet.route);
@@ -279,8 +279,8 @@ public final class PlannerServer {
         }
         EntityRampUnit unit = findOwnedUnit(player, mark.unitId);
         DroneType type = unit == null ? null : unit.getDroneType();
-        if (unit != null && unit.isEmpDisabled()) {
-            status(player, "message.combat_drones.emp.disabled");
+        if (unit != null && unit.isDisabled()) {
+            status(player, unit.disabledMessage());
         } else if (type != null) {
             // A unit in flight only ever gets a valid route
             String problem = RouteValidator.validate(route, unit.posX, unit.posZ, ModConfig.routeLimits(), allowedTerminals(type));

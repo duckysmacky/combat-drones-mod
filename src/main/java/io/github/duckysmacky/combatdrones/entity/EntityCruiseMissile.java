@@ -157,7 +157,7 @@ public class EntityCruiseMissile extends EntityRampUnit {
             setDead();
             return;
         }
-        if (empFall(type)) {
+        if (downedFall(type)) {
             return;
         }
         if (isDiving()) {

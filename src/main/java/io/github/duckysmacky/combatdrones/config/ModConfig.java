@@ -4,6 +4,7 @@ import com.electronwill.nightconfig.core.Config;
 import com.electronwill.nightconfig.core.file.CommentedFileConfig;
 import com.electronwill.nightconfig.toml.TomlFormat;
 import io.github.duckysmacky.combatdrones.CombatDrones;
+import io.github.duckysmacky.combatdrones.physics.DownedFall;
 import io.github.duckysmacky.combatdrones.physics.RouteValidator;
 import io.github.duckysmacky.combatdrones.type.BatteryPack;
 import io.github.duckysmacky.combatdrones.type.AerialBombType;
@@ -147,6 +148,17 @@ public final class ModConfig {
     public static String blastOnContact = "disable";
     public static double blastDisableSeconds = 5.0;
     public static double blastDestroyBlastPower = 5.0;
+
+    // [state.shot_down]
+    public static boolean shotDownPlanes = true;
+    public static boolean shotDownDrones = false;
+    public static boolean shotDownMunitions = false;
+    public static double shotDownFallingHP = 20.0;
+    public static double shotDownDrag = 0.35;
+    public static double shotDownFallAcceleration = 8.0;
+    public static double shotDownMaxFallSpeed = 30.0;
+    public static double shotDownRollDegreesPerSecond = 240.0;
+    public static double shotDownTurnDegreesPerSecond = 25.0;
 
     // [stinger]
     public static double stingerDamage = 100.0;
@@ -293,6 +305,26 @@ public final class ModConfig {
         } else if (!now.equals(before)) {
             changes.add(name + ": " + before + " -> " + now);
         }
+    }
+
+    /** Whether a vehicle of this kind shot to 0 HP goes down burning ({@code [state.shot_down]}) instead of exploding at once. */
+    public static boolean isShotDownEnabled(DroneType.Kind kind) {
+        switch (kind) {
+            case PLANE:
+                return shotDownPlanes;
+            case DRONE:
+                return shotDownDrones;
+            case MUNITION:
+                return shotDownMunitions;
+            default:
+                return false; // the cruise missile has no going-down state
+        }
+    }
+
+    /** How a shot-down vehicle falls. */
+    public static DownedFall.Params shotDownFall() {
+        return DownedFall.Params.perSecond(shotDownDrag, shotDownFallAcceleration, shotDownMaxFallSpeed, shotDownRollDegreesPerSecond,
+                shotDownTurnDegreesPerSecond);
     }
 
     /** A hand-flown drone type's own table; compiled defaults for a type without one. */
@@ -456,6 +488,26 @@ public final class ModConfig {
             blastDestroyBlastPower = defaults.number("emp_blast.destroyBlastPower", blastDestroyBlastPower, 0, 10,
                     "Blast power of a vehicle the blast knocks out, or of a disabled one crashing (vanilla TNT = 4). 0 = no blast, just a wreck.");
 
+            shotDownPlanes = defaults.get("state.shot_down.planes", shotDownPlanes,
+                    "Planes (Strike and Attack Plane, Gunship, Stealth Bomber, Recon UAV) shot to 0 HP go down burning instead of "
+                            + "exploding at once. Off: they explode on the spot.");
+            shotDownDrones = defaults.get("state.shot_down.drones", shotDownDrones,
+                    "The same for hand-flown drones (FPV and DJI). Off: they explode (or wreck) on the spot.");
+            shotDownMunitions = defaults.get("state.shot_down.munitions", shotDownMunitions,
+                    "The same for loitering munitions. Off: their warhead goes off on the spot.");
+            shotDownFallingHP = defaults.number("state.shot_down.fallingHP", shotDownFallingHP, 1, 1000,
+                    "Health a vehicle going down has left. Shot to 0 again, it blows up in the air before it reaches the ground.");
+            shotDownDrag = defaults.number("state.shot_down.drag", shotDownDrag, 0, 0.99,
+                    "Share of its forward speed a vehicle going down loses per second. Higher = a shorter, steeper arc.");
+            shotDownFallAcceleration = defaults.number("state.shot_down.fallAcceleration", shotDownFallAcceleration, 0.5, 40,
+                    "How fast a vehicle going down picks up its fall, in blocks/s^2.");
+            shotDownMaxFallSpeed = defaults.number("state.shot_down.maxFallSpeed", shotDownMaxFallSpeed, 2, 80,
+                    "Fastest a vehicle going down falls, in blocks/s.");
+            shotDownRollDegreesPerSecond = defaults.number("state.shot_down.rollDegreesPerSecond", shotDownRollDegreesPerSecond, 0, 1440,
+                    "How fast a plane going down rolls over, in degrees/s (0 = no roll). The pilot's camera rolls with it.");
+            shotDownTurnDegreesPerSecond = defaults.number("state.shot_down.turnDegreesPerSecond", shotDownTurnDegreesPerSecond, 0, 180,
+                    "How fast its path curls into a spiral, in degrees/s (0 = straight on).");
+
             stingerDamage = defaults.number("stinger.damage", stingerDamage, 0, 1000,
                     "Damage a Stinger missile does to the aircraft it hits, on top of its blast (compare the maxHP of [drones.*]; "
                             + "general.droneDamageTakenMultiplier applies). Only aircraft take it.");
@@ -585,6 +637,10 @@ public final class ModConfig {
                     + "flying a drone, unit or missile nearby. Self and teammates are never marked.");
             defaults.comment("emp_station", "EMP Field Station: a placed block that keeps an EMP field up around itself while switched on.");
             defaults.comment("emp_blast", "EMP Blast Gadget: a hand-held charge that sets off a growing EMP field around its user.");
+            defaults.comment("state", "What happens to vehicles that are shot down or hit by an EMP.");
+            defaults.comment("state.shot_down", "Shot down (0 HP): the vehicle loses all control and goes down in a burning, spinning arc; "
+                    + "whoever flies or watches it rides it out. It explodes on impact with its own blastPower ([drones.<id>]), as if flown "
+                    + "into the ground.");
             defaults.comment("stinger", "Stinger: a shoulder-fired launcher whose missile homes in on a locked aircraft (drones, munitions, "
                     + "planes, missiles in flight). Never locks on to players.");
             defaults.comment("weapons", "Armed plane weapons, fired only under manual control.");

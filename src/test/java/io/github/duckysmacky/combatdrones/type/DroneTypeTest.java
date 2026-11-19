@@ -68,6 +68,20 @@ class DroneTypeTest {
         }
     }
 
+    /** The bundled roster sorts into the [state.*] kinds as the spec lists them. */
+    @Test
+    void bundledTypesHaveTheirKind() throws IOException {
+        Path types = Paths.get("src/main/resources/assets/combat_drones/drone_types");
+        String[][] expected = {{"strike_plane", "PLANE"}, {"attack_plane", "PLANE"}, {"gunship", "PLANE"}, {"stealth_bomber", "PLANE"},
+                {"recon_uav", "PLANE"}, {"loitering_light", "MUNITION"}, {"loitering_heavy", "MUNITION"}, {"racer_drone", "DRONE"},
+                {"dji_drone", "DRONE"}, {"cruise_missile", "MISSILE"}};
+        for (String[] entry : expected) {
+            try (Reader reader = Files.newBufferedReader(types.resolve(entry[0] + ".json"))) {
+                assertEquals(DroneType.Kind.valueOf(entry[1]), DroneType.parse(entry[0], reader).getKind(), entry[0]);
+            }
+        }
+    }
+
     @Test
     void parsesCommentedJson() {
         DroneType type = parse(RACER);

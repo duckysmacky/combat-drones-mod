@@ -19,6 +19,9 @@ public final class DroneType {
     /** Hand-flown multirotors, ramp-launched fixed-wing units, or missiles launched straight up from a pad. */
     public enum Category { HAND_FLOWN, RAMP_AUTOPILOT, VERTICAL_STRIKE }
 
+    /** Which {@code [state.*]} switch a type answers to: planes, drones, munitions or missiles. */
+    public enum Kind { PLANE, DRONE, MUNITION, MISSILE }
+
     /**
      * How the drone is flown. Hand-flown: FPV (acro/angle/hover quad) or DJI (stabilized velocity control).
      * Ramp-launched (manual takeover from the Mission Planner): STICK, CLICK_DESIGNATE, GUNNER (the autopilot flies, the
@@ -228,6 +231,17 @@ public final class DroneType {
 
     public Category getCategory() {
         return category;
+    }
+
+    /** Hand-flown types are drones, the pad-launched one a missile; ramp units that detonate on impact are munitions, the rest planes. */
+    public Kind getKind() {
+        if (category == Category.HAND_FLOWN) {
+            return Kind.DRONE;
+        }
+        if (category == Category.VERTICAL_STRIKE) {
+            return Kind.MISSILE;
+        }
+        return impactDetonates ? Kind.MUNITION : Kind.PLANE;
     }
 
     public double getMaxSpeed() {

@@ -4,6 +4,7 @@ import io.github.duckysmacky.combatdrones.Fx;
 import io.github.duckysmacky.combatdrones.CombatDrones;
 import io.github.duckysmacky.combatdrones.ModSounds;
 import net.minecraft.entity.Entity;
+import net.minecraft.init.SoundEvents;
 import net.minecraft.util.EnumParticleTypes;
 import net.minecraft.util.SoundCategory;
 import net.minecraft.world.WorldServer;
@@ -31,6 +32,31 @@ final class DamageEffects {
         ((WorldServer) drone.world).spawnParticle(EnumParticleTypes.EXPLOSION_NORMAL, drone.posX, drone.posY + drone.height / 2, drone.posZ,
                 10, 0.2, 0.2, 0.2, 0.03);
         drone.world.playSound(null, drone.posX, drone.posY, drone.posZ, ModSounds.DRONE_HIT, SoundCategory.NEUTRAL, 1.2F, 0.6F);
+    }
+
+    /** Server: shot down and going down: a burst of flame and smoke and a heavy crack. */
+    static void goingDown(Entity drone) {
+        WorldServer world = (WorldServer) drone.world;
+        double y = drone.posY + drone.height / 2;
+        world.spawnParticle(EnumParticleTypes.EXPLOSION_LARGE, drone.posX, y, drone.posZ, 1, 0.0, 0.0, 0.0, 0.0);
+        world.spawnParticle(EnumParticleTypes.FLAME, drone.posX, y, drone.posZ, 12, drone.width / 3, drone.height / 3, drone.width / 3, 0.05);
+        world.playSound(null, drone.posX, drone.posY, drone.posZ, SoundEvents.ENTITY_GENERIC_EXPLODE, SoundCategory.NEUTRAL, 1.5F, 1.4F);
+        hit(drone);
+    }
+
+    /** Client, every tick while shot down: a thick black smoke trail with fire licking out of it, scaled to the airframe. */
+    static void burningTrail(Entity drone) {
+        float size = Math.max(drone.width, drone.height);
+        int puffs = 1 + Math.round(size);
+        for (int i = 0; i < puffs; i++) {
+            double x = drone.posX + (drone.world.rand.nextDouble() - 0.5) * drone.width;
+            double y = drone.posY + drone.world.rand.nextDouble() * drone.height;
+            double z = drone.posZ + (drone.world.rand.nextDouble() - 0.5) * drone.width;
+            CombatDrones.proxy.fx(drone.world, Fx.DARK_SMOKE, x, y, z, 0, 0.04, 0, 0.7F + size * 0.35F);
+            if (drone.world.rand.nextBoolean()) {
+                CombatDrones.proxy.fx(drone.world, Fx.FIRE, x, y, z, 0, 0.02, 0, 0.45F + size * 0.2F);
+            }
+        }
     }
 
     /** Client: smoke trail once badly damaged, so everyone can see the drone has been hit. */

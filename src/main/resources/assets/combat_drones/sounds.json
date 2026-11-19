@@ -626,6 +626,12 @@
       "combat_drones:ui/lock_tick"
     ]
   },
+  "ui.going_down": {
+    "category": "master",
+    "sounds": [
+      "combat_drones:ui/going_down"
+    ]
+  },
   "ui.lock_lost": {
     "category": "master",
     "sounds": [

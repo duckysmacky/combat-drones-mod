@@ -140,8 +140,8 @@ public final class RemoteSessions {
         if (control && (type.getControlScheme() == null || !type.getControlScheme().isFlyable())) {
             return "message.combat_drones.remote.not_flyable";
         }
-        if (unit.isEmpDisabled()) {
-            return "message.combat_drones.emp.disabled";
+        if (unit.isDisabled()) {
+            return unit.disabledMessage();
         }
         Session other = sessionOf(unit);
         if (other != null && other.player != player) {
@@ -481,6 +481,10 @@ public final class RemoteSessions {
         DroneType type = carrier.getDroneType();
         UUID owner = carrier.getOwner();
         if (type == null || !type.isSensor() || owner == null) {
+            return;
+        }
+        if (carrier.isDisabled()) {
+            abandonLockOn(session);
             return;
         }
         LockOnSettings settings = carrier.getLockOnSettings();

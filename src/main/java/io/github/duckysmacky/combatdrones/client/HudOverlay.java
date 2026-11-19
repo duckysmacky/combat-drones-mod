@@ -6,11 +6,13 @@ import io.github.duckysmacky.combatdrones.client.hud.FpvFeed;
 import io.github.duckysmacky.combatdrones.client.hud.MissileFeed;
 import io.github.duckysmacky.combatdrones.client.hud.StingerScope;
 import io.github.duckysmacky.combatdrones.client.hud.Ui;
+import io.github.duckysmacky.combatdrones.client.hud.UiSounds;
 import io.github.duckysmacky.combatdrones.client.hud.UnitFeed;
 import io.github.duckysmacky.combatdrones.client.hud.Widgets;
 import io.github.duckysmacky.combatdrones.entity.EntityCruiseMissile;
 import io.github.duckysmacky.combatdrones.entity.EntityHandFlownDrone;
 import io.github.duckysmacky.combatdrones.entity.EntityRampUnit;
+import io.github.duckysmacky.combatdrones.entity.VehicleState;
 import io.github.duckysmacky.combatdrones.type.DroneType;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.ScaledResolution;
@@ -20,6 +22,7 @@ import net.minecraftforge.client.event.RenderGameOverlayEvent;
 import net.minecraftforge.client.event.RenderGameOverlayEvent.ElementType;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import net.minecraftforge.fml.common.gameevent.TickEvent;
 import net.minecraftforge.fml.relauncher.Side;
 
 import javax.annotation.Nullable;
@@ -40,6 +43,10 @@ public final class HudOverlay {
     /** How long the INBOUND banner stays up (ms). */
     private static final long STRIKE_ALERT_MILLIS = 6000;
     private static long strikeAlertUntil;
+    /** Ticks between the going-down alarm's plays (it lasts 0.44 s) and the EMP tone's. */
+    private static final int GOING_DOWN_ALARM_TICKS = 9;
+    private static final int EMP_ALARM_TICKS = 12;
+    private static int alarmDelay;
     /** How far the Stinger has to be raised ({@code StingerController.scopeAmount}) before its scope fills the screen. */
     private static final float SCOPE_SHOWN = 0.5F;
     /** What the current feed is looking through, and when it came up (for the flight timer and the link-up static). */
@@ -117,6 +124,11 @@ public final class HudOverlay {
             }
         }
         int top = 4;
+        VehicleState state = viewedState();
+        if (state != VehicleState.FLYING) {
+            drawDownedAlert(resolution, top, state);
+            top += 38;
+        }
         if (Minecraft.getSystemTime() < strikeAlertUntil) {
             drawStrikeAlert(resolution);
             top += 38;
@@ -156,6 +168,48 @@ public final class HudOverlay {
         if (building > 0) {
             Ui.bar(centerX - halfWidth + 3, top + 31, halfWidth * 2 - 6, 2, building, Ui.WARN);
         }
+    }
+
+    /** What the vehicle the player flies or watches is up to (flying while on foot). */
+    private static VehicleState viewedState() {
+        EntityRampUnit unit = RemoteController.getUnit();
+        if (unit != null) {
+            return unit.getState();
+        }
+        EntityHandFlownDrone drone = PilotController.getPilotedDrone();
+        return drone != null ? drone.getState() : VehicleState.FLYING;
+    }
+
+    /** While the vehicle is going down: the alarm, back to back; while an EMP holds it: the refused-action tone, steadily. */
+    @SubscribeEvent
+    public static void onClientTick(TickEvent.ClientTickEvent event) {
+        if (event.phase != TickEvent.Phase.END || Minecraft.getMinecraft().isGamePaused()) {
+            return;
+        }
+        VehicleState state = viewedState();
+        if (state == VehicleState.FLYING) {
+            alarmDelay = 0;
+        } else if (--alarmDelay <= 0) {
+            boolean down = state == VehicleState.SHOT_DOWN;
+            UiSounds.play(down ? UiSounds.GOING_DOWN : UiSounds.DENY, down ? 1.0F : 0.8F);
+            alarmDelay = down ? GOING_DOWN_ALARM_TICKS : EMP_ALARM_TICKS;
+        }
+    }
+
+    /** Shot down or EMP-disabled: a blinking banner telling the pilot they've lost control. */
+    private static void drawDownedAlert(ScaledResolution resolution, int top, VehicleState state) {
+        int centerX = resolution.getScaledWidth() / 2;
+        boolean down = state == VehicleState.SHOT_DOWN;
+        boolean bright = Ui.blink(down ? 4 : 2);
+        String title = I18n.format(down ? "hud.combat_drones.shot_down" : "hud.combat_drones.emped");
+        String sub = I18n.format(down ? "hud.combat_drones.shot_down.sub" : "hud.combat_drones.emped.sub");
+        int halfWidth = Math.max(Ui.width(title), Ui.width(sub) / 2) + 14;
+        int dim = down ? 0xF05E1418 : 0xF0143A5E;
+        int lit = down ? 0xF08A1F20 : 0xF01F5A8A;
+        Ui.rect(centerX - halfWidth, top, centerX + halfWidth, top + 34, bright ? lit : dim);
+        Ui.frame(centerX - halfWidth, top, halfWidth * 2, 34);
+        Ui.textScaled(title, centerX, top + 5, 2, bright ? Ui.TEXT : down ? 0xFFEE7A5E : 0xFF7AC8EE);
+        Ui.textCentered(sub, centerX, top + 23, Ui.TEXT);
     }
 
     /** Blinking red banner at the top of the screen, double size: a cruise missile is diving on this area. */

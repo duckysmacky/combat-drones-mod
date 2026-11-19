@@ -32,6 +32,9 @@ public interface LockOnCarrier {
     /** How far the next lock-on charge has reloaded, 0..1 (0 when none is reloading; held where it was while on hold). */
     float getLockReloadFraction();
 
+    /** EMP-disabled or shot down: its camera can't lock on. */
+    boolean isDisabled();
+
     /** Server: uses a lock-on charge; false when there's none left. */
     boolean spendLockCharge();
 }
