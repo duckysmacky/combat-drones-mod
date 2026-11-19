@@ -282,6 +282,7 @@ message.combat_drones.ramp.ammo_full=Ammo is already full
 message.combat_drones.ramp.ammo_loaded=Ammo loaded: %s/%s
 message.combat_drones.ramp.not_owner=This unit belongs to someone else
 message.combat_drones.ramp.emp_disabled=Ramp knocked out by an EMP: launch again in a moment
+message.combat_drones.runway.emp_disabled=Runway knocked out by an EMP: launch again in a moment
 message.combat_drones.ramp.linked=Ramp linked: right-click it again, or the air, with the Mission Planner to plan and launch from anywhere
 message.combat_drones.ramp.not_linked=Link the ramp first: right-click it with the Mission Planner
 message.combat_drones.planner.route_saved=Route saved

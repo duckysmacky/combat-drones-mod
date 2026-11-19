@@ -86,9 +86,11 @@ public class RenderLaunchRamp extends Render<EntityLaunchRamp> {
      */
     private static void renderRunway(EntityRunway runway, EntityLaunchRamp.Kind kind, @Nullable DroneType unit, float partialTicks) {
         GeoModels.reset(kind.getName());
-        GeoModels.show(kind.getName(), "glow_edge", true);
-        GeoModels.show(kind.getName(), "glow_screen", true);
-        GeoModels.show(kind.getName(), "glow_ready", unit != null);
+        // Knocked out by an EMP: lamps and terminal dark until it comes back
+        boolean powered = !runway.isEmpDisabled();
+        GeoModels.show(kind.getName(), "glow_edge", powered);
+        GeoModels.show(kind.getName(), "glow_screen", powered);
+        GeoModels.show(kind.getName(), "glow_ready", powered && unit != null);
         GeoModels.render(kind.getName(), 1.0F, 1.0F, 1.0F);
         if (unit == null) {
             return;

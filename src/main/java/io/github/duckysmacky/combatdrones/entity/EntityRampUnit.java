@@ -387,11 +387,11 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder, LockOn
 
     /** Server tick of a unit with a known type: route autopilot or manual flight, fuel, movement and collisions. */
     protected void serverUpdate(DroneType type) {
-        if (takingOff) {
+        if (takingOff && !isDisabled()) {
             takeoffRoll(type);
             return;
         }
-        if (rollingOutOn != null) {
+        if (rollingOutOn != null && !isDisabled()) {
             rollOut(type);
             return;
         }
@@ -548,7 +548,8 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder, LockOn
             return true;
         }
         Entity entity = ((WorldServer) world).getEntityFromUuid(runway.id);
-        return entity instanceof EntityRunway && ((EntityRunway) entity).canTake(type, owner);
+        // A runway knocked out by an EMP can't take it in yet: circle until it comes back
+        return entity instanceof EntityRunway && ((EntityRunway) entity).canTake(type, owner) && !((EntityRunway) entity).isEmpDisabled();
     }
 
     /** Server tick of the roll-out after a landing; once stopped it's parked on the runway (or wrecked if it's gone). */

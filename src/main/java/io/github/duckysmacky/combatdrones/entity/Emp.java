@@ -62,7 +62,9 @@ public final class Emp {
             if (entity instanceof EntityLaunchRamp) {
                 EntityLaunchRamp launcher = (EntityLaunchRamp) entity;
                 if (!launcher.isEmpDisabled()) {
-                    EffectPacket.empZap(world, new Vec3d(entity.posX, entity.posY + entity.height / 2, entity.posZ), Math.max(entity.width, entity.height));
+                    // Sized to the hitbox, not the width: a runway is far longer than it is wide
+                    EffectPacket.empZap(world, new Vec3d(entity.posX, entity.posY + entity.height / 2, entity.posZ),
+                            (float) Math.max(box.maxX - box.minX, Math.max(box.maxZ - box.minZ, entity.height)));
                 }
                 launcher.empDisable(rules.disableTicks);
                 continue;
@@ -103,9 +105,13 @@ public final class Emp {
 
     /** Client: an arc snapping somewhere over a disabled vehicle. */
     static void crackle(Entity vehicle) {
-        CombatDrones.proxy.fx(vehicle.world, Fx.ARC, vehicle.posX + (vehicle.world.rand.nextDouble() - 0.5) * vehicle.width,
-                vehicle.posY + vehicle.world.rand.nextDouble() * vehicle.height, vehicle.posZ + (vehicle.world.rand.nextDouble() - 0.5) * vehicle.width,
-                0, 0, 0, 0.3F + Math.max(vehicle.width, vehicle.height) * 0.2F);
+        // Spread over the hitbox, so a long runway sparks along its whole length
+        AxisAlignedBB box = vehicle.getEntityBoundingBox();
+        double spanX = box.maxX - box.minX;
+        double spanZ = box.maxZ - box.minZ;
+        CombatDrones.proxy.fx(vehicle.world, Fx.ARC, vehicle.posX + (vehicle.world.rand.nextDouble() - 0.5) * spanX,
+                vehicle.posY + vehicle.world.rand.nextDouble() * vehicle.height, vehicle.posZ + (vehicle.world.rand.nextDouble() - 0.5) * spanZ,
+                0, 0, 0, 0.3F + (float) Math.min(Math.max(vehicle.width, vehicle.height), 4) * 0.2F);
     }
 
     /** Something flying: a ramp unit or missile, or a hand-flown drone off the ground. */

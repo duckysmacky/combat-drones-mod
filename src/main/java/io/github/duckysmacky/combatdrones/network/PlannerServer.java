@@ -83,7 +83,7 @@ public final class PlannerServer {
                         runway.entityId = ramp.getEntityId();
                         runway.runway = ((EntityRunway) ramp).geometry();
                         runway.kind = ramp.getKind().ordinal();
-                        runway.free = !ramp.isLoaded();
+                        runway.free = !ramp.isLoaded() && !ramp.isEmpDisabled();
                         packet.runways.add(runway);
                     }
                 }
@@ -182,7 +182,7 @@ public final class PlannerServer {
             return;
         }
         if (ramp.isEmpDisabled()) {
-            status(player, "message.combat_drones.ramp.emp_disabled");
+            status(player, ramp instanceof EntityRunway ? "message.combat_drones.runway.emp_disabled" : "message.combat_drones.ramp.emp_disabled");
             openAll(player, ramp.getEntityId());
             return;
         }
