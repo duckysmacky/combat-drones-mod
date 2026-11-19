@@ -154,19 +154,19 @@ public final class ModConfig {
     public static boolean shotDownDrones = false;
     public static boolean shotDownMunitions = false;
     public static double shotDownFallingHP = 20.0;
-    public static double shotDownDrag = 0.35;
-    public static double shotDownFallAcceleration = 8.0;
-    public static double shotDownMaxFallSpeed = 30.0;
-    public static double shotDownRollDegreesPerSecond = 240.0;
-    public static double shotDownTurnDegreesPerSecond = 25.0;
+    public static double shotDownDrag = 0.15;
+    public static double shotDownFallAcceleration = 5.0;
+    public static double shotDownMaxFallSpeed = 25.0;
+    public static double shotDownRollDegreesPerSecond = 90.0;
+    public static double shotDownTurnDegreesPerSecond = 12.0;
 
     // [state.emped]
     public static boolean empedPlanes = true;
     public static boolean empedDrones = true;
     public static boolean empedMunitions = true;
     public static boolean empedMissiles = true;
-    public static double empedDrag = 0.2;
-    public static double empedFallAcceleration = 4.0;
+    public static double empedDrag = 0.1;
+    public static double empedFallAcceleration = 3.0;
     public static double empedMaxFallSpeed = 12.0;
     public static double empedCrashBlastPower = 5.0;
 
