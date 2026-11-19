@@ -130,7 +130,7 @@ public final class StingerScope {
     }
 
     /** Black from the optic's rim out past the screen corners, fading in over the last few pixels inside the rim. */
-    private static void surround(double centerX, double centerY, double radius, double far) {
+    static void surround(double centerX, double centerY, double radius, double far) {
         GlStateManager.disableTexture2D();
         GlStateManager.enableBlend();
         GlStateManager.disableAlpha();

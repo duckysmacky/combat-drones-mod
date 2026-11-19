@@ -3,6 +3,7 @@ package io.github.duckysmacky.combatdrones;
 import io.github.duckysmacky.combatdrones.entity.EntityBomb;
 import io.github.duckysmacky.combatdrones.entity.EntityCruiseMissile;
 import io.github.duckysmacky.combatdrones.entity.EntityEmpBlast;
+import io.github.duckysmacky.combatdrones.entity.EntityEmpOrb;
 import io.github.duckysmacky.combatdrones.entity.EntityEmpStation;
 import io.github.duckysmacky.combatdrones.entity.EntityHandFlownDrone;
 import io.github.duckysmacky.combatdrones.entity.EntityLaunchRamp;
@@ -15,6 +16,7 @@ import io.github.duckysmacky.combatdrones.item.ItemBattery;
 import io.github.duckysmacky.combatdrones.item.ItemBomb;
 import io.github.duckysmacky.combatdrones.item.ItemDrone;
 import io.github.duckysmacky.combatdrones.item.ItemEmpBlast;
+import io.github.duckysmacky.combatdrones.item.ItemEmpGun;
 import io.github.duckysmacky.combatdrones.item.ItemEmpStation;
 import io.github.duckysmacky.combatdrones.item.ItemGoggles;
 import io.github.duckysmacky.combatdrones.item.ItemLaunchRamp;
@@ -94,7 +96,7 @@ public final class ModContent {
                 Arrays.asList(lightBattery, standardBattery, heavyBattery, fragGrenade, bombLight, bomb, bombHeavy),
                 Arrays.asList(launchRamp, lightRunway, heavyRunway, missionPlanner, fuelCan, missilePad, missileTablet),
                 Arrays.asList(rocket, rocketHeavy, rifleRounds, cannonShell, howitzerShell, aerialBombSmall, aerialBombMedium, aerialBombLarge),
-                Arrays.asList(pilotDetector, empStation, empBlast, stinger, stingerMissile));
+                Arrays.asList(pilotDetector, empStation, empBlast, stinger, stingerMissile, empGun, empCell));
         for (int group = 0; group < groups.size(); group++) {
             int index = groups.get(group).indexOf(item);
             if (index >= 0) {
@@ -141,6 +143,8 @@ public final class ModContent {
     public static Item empBlast;
     public static Item stinger;
     public static Item stingerMissile;
+    public static Item empGun;
+    public static Item empCell;
 
     private ModContent() {
     }
@@ -176,6 +180,8 @@ public final class ModContent {
         empBlast = register(event, named(new ItemEmpBlast(), "emp_blast"));
         stinger = register(event, named(new ItemStinger(), "stinger"));
         stingerMissile = register(event, simpleItem("stinger_missile"));
+        empGun = register(event, named(new ItemEmpGun(), "emp_gun"));
+        empCell = register(event, simpleItem("emp_cell"));
         // One placeable item per data-defined type; the registry name is the type ID
         for (DroneType type : DroneTypes.all()) {
             register(event, named(new ItemDrone(type.getId()), type.getId()));
@@ -297,6 +303,13 @@ public final class ModContent {
                 .id(new ResourceLocation(CombatDrones.MOD_ID, "emp_blast"), 9)
                 .name(CombatDrones.MOD_ID + ".emp_blast")
                 .tracker(160, 1, false)
+                .build());
+        // Every tick, with its velocity: it is fast and drawn as a big field
+        event.getRegistry().register(EntityEntryBuilder.create()
+                .entity(EntityEmpOrb.class)
+                .id(new ResourceLocation(CombatDrones.MOD_ID, "emp_orb"), 11)
+                .name(CombatDrones.MOD_ID + ".emp_orb")
+                .tracker(160, 1, true)
                 .build());
     }
 

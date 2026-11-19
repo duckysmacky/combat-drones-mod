@@ -10,6 +10,7 @@ import io.github.duckysmacky.combatdrones.entity.EntityCruiseMissile;
 import io.github.duckysmacky.combatdrones.entity.EntityHandFlownDrone;
 import io.github.duckysmacky.combatdrones.entity.EntityLaunchRamp;
 import io.github.duckysmacky.combatdrones.entity.EntityEmpBlast;
+import io.github.duckysmacky.combatdrones.entity.EntityEmpOrb;
 import io.github.duckysmacky.combatdrones.entity.EntityEmpStation;
 import io.github.duckysmacky.combatdrones.entity.EntityMissilePad;
 import io.github.duckysmacky.combatdrones.entity.EntityPilotBody;
@@ -37,6 +38,7 @@ public class ClientProxy extends CommonProxy {
         RenderingRegistry.registerEntityRenderingHandler(EntityMissilePad.class, RenderMissilePad::new);
         RenderingRegistry.registerEntityRenderingHandler(EntityEmpStation.class, RenderEmpStation::new);
         RenderingRegistry.registerEntityRenderingHandler(EntityEmpBlast.class, RenderEmpBlast::new);
+        RenderingRegistry.registerEntityRenderingHandler(EntityEmpOrb.class, RenderEmpOrb::new);
         RenderingRegistry.registerEntityRenderingHandler(EntityCruiseMissile.class, RenderRampUnit::new);
         RenderingRegistry.registerEntityRenderingHandler(EntityPilotBody.class, RenderPilotBody::new);
         RenderingRegistry.registerEntityRenderingHandler(EntityRocket.class, RenderProjectile::rocket);
@@ -51,8 +53,8 @@ public class ClientProxy extends CommonProxy {
     }
 
     @Override
-    public void empHum(EntityEmpStation station) {
-        EmpHumSound.ensure(station);
+    public void empHum(Entity source) {
+        EmpHumSound.ensure(source);
     }
 
     @Override

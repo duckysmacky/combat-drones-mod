@@ -95,6 +95,9 @@ public final class Effects {
             case STINGER_LAUNCH:
                 stingerLaunch(world, player, packet.getPosition(), packet.getDirection());
                 break;
+            case EMP_GUN_FIRE:
+                empGunFire(world, player, packet.getPosition(), packet.getDirection());
+                break;
         }
     }
 
@@ -237,6 +240,22 @@ public final class Effects {
         double distance = player.getPositionEyes(1).distanceTo(muzzle);
         if (distance < 6) {
             Impact.shake((float) (0.3 * (1 - distance / 6)));
+        }
+    }
+
+    /** An EMP Gun firing: a flash and arcs snapping out of the emitter, sparks thrown ahead, a jolt close by. */
+    private static void empGunFire(World world, EntityPlayer player, Vec3d muzzle, Vec3d direction) {
+        Random random = world.rand;
+        fx(world, Fx.FLASH, muzzle, Vec3d.ZERO, 0.8F);
+        for (int index = 0; index < 10; index++) {
+            fx(world, Fx.ARC, muzzle.add(randomDirection(random).scale(0.2 + random.nextDouble() * 0.5)), Vec3d.ZERO, 0.4F + random.nextFloat() * 0.3F);
+        }
+        for (int index = 0; index < 6; index++) {
+            fx(world, Fx.SPARK, muzzle, direction.scale(0.3 + random.nextDouble() * 0.3).add(randomDirection(random).scale(0.12)), 0.5F);
+        }
+        double distance = player.getPositionEyes(1).distanceTo(muzzle);
+        if (distance < 6) {
+            Impact.shake((float) (0.25 * (1 - distance / 6)));
         }
     }
 

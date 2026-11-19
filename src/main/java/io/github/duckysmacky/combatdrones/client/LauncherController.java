@@ -2,6 +2,7 @@ package io.github.duckysmacky.combatdrones.client;
 
 import io.github.duckysmacky.combatdrones.CombatDrones;
 import io.github.duckysmacky.combatdrones.client.hud.UiSounds;
+import io.github.duckysmacky.combatdrones.item.ItemEmpGun;
 import io.github.duckysmacky.combatdrones.item.ItemLauncher;
 import io.github.duckysmacky.combatdrones.item.ItemStinger;
 import io.github.duckysmacky.combatdrones.network.ModNetwork;
@@ -40,6 +41,8 @@ public final class LauncherController {
     private static int targetId = -1;
     private static float progress;
     private static boolean fireHeld;
+    /** Ticks the trigger has been held for (0 = not held). */
+    private static int triggerTicks;
     private static boolean reloadHeld;
     private static int beepDelay;
     private static float scope;
@@ -83,6 +86,18 @@ public final class LauncherController {
         return left <= 0 ? 0 : 1 - left;
     }
 
+    /**
+     * 0..1 through an EMP Gun's charge, as this client times it (from its own trigger and the local chargeSeconds):
+     * only for the sight, the server decides when the shot is charged. 0 when not charging.
+     */
+    public static float chargeProgress(float partialTicks) {
+        ItemStack stack = held();
+        if (!(stack.getItem() instanceof ItemEmpGun) || triggerTicks <= 0 || !ItemLauncher.isLoaded(stack) || reloadProgress(partialTicks) > 0) {
+            return 0;
+        }
+        return Math.min(1, (triggerTicks + partialTicks) / ItemEmpGun.chargeTicks());
+    }
+
     /** The Stinger's seeker: 0 = it has nothing, up to 1 = locked. */
     public static float getProgress() {
         return held().getItem() instanceof ItemStinger ? progress : 0;
@@ -119,8 +134,11 @@ public final class LauncherController {
         boolean fire = holding && minecraft.gameSettings.keyBindAttack.isKeyDown();
         boolean reload = holding && DroneKeys.RELOAD.isKeyDown();
         if (fire != fireHeld) {
-            ModNetwork.CHANNEL.sendToServer(new LauncherInputPacket(fire ? LauncherInputPacket.ACTION_PRESS : LauncherInputPacket.ACTION_RELEASE));
+            // Let go because a screen opened or the launcher was put away: that doesn't fire
+            int action = fire ? LauncherInputPacket.ACTION_PRESS : holding ? LauncherInputPacket.ACTION_RELEASE : LauncherInputPacket.ACTION_CANCEL;
+            ModNetwork.CHANNEL.sendToServer(new LauncherInputPacket(action));
         }
+        triggerTicks = fire ? triggerTicks + 1 : 0;
         if (reload && !reloadHeld) {
             ModNetwork.CHANNEL.sendToServer(new LauncherInputPacket(LauncherInputPacket.ACTION_RELOAD));
         }

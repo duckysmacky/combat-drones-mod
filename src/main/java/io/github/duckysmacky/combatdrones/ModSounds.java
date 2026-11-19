@@ -69,6 +69,12 @@ public final class ModSounds {
     public static final SoundEvent STINGER_FIRE = create("stinger.fire");
     public static final SoundEvent STINGER_RELOAD = create("stinger.reload");
 
+    /** EMP Gun: the charge-up whine, a charge let go early, the shot, and a cell going in. */
+    public static final SoundEvent EMP_GUN_CHARGE = create("emp_gun.charge");
+    public static final SoundEvent EMP_GUN_CANCEL = create("emp_gun.cancel");
+    public static final SoundEvent EMP_GUN_FIRE = create("emp_gun.fire");
+    public static final SoundEvent EMP_GUN_RELOAD = create("emp_gun.reload");
+
     private ModSounds() {
     }
 
@@ -83,6 +89,6 @@ public final class ModSounds {
                 GUNSHIP_ROCKET, GUNSHIP_GUN, UNIT_BOOST, BOMB_RELEASE, BOMBER_RELEASE, BULLET_IMPACT, BULLET_FLYBY, MISSILE_IGNITION, MISSILE_LIFTOFF, MISSILE_SCREAM, MISSILE_ALARM,
                 DRONE_PLACE, DRONE_PICKUP, UNIT_INSTALL, UNIT_REMOVE, UNIT_AMMO, PAD_LOAD, RAMP_PLACE,
                 DETECTOR_PING, DETECTOR_CONTACT, EMP_STATION_ON, EMP_STATION_OFF, EMP_HUM, EMP_ZAP, EMP_CHARGE, EMP_BLAST,
-                STINGER_FIRE, STINGER_RELOAD);
+                STINGER_FIRE, STINGER_RELOAD, EMP_GUN_CHARGE, EMP_GUN_CANCEL, EMP_GUN_FIRE, EMP_GUN_RELOAD);
     }
 }

@@ -1,6 +1,7 @@
 package io.github.duckysmacky.combatdrones.client;
 
 import io.github.duckysmacky.combatdrones.CombatDrones;
+import io.github.duckysmacky.combatdrones.item.ItemEmpGun;
 import io.github.duckysmacky.combatdrones.item.ItemLauncher;
 import io.github.duckysmacky.combatdrones.item.ItemStinger;
 import io.github.duckysmacky.combatdrones.type.DroneType;
@@ -388,7 +389,14 @@ public final class GeoModels implements IGeoRenderer<Object> {
          */
         private static void poseLauncher(String name, ItemStack stack, String bone) {
             boolean loaded = ItemLauncher.isLoaded(stack);
-            float reload = loaded || !LauncherModel.isFirstPerson() ? 0 : LauncherController.reloadProgress(Minecraft.getMinecraft().getRenderPartialTicks());
+            float partialTicks = Minecraft.getMinecraft().getRenderPartialTicks();
+            float reload = loaded || !LauncherModel.isFirstPerson() ? 0 : LauncherController.reloadProgress(partialTicks);
+            if (stack.getItem() instanceof ItemEmpGun) {
+                // Coils lit while a cell is in; the core in the emitter flickers as the charge builds, steady once charged
+                float charge = LauncherModel.isFirstPerson() ? LauncherController.chargeProgress(partialTicks) : 0;
+                show(name, "glow_coils", loaded);
+                show(name, "glow_core", loaded && (charge >= 1 || Minecraft.getSystemTime() % 200 < 200 * (0.35 + 0.65 * charge)));
+            }
             show(name, bone, loaded || reload >= RELOAD_TIP);
             if (reload <= 0) {
                 return;

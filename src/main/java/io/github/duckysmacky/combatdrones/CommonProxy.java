@@ -1,6 +1,6 @@
 package io.github.duckysmacky.combatdrones;
 
-import io.github.duckysmacky.combatdrones.entity.EntityEmpStation;
+import net.minecraft.entity.Entity;
 import net.minecraft.world.World;
 
 /** Server-safe lifecycle hooks; {@code client.ClientProxy} adds the client-only setup. */
@@ -18,7 +18,7 @@ public class CommonProxy {
     public void fx(World world, Fx kind, double x, double y, double z, double velocityX, double velocityY, double velocityZ, float size) {
     }
 
-    /** Client: keeps a switched-on EMP station's hum playing. Nothing on a dedicated server. */
-    public void empHum(EntityEmpStation station) {
+    /** Client: keeps the hum of a switched-on EMP station, or of an EMP Gun orb in flight, playing. Nothing on a dedicated server. */
+    public void empHum(Entity source) {
     }
 }

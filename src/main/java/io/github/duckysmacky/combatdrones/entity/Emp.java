@@ -17,9 +17,10 @@ import javax.annotation.Nullable;
 import java.util.UUID;
 
 /**
- * EMP fields (the station's and the blast gadget's): a launch ramp the field touches can't launch until it wears off
- * (whatever onContact says). Every flying drone, ramp unit or missile whose hitbox touches the sphere is either destroyed with a small blast (no warhead, bombs or fuel going off) or disabled for a while (motors
- * off, gliding down out of control, see {@code [state.emped]}), per the field's {@link Rules}. A kind that
+ * EMP fields (the station's, the blast gadget's and the EMP Gun's): a launch ramp or runway the field touches can't
+ * launch until it wears off (whatever onContact says). Every flying drone, ramp unit or missile whose hitbox touches
+ * the sphere is either destroyed with a small blast (no warhead, bombs or fuel going off) or disabled for a while
+ * (motors off, gliding down out of control, see {@code [state.emped]}), per the field's {@link Rules}. A kind that
  * {@code [state.emped]} leaves out is destroyed instead. A hand-flown drone sitting on the ground isn't flying and is
  * left alone.
  */
@@ -47,6 +48,10 @@ public final class Emp {
 
         public static Rules blast() {
             return new Rules(ModConfig.blastSpares, ModConfig.blastOnContact, ModConfig.blastDisableSeconds, ModConfig.blastDestroyBlastPower);
+        }
+
+        public static Rules gun() {
+            return new Rules(ModConfig.gunSpares, ModConfig.gunOnContact, ModConfig.gunDisableSeconds, ModConfig.gunDestroyBlastPower);
         }
     }
 

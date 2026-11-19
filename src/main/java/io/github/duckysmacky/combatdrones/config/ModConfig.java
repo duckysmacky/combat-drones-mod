@@ -38,6 +38,7 @@ import java.util.Map;
  *   <li>{@code [stinger]}: the Stinger anti-air launcher and its missile (server).</li>
  *   <li>{@code [emp_station]}: the EMP Field Station (server).</li>
  *   <li>{@code [emp_blast]}: the EMP Blast Gadget (server).</li>
+ *   <li>{@code [emp_gun]}: the EMP Gun and its orb (server).</li>
  *   <li>{@code [client]}: options for your own client only; a server ignores them. Re-read alone by
  *       {@link #reloadClient}.</li>
  *   <li>{@code [batteries.<size>]}: battery pack capacity and weight multipliers, synced to clients.</li>
@@ -174,6 +175,21 @@ public final class ModConfig {
     public static double empedFallAcceleration = 3.0;
     public static double empedMaxFallSpeed = 12.0;
     public static double empedCrashBlastPower = 5.0;
+
+    // [emp_gun]
+    public static double gunRadius = 12.0;
+    public static String gunFieldMode = "travelling";
+    public static double gunTravellingExpandSeconds = 2.5;
+    public static double gunBurstExpandSeconds = 0.5;
+    public static double gunChargeSeconds = 3.0;
+    public static double gunChargeSlowdown = 0.5;
+    public static double gunProjectileSpeed = 1.25;
+    public static double gunMaxRange = 128.0;
+    public static double gunReloadSeconds = 3.0;
+    public static String gunSpares = "team";
+    public static String gunOnContact = "disable";
+    public static double gunDisableSeconds = 5.0;
+    public static double gunDestroyBlastPower = 5.0;
 
     // [stinger]
     public static double stingerDamage = 100.0;
@@ -591,6 +607,40 @@ public final class ModConfig {
                     "Blast of an EMP-disabled vehicle hitting anything (its warhead, bombs and fuel stay dead; a cruise missile's warhead "
                             + "still goes off). Vanilla TNT = 4; 0 = no blast, just a wreck.");
 
+            gunRadius = defaults.number("emp_gun.radius", gunRadius, 1, 32, "Radius of the orb's EMP field, in blocks.");
+            gunFieldMode = defaults.choice("emp_gun.fieldMode", gunFieldMode, FIELD_MODES,
+                    "travelling: the orb carries its field the whole flight, knocking out vehicles it passes, and fades where it stops. "
+                            + "burst: only the orb's core flies; it bursts into the field (growing over burstExpandSeconds) when it hits a block, "
+                            + "touches a flying vehicle or reaches maxRange.");
+            gunTravellingExpandSeconds = defaults.number("emp_gun.travellingExpandSeconds", gunTravellingExpandSeconds, 0, 10,
+                    "fieldMode = travelling: how long the orb's field takes to grow from the core to its full radius after the shot, "
+                            + "in seconds (fast at first, easing in). 0 = full size at once.");
+            gunBurstExpandSeconds = defaults.number("emp_gun.burstExpandSeconds", gunBurstExpandSeconds, 0.1, 5,
+                    "fieldMode = burst: how long the burst takes to grow to its full radius, in seconds. It then fades out.");
+            gunChargeSeconds = defaults.number("emp_gun.chargeSeconds", gunChargeSeconds, 0.25, 5,
+                    "How long left-click must be held before the gun is charged, in seconds. Releasing it then fires; releasing "
+                            + "earlier cancels the shot without using the cell.");
+            gunChargeSlowdown = defaults.number("emp_gun.chargeSlowdown", gunChargeSlowdown, 0, 1,
+                    "Share of walking speed the shooter loses while charging or holding a charge (0 = none, 1 = can't walk).");
+            gunProjectileSpeed = defaults.number("emp_gun.projectileSpeed", gunProjectileSpeed, 0.25, 5,
+                    "Orb speed, in blocks/tick. It flies dead straight, so fast aircraft have to be led.");
+            gunMaxRange = defaults.number("emp_gun.maxRange", gunMaxRange, 8, 256,
+                    "How far the orb flies before it fades out (travelling) or bursts (burst), in blocks.");
+            gunReloadSeconds = defaults.number("emp_gun.reloadSeconds", gunReloadSeconds, 0, 60,
+                    "How long loading an EMP Cell into the gun takes, in seconds.");
+            gunSpares = defaults.choice("emp_gun.spares", gunSpares, SPARES,
+                    "Whose vehicles the field leaves alone: none, owner (the shooter) or team (the shooter and their scoreboard "
+                            + "teammates, see general.ignoredTeams).");
+            gunOnContact = defaults.choice("emp_gun.onContact", gunOnContact, ON_CONTACT,
+                    "What the field does to a flying vehicle it touches: destroy (it's knocked out with only a destroyBlastPower blast: "
+                            + "no warhead, bombs or fuel going off) or disable (for disableSeconds its motors cut out and it glides down out "
+                            + "of control, see [state.emped]). Ramps and runways it touches can't launch for disableSeconds either way.");
+            gunDisableSeconds = defaults.number("emp_gun.disableSeconds", gunDisableSeconds, 0.5, 120,
+                    "How long a vehicle stays disabled (onContact = disable), in seconds, counted from when it last touched the field.");
+            gunDestroyBlastPower = defaults.number("emp_gun.destroyBlastPower", gunDestroyBlastPower, 0, 10,
+                    "Blast power of a vehicle the field destroys (onContact = destroy, or a kind [state.emped] leaves out). Vanilla TNT = 4; "
+                            + "0 = no blast, just a wreck.");
+
             stingerDamage = defaults.number("stinger.damage", stingerDamage, 0, 1000,
                     "Damage a Stinger missile does to the aircraft it hits, on top of its blast (compare the maxHP of [drones.*]; "
                             + "general.droneDamageTakenMultiplier applies). Only aircraft take it.");
@@ -726,6 +776,8 @@ public final class ModConfig {
                     + "into the ground.");
             defaults.comment("state.emped", "EMP-disabled (an EMP field with onContact = disable): motors off, the vehicle glides down out of "
                     + "control for the field's disableSeconds; whoever flies or watches it stays on and gets control back when it wears off.");
+            defaults.comment("emp_gun", "EMP Gun: a shoulder-fired launcher that charges up, then fires a straight-flying orb "
+                    + "carrying an EMP field. No lock-on.");
             defaults.comment("stinger", "Stinger: a shoulder-fired launcher whose missile homes in on a locked aircraft (drones, munitions, "
                     + "planes, missiles in flight). Never locks on to players.");
             defaults.comment("weapons", "Armed plane weapons, fired only under manual control.");
@@ -876,6 +928,8 @@ public final class ModConfig {
     private static final String[] SPARES = {"none", "owner", "team"};
     /** Values of the EMP {@code onContact} settings. */
     private static final String[] ON_CONTACT = {"destroy", "disable"};
+    /** Values of {@code emp_gun.fieldMode}. */
+    private static final String[] FIELD_MODES = {"travelling", "burst"};
     private static final String DEFAULT_MARK = "Default: ";
     private static final String CLIENT_COMMENT = "Options for your own client only. Apply edits with /combat_drones reload_client_config "
             + "(an op's config_reload also reloads everyone's).";

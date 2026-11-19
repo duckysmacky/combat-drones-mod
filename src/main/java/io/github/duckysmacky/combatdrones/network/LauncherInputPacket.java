@@ -1,6 +1,8 @@
 package io.github.duckysmacky.combatdrones.network;
 
+import io.github.duckysmacky.combatdrones.entity.EmpGunServer;
 import io.github.duckysmacky.combatdrones.entity.StingerServer;
+import io.github.duckysmacky.combatdrones.item.ItemEmpGun;
 import io.github.duckysmacky.combatdrones.item.ItemStinger;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.entity.player.EntityPlayerMP;
@@ -19,6 +21,8 @@ public class LauncherInputPacket implements IMessage {
     public static final int ACTION_PRESS = 0;
     public static final int ACTION_RELOAD = 1;
     public static final int ACTION_RELEASE = 2;
+    /** The trigger let go of without meaning to fire: a screen opened or the launcher put away. */
+    public static final int ACTION_CANCEL = 3;
 
     private int action;
 
@@ -47,6 +51,8 @@ public class LauncherInputPacket implements IMessage {
                 Item held = player.getHeldItemMainhand().getItem();
                 if (held instanceof ItemStinger) {
                     StingerServer.onInput(player, message.action);
+                } else if (held instanceof ItemEmpGun) {
+                    EmpGunServer.onInput(player, message.action);
                 }
             });
             return null;

@@ -22,7 +22,7 @@ import java.util.UUID;
 /**
  * One EMP Blast Gadget use: during the build-up it rides along with its user, crackling; then it stays where they
  * stood and its field grows from a block across to the full radius over the expand time, knocking out vehicles it
- * reaches ({@link Emp}), and fades. The timings and radius ride in entity data, so clients draw the same field from
+ * reaches ({@link Emp}), and fades. An EMP Gun orb's burst ({@link #burst}) is the same without the build-up. The timings and radius ride in entity data, so clients draw the same field from
  * the entity's age. Never saved: a blast doesn't survive a restart.
  */
 public class EntityEmpBlast extends Entity {
@@ -38,6 +38,8 @@ public class EntityEmpBlast extends Entity {
 
     @Nullable
     private UUID owner;
+    /** An EMP Gun orb's burst: the gun's field rules, not the gadget's. */
+    private boolean fromGun;
     private int age;
 
     public EntityEmpBlast(World world) {
@@ -54,6 +56,18 @@ public class EntityEmpBlast extends Entity {
         dataManager.set(EXPAND_TICKS, Math.max(1, (int) Math.round(ModConfig.blastExpandSeconds * 20)));
         dataManager.set(RADIUS, (float) ModConfig.blastRadius);
         dataManager.set(USER, user.getEntityId());
+    }
+
+    /** An EMP Gun orb bursting at {@code at}: no build-up, grows to the gun's radius over its expand time. */
+    public static EntityEmpBlast burst(World world, Vec3d at, @Nullable UUID owner) {
+        EntityEmpBlast blast = new EntityEmpBlast(world);
+        blast.owner = owner;
+        blast.fromGun = true;
+        blast.setPosition(at.x, at.y, at.z);
+        blast.dataManager.set(BUILD_TICKS, 0);
+        blast.dataManager.set(EXPAND_TICKS, Math.max(1, (int) Math.round(ModConfig.gunBurstExpandSeconds * 20)));
+        blast.dataManager.set(RADIUS, (float) ModConfig.gunRadius);
+        return blast;
     }
 
     @Override
@@ -107,7 +121,7 @@ public class EntityEmpBlast extends Entity {
         }
         int since = age - build;
         if (since >= 0 && since <= expand) {
-            Emp.fry(world, getPositionVector(), radiusAt(since, expand, getMaxRadius()), owner, Emp.Rules.blast());
+            Emp.fry(world, getPositionVector(), radiusAt(since, expand, getMaxRadius()), owner, fromGun ? Emp.Rules.gun() : Emp.Rules.blast());
         }
         if (since > expand + FADE_TICKS) {
             setDead();

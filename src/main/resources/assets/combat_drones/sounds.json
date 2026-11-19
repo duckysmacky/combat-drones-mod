@@ -754,5 +754,33 @@
     "sounds": [
       "combat_drones:emp/blast"
     ]
+  },
+  "emp_gun.charge": {
+    "category": "player",
+    "subtitle": "subtitles.combat_drones.emp_gun.charge",
+    "sounds": [
+      "combat_drones:emp_gun/charge"
+    ]
+  },
+  "emp_gun.cancel": {
+    "category": "player",
+    "subtitle": "subtitles.combat_drones.emp_gun.cancel",
+    "sounds": [
+      "combat_drones:emp_gun/cancel"
+    ]
+  },
+  "emp_gun.fire": {
+    "category": "player",
+    "subtitle": "subtitles.combat_drones.emp_gun.fire",
+    "sounds": [
+      "combat_drones:emp_gun/fire"
+    ]
+  },
+  "emp_gun.reload": {
+    "category": "player",
+    "subtitle": "subtitles.combat_drones.emp_gun.reload",
+    "sounds": [
+      "combat_drones:emp_gun/reload"
+    ]
   }
 }

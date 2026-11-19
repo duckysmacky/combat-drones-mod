@@ -1,6 +1,7 @@
 package io.github.duckysmacky.combatdrones.client;
 
 import io.github.duckysmacky.combatdrones.CombatDrones;
+import io.github.duckysmacky.combatdrones.client.hud.EmpGunSight;
 import io.github.duckysmacky.combatdrones.client.hud.Feed;
 import io.github.duckysmacky.combatdrones.client.hud.FpvFeed;
 import io.github.duckysmacky.combatdrones.client.hud.MissileFeed;
@@ -13,11 +14,13 @@ import io.github.duckysmacky.combatdrones.entity.EntityCruiseMissile;
 import io.github.duckysmacky.combatdrones.entity.EntityHandFlownDrone;
 import io.github.duckysmacky.combatdrones.entity.EntityRampUnit;
 import io.github.duckysmacky.combatdrones.entity.VehicleState;
+import io.github.duckysmacky.combatdrones.item.ItemEmpGun;
 import io.github.duckysmacky.combatdrones.type.DroneType;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.client.resources.I18n;
 import net.minecraft.entity.Entity;
+import net.minecraft.item.Item;
 import net.minecraftforge.client.event.RenderGameOverlayEvent;
 import net.minecraftforge.client.event.RenderGameOverlayEvent.ElementType;
 import net.minecraftforge.fml.common.Mod;
@@ -47,7 +50,7 @@ public final class HudOverlay {
     private static final int GOING_DOWN_ALARM_TICKS = 9;
     private static final int EMP_ALARM_TICKS = 12;
     private static int alarmDelay;
-    /** How far the Stinger has to be raised ({@code LauncherController.scopeAmount}) before its scope fills the screen. */
+    /** How far a launcher has to be raised ({@code LauncherController.scopeAmount}) before its sight replaces the crosshair. */
     private static final float SCOPE_SHOWN = 0.5F;
     /** What the current feed is looking through, and when it came up (for the flight timer and the link-up static). */
     private static Entity session;
@@ -117,7 +120,11 @@ public final class HudOverlay {
             FpvFeed.draw(resolution, drone, drone.getDroneType(), feed, flown, event.getPartialTicks());
         }
         if (feed == null) {
-            if (LauncherController.scopeAmount(event.getPartialTicks()) > SCOPE_SHOWN) {
+            boolean raised = LauncherController.scopeAmount(event.getPartialTicks()) > SCOPE_SHOWN;
+            Item launcher = LauncherController.held().getItem();
+            if (launcher instanceof ItemEmpGun) {
+                EmpGunSight.draw(resolution, event.getPartialTicks(), raised);
+            } else if (raised) {
                 StingerScope.draw(resolution, event.getPartialTicks());
             } else {
                 StingerScope.drawHip(resolution, event.getPartialTicks());
