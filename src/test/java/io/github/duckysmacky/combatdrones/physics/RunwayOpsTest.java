@@ -70,4 +70,92 @@ class RunwayOpsTest {
         }
         assertTrue(state.position.y > HEAVY.y + RunwayOps.CLIMB_OUT_HEIGHT - 1, "didn't climb out: " + state.position.y);
     }
+
+    /** Strike Plane, Attack Plane, Gunship, Stealth Bomber, Recon UAV. */
+    static final FixedWingFlight.Params[] PLANES = {
+            new FixedWingFlight.Params(0.9, 0.05, 1.15, 1.25), new FixedWingFlight.Params(1.4, 0.09, 1.8),
+            new FixedWingFlight.Params(0.7, 0.035, 0.6), new FixedWingFlight.Params(0.72, 0.036, 0.5), new FixedWingFlight.Params(0.8, 0.05, 1.2)};
+
+    private static RouteAutopilot.Situation situation(Route.Runway runway, boolean free) {
+        return new RouteAutopilot.Situation(runway.y, 0, true, 1, 0.15, false, Double.NaN, runway, free);
+    }
+
+    /**
+     * Flies "Return to runway" from {@code (x, y, z)} on {@code heading} over flat ground at deck level; returns the
+     * along-track spot it stopped on, or fails if it hits the ground first or never gets down.
+     */
+    private static double landFrom(Route.Runway runway, FixedWingFlight.Params params, double x, double y, double z, double heading) {
+        FixedWingFlight.State state = new FixedWingFlight.State();
+        state.position.set(x, y, z);
+        state.heading = heading;
+        state.speed = params.maxSpeed() * 0.65;
+        for (int tick = 0; tick < 6000; tick++) {
+            RouteAutopilot.Command command = RouteAutopilot.returnToRunway(state, situation(runway, true), params, 0);
+            FixedWingFlight.step(state, command.controls, params);
+            if (command.phase == RouteAutopilot.Phase.LAND && RunwayOps.captured(state, runway, params.maxSpeed())) {
+                for (int roll = 0; roll < 200; roll++) {
+                    if (RunwayOps.rollout(state, runway)) {
+                        assertEquals(runway.y, state.position.y, 1e-6);
+                        assertTrue(Math.abs(runway.cross(state.position.x, state.position.z)) < runway.width / 2, "stopped off the deck");
+                        return runway.along(state.position.x, state.position.z);
+                    }
+                }
+                throw new AssertionError("never stopped");
+            }
+            assertTrue(state.position.y > runway.y, "hit the ground at " + state.position + " tick " + tick);
+        }
+        throw new AssertionError("never landed, ended at " + state.position);
+    }
+
+    @Test
+    void landsOnTheRunwayFromAnyDirection() {
+        double[][] starts = {{0, -300}, {0, 300}, {300, 0}, {-300, 0}, {200, 200}, {-150, 40}, {20, 10}};
+        for (Route.Runway runway : new Route.Runway[]{LIGHT, HEAVY}) {
+            for (FixedWingFlight.Params params : PLANES) {
+                for (double[] start : starts) {
+                    for (double heading : new double[]{0, 90, 180, -90}) {
+                        double stop = landFrom(runway, params, runway.x + start[0], runway.y + 30, runway.z + start[1], heading);
+                        assertTrue(stop > 0 && stop <= runway.length - RunwayOps.ROLL_MARGIN + 1e-6,
+                                "stopped at " + stop + " on a " + runway.length + "-block runway");
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    void circlesARunwayItCantUseYet() {
+        FixedWingFlight.Params params = PLANES[0];
+        FixedWingFlight.State state = new FixedWingFlight.State();
+        state.position.set(LIGHT.x - 200, LIGHT.y + 30, LIGHT.z);
+        state.speed = 0.6;
+        double closest = Double.MAX_VALUE;
+        for (int tick = 0; tick < 3000; tick++) {
+            RouteAutopilot.Command command = RouteAutopilot.returnToRunway(state, situation(LIGHT, false), params, 0);
+            assertEquals(RouteAutopilot.Phase.RETURN, command.phase);
+            FixedWingFlight.step(state, command.controls, params);
+            if (tick > 1500) {
+                closest = Math.min(closest, Math.hypot(state.position.x - LIGHT.x, state.position.z - LIGHT.z));
+                assertTrue(state.position.y > LIGHT.y + 20, "should hold its height over the runway");
+            }
+        }
+        assertTrue(closest > 20 && closest < 60, "should circle round it, closest " + closest);
+    }
+
+    @Test
+    void notCapturedWhenFastHighOrCrossing() {
+        FixedWingFlight.State state = new FixedWingFlight.State();
+        state.position.set(LIGHT.pointX(1, 0), LIGHT.y + 1, LIGHT.pointZ(1, 0));
+        state.heading = LIGHT.heading;
+        state.speed = 0.4;
+        assertTrue(RunwayOps.captured(state, LIGHT, 0.9));
+        state.speed = 0.8;
+        assertTrue(!RunwayOps.captured(state, LIGHT, 0.9), "too fast");
+        state.speed = 0.4;
+        state.position.y = LIGHT.y + 4;
+        assertTrue(!RunwayOps.captured(state, LIGHT, 0.9), "too high");
+        state.position.y = LIGHT.y + 1;
+        state.heading = LIGHT.heading + 90;
+        assertTrue(!RunwayOps.captured(state, LIGHT, 0.9), "crossing it");
+    }
 }

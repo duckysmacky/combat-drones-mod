@@ -133,7 +133,8 @@ class RouteAutopilotTest {
     }
 
     private static RouteAutopilot.Situation situation(double fuelFraction, boolean warhead) {
-        return new RouteAutopilot.Situation(ORIGIN_Y, 0, true, fuelFraction, 0.15, warhead, ORIGIN_Y, 0, ORIGIN_Y, 0);
+        return new RouteAutopilot.Situation(ORIGIN_Y, 0, true, fuelFraction, 0.15, warhead, ORIGIN_Y,
+                new Route.Runway(new java.util.UUID(0, 1), 0, ORIGIN_Y, 0, 0, 6, 2), true);
     }
 
     /** Flies until the plane reaches the ground plane at {@code groundY}; returns where it touched, or null. */
@@ -179,17 +180,7 @@ class RouteAutopilotTest {
         assertEquals(RouteAutopilot.Phase.LOITER, RouteAutopilot.guide(munition, route, 1, situation(0.5, true), PLANE).phase);
         FixedWingFlight.State gunship = launched();
         gunship.position.set(0, ORIGIN_Y + 30, 10);
-        assertEquals(RouteAutopilot.Phase.LAND, RouteAutopilot.guide(gunship, route, 1, situation(0.1, false), PLANE).phase);
-    }
-
-    @Test
-    void returnLandsSlowlyNearHome() {
-        FixedWingFlight.State state = launched();
-        Route route = new Route(Collections.singletonList(new Waypoint(300, 300, 40)), TerminalAction.RETURN);
-        FixedWingFlight.State touchdown = flyToGround(state, route, situation(1, false), ORIGIN_Y, 4000);
-        assertTrue(touchdown != null, "should come down");
-        assertTrue(Math.hypot(touchdown.position.x, touchdown.position.z) < 40, "should land near home");
-        assertTrue(touchdown.speed < 0.75 * PLANE.maxSpeed, "should touch down slowly, was " + touchdown.speed);
+        assertEquals(RouteAutopilot.Phase.RETURN, RouteAutopilot.guide(gunship, route, 1, situation(0.1, false), PLANE).phase);
     }
 
     @Test

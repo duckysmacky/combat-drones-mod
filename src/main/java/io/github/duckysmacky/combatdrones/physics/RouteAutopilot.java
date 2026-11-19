@@ -4,8 +4,8 @@ package io.github.duckysmacky.combatdrones.physics;
  * Flies a {@link Route} by turning flight state into {@link FixedWingFlight.Controls}: banks toward the next waypoint,
  * pitches toward its altitude (never below the terrain floor it's given) and holds the leg's speed. Once the
  * waypoints are done it carries out the route's terminal action: orbit the last waypoint (loiter), fly the route
- * again (loop), dive onto a point (dive / destroy), or fly home and land (return). Pure; the entity supplies terrain, fuel and home in a
- * {@link Situation}.
+ * again (loop), dive onto a point (dive / destroy), or fly back and land on its runway (return, {@link RunwayOps}). Pure;
+ * the entity supplies terrain, fuel and the runway in a {@link Situation}.
  */
 public final class RouteAutopilot {
     static final double BANK_GAIN = 1.5;
@@ -33,12 +33,10 @@ public final class RouteAutopilot {
     static final double PURSUIT_TURN_SPEED = 0.55;
     /** Steepest descent while turning in, so a target too steep to dive on is spiralled down to instead of looped. */
     static final double PURSUIT_SPIRAL_PITCH = 35.0;
-    /** Returning units start their landing approach this close to home. */
+    /** Returning units come down from their return height this close to the approach fix. */
     static final double LANDING_RADIUS = 48.0;
-    /** Height above home a returning unit cruises at before the approach. */
+    /** Height above the runway a returning unit cruises at before the approach. */
     static final double RETURN_HEIGHT = 30.0;
-    /** Landing glideslope: height above home per block of distance. */
-    static final double GLIDESLOPE = 0.15;
 
     public enum Phase { ROUTE, LOITER, STRIKE, RETURN, LAND }
 
@@ -57,13 +55,13 @@ public final class RouteAutopilot {
         final boolean warhead;
         /** Ground height under the last waypoint (Dive aims here); NaN if unknown, then the launch altitude is used. */
         final double strikeGroundY;
-        /** Where Return lands (the launch ramp); NaN X if unknown, then Return loiters instead. */
-        final double homeX;
-        final double homeY;
-        final double homeZ;
+        /** Where Return lands; null if it has none, then Return loiters instead. */
+        final Route.Runway runway;
+        /** False while the runway is taken by another plane or gone: Return circles over it. */
+        final boolean runwayFree;
 
         public Situation(double originY, double minSafeY, boolean hasFuel, double fuelFraction, double lowFuelFraction, boolean warhead,
-                         double strikeGroundY, double homeX, double homeY, double homeZ) {
+                         double strikeGroundY, Route.Runway runway, boolean runwayFree) {
             this.originY = originY;
             this.minSafeY = minSafeY;
             this.hasFuel = hasFuel;
@@ -71,18 +69,17 @@ public final class RouteAutopilot {
             this.lowFuelFraction = lowFuelFraction;
             this.warhead = warhead;
             this.strikeGroundY = strikeGroundY;
-            this.homeX = homeX;
-            this.homeY = homeY;
-            this.homeZ = homeZ;
+            this.runway = runway;
+            this.runwayFree = runwayFree;
         }
 
-        /** Plenty of fuel, no home and no known ground: just flying the route. */
+        /** Plenty of fuel, no runway and no known ground: just flying the route. */
         static Situation basic(double originY, double minSafeY, boolean hasFuel) {
-            return new Situation(originY, minSafeY, hasFuel, 1, 0, false, Double.NaN, Double.NaN, Double.NaN, Double.NaN);
+            return new Situation(originY, minSafeY, hasFuel, 1, 0, false, Double.NaN, null, false);
         }
 
         boolean hasHome() {
-            return !Double.isNaN(homeX);
+            return runway != null;
         }
     }
 
@@ -245,17 +242,14 @@ public final class RouteAutopilot {
         return new FixedWingFlight.Controls(bank, pitch, hasFuel ? throttle : 0, hasFuel);
     }
 
-    /** Head home at a safe height; close in, fly a shallow glideslope down onto the ground at home at slow speed. */
+    /** Fly back to the runway and land on it. */
     private static Command returnHome(FixedWingFlight.State state, Situation situation, FixedWingFlight.Params params, int index) {
-        double distance = Math.hypot(situation.homeX - state.position.x, situation.homeZ - state.position.z);
-        double bank = bankToward(state, bearing(state, situation.homeX, situation.homeZ));
-        if (distance > LANDING_RADIUS) {
-            double targetY = Math.max(situation.homeY + RETURN_HEIGHT, situation.minSafeY);
-            return new Command(controls(state, bank, targetY, Route.Speed.MEDIUM.fraction, params, situation.hasFuel), index, Phase.RETURN);
-        }
-        // Aim a little below the ground so it actually touches down instead of skimming
-        double targetY = situation.homeY + distance * GLIDESLOPE - 2;
-        return new Command(controls(state, bank, targetY, Route.Speed.SLOW.fraction, params, situation.hasFuel), index, Phase.LAND);
+        return RunwayOps.approach(state, situation.runway, situation.runwayFree, situation.minSafeY, params, situation.hasFuel, index);
+    }
+
+    /** "Return to runway": the route set aside, straight back to land (straight and level if it has no runway). */
+    public static Command returnToRunway(FixedWingFlight.State state, Situation situation, FixedWingFlight.Params params, int index) {
+        return situation.hasHome() ? returnHome(state, situation, params, index) : new Command(hold(state, situation, params), index, Phase.ROUTE);
     }
 
     /** No route: fly straight and level (above the floor). */
@@ -286,11 +280,11 @@ public final class RouteAutopilot {
         return new FixedWingFlight.Controls(bank, pitch, throttle, true);
     }
 
-    private static double bankToward(FixedWingFlight.State state, double desiredHeading) {
+    static double bankToward(FixedWingFlight.State state, double desiredHeading) {
         return FixedWingFlight.clamp(FixedWingFlight.wrap(desiredHeading - state.heading) * BANK_GAIN, FixedWingFlight.MAX_BANK_DEG);
     }
 
-    private static FixedWingFlight.Controls controls(FixedWingFlight.State state, double bank, double targetY, double speedFraction,
+    static FixedWingFlight.Controls controls(FixedWingFlight.State state, double bank, double targetY, double speedFraction,
                                                      FixedWingFlight.Params params, boolean hasFuel) {
         if (!hasFuel) {
             return new FixedWingFlight.Controls(bank, FixedWingFlight.GLIDE_PITCH_DEG, 0, false);

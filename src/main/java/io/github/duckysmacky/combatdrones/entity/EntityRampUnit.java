@@ -26,18 +26,14 @@ import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.entity.MoverType;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.network.datasync.DataParameter;
 import net.minecraft.network.datasync.DataSerializers;
 import net.minecraft.network.datasync.EntityDataManager;
 import net.minecraft.util.DamageSource;
 import net.minecraft.util.EntityDamageSourceIndirect;
-import net.minecraft.util.EnumParticleTypes;
 import net.minecraft.util.SoundCategory;
 import net.minecraft.util.math.RayTraceResult;
-import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
@@ -47,7 +43,6 @@ import net.minecraft.util.text.TextComponentTranslation;
 import net.minecraft.world.WorldServer;
 import net.minecraftforge.common.ForgeChunkManager;
 import net.minecraftforge.fml.common.network.NetworkRegistry;
-import net.minecraftforge.fml.common.registry.ForgeRegistries;
 import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.fml.relauncher.SideOnly;
 
@@ -70,11 +65,8 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder, LockOn
     /** Movement lost to a collision beyond this (blocks/tick) counts as a crash. */
     private static final double CRASH_THRESHOLD = 0.1;
     private static final double RENDER_DISTANCE = 160.0;
-    /** On its Return landing approach, a unit touching down slower than this share of top speed lands intact. */
-    private static final double LANDING_SPEED_FRACTION = 0.75;
-    /** Anywhere else only a belly landing does: flat onto the ground, slower than this share, barely sinking. */
-    private static final double BELLY_LANDING_SPEED_FRACTION = 0.5;
-    private static final double BELLY_LANDING_SINK_RATE = 0.2;
+    /** Within this distance of its runway a returning plane checks the runway is still there and free. */
+    private static final double RUNWAY_CHECK_RANGE = 128;
     /** Manual input older than this (ticks) is treated as a centred stick. */
     protected static final int STALE_INPUT_TICKS = 10;
     private static final int DESIGNATE_COOLDOWN_TICKS = 10;
@@ -134,9 +126,6 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder, LockOn
     private Route route = Route.empty(Route.TerminalAction.LOITER);
     private int waypointIndex;
     private double launchY;
-    /** Where Return flies back to: the launch point. NaN for units summoned without one. */
-    private double homeX = Double.NaN;
-    private double homeZ = Double.NaN;
     protected double fuel;
     protected float health;
     /** The runway it took off from: where it goes back to land. Null for units summoned without one. */
@@ -147,6 +136,13 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder, LockOn
     private int takeoffTicks;
     /** Just lifted off: climbing straight ahead to {@link RunwayOps#CLIMB_OUT_HEIGHT} before turning onto the route. */
     private boolean climbingOut;
+    /** "Return to runway": the route set aside (kept, Apply brings it back) and only landing. */
+    private boolean recalling;
+    /** Landed: rolling out on the runway it's landing on, braking to a stop, then parked on it. */
+    @Nullable
+    private Route.Runway rollingOutOn;
+    /** Its runway is there and free to land on, as last checked (unknown counts as free until it's close). */
+    private boolean runwayFree = true;
     // Manual control ("Take control"): the controller's latest input, and when it arrived
     private double manualPitch;
     private double manualRoll;
@@ -214,8 +210,6 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder, LockOn
         this.route = route;
         this.fuel = fuel;
         this.launchY = y;
-        this.homeX = x;
-        this.homeZ = z;
         setHealth(type.getMaxHP());
         setPosition(x, y, z);
         flight.position.set(x, y, z);
@@ -328,6 +322,7 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder, LockOn
     /** Server: replace the route in flight (Mission Planner "Apply"). The unit heads for the new first waypoint. */
     public void setRoute(Route newRoute) {
         route = newRoute;
+        recalling = false;
         waypointIndex = 0;
         bombRun = 0;
         // A new plan (and target) from the planner replaces any point picked from the camera
@@ -396,6 +391,13 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder, LockOn
             takeoffRoll(type);
             return;
         }
+        if (rollingOutOn != null) {
+            rollOut(type);
+            return;
+        }
+        if (ticksExisted % 20 == 0) {
+            runwayFree = checkRunway(type);
+        }
         if (downedFall(type)) {
             return;
         }
@@ -416,6 +418,7 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder, LockOn
         // The entity position is the truth (picks up /tp and positions set after NBT load)
         flight.position.set(posX, posY, posZ);
         FixedWingFlight.Controls controls = manualControls(type, params, boosting);
+        boolean handFlown = controls != null;
         gunnerFire(type);
         landingApproach = false;
         Vec3d strikePoint = null;
@@ -448,6 +451,14 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder, LockOn
         if (controls.engineOn) {
             double burn = DroneSystems.drainPerTick(type.getDrainRatePerTick(), thrust) * (boosting ? ModConfig.boostFuelMultiplier : 1);
             fuel = Math.max(0, fuel - burn);
+        }
+        // Down onto its runway: on the autopilot's landing approach, or flown in by hand
+        Route.Runway runway = landingRunway();
+        boolean landing = landingApproach || (handFlown && !climbingOut);
+        if (landing && runway != null && runwayFree && !type.isImpactDetonates() && RunwayOps.captured(flight, runway, type.getMaxSpeed())) {
+            rollingOutOn = runway; // whoever is flying it watches it roll out; the controls no longer do anything
+            rollOut(type);
+            return;
         }
 
         double wantedX = flight.position.x - posX;
@@ -494,11 +505,72 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder, LockOn
         return takingOff;
     }
 
-    /** The route (and its terminal action) on autopilot. */
+    /** Where Return lands: the runway the route names, else the one it took off from. Null if it has neither. */
+    @Nullable
+    public Route.Runway landingRunway() {
+        return route.getRunway() != null ? route.getRunway() : homeRunway;
+    }
+
+    /** "Return to runway" was pressed: flying back to land, the route set aside until the next Apply. */
+    public boolean isRecalling() {
+        return recalling;
+    }
+
+    /** Server: sets the route aside and heads back to land. False (nothing changes) if it has no runway. */
+    public boolean recall() {
+        if (landingRunway() == null || getDroneType() == null || getDroneType().isImpactDetonates()) {
+            return false;
+        }
+        recalling = true;
+        bombRun = 0;
+        designatedTarget = null;
+        dataManager.set(STRIKING, false);
+        return true;
+    }
+
+    /**
+     * Is its runway there and free? Only judged close by, where a missing runway means it's gone (the runway's chunk
+     * is loaded); far off an unknown runway counts as free.
+     */
+    private boolean checkRunway(DroneType type) {
+        Route.Runway runway = landingRunway();
+        if (runway == null || Math.hypot(runway.x - posX, runway.z - posZ) > RUNWAY_CHECK_RANGE) {
+            return true;
+        }
+        BlockPos threshold = new BlockPos(runway.x, runway.y, runway.z);
+        if (!world.isBlockLoaded(threshold)) {
+            return true;
+        }
+        Entity entity = ((WorldServer) world).getEntityFromUuid(runway.id);
+        return entity instanceof EntityRunway && ((EntityRunway) entity).canTake(type, owner);
+    }
+
+    /** Server tick of the roll-out after a landing; once stopped it's parked on the runway (or wrecked if it's gone). */
+    private void rollOut(DroneType type) {
+        flight.position.set(posX, posY, posZ);
+        boolean stopped = RunwayOps.rollout(flight, rollingOutOn);
+        setPosition(flight.position.x, flight.position.y, flight.position.z);
+        syncPresentation();
+        if (!stopped) {
+            return;
+        }
+        Entity entity = ((WorldServer) world).getEntityFromUuid(rollingOutOn.id);
+        if (entity instanceof EntityRunway && ((EntityRunway) entity).canTake(type, owner)) {
+            ((EntityRunway) entity).dock(type, this);
+            setDead();
+        } else {
+            detonate(type);
+        }
+    }
+
+    /** The route (and its terminal action) on autopilot, or straight back to land when recalled. */
     private RouteAutopilot.Command autopilotCommand(DroneType type, FixedWingFlight.Params params) {
         RouteAutopilot.Situation situation = new RouteAutopilot.Situation(launchY, terrainFloor(), fuel > 0,
                 fuel / type.getBatteryOrFuelCapacity(), ModConfig.lowFuelFraction, type.isArmed() && type.isImpactDetonates(),
-                strikeGroundY(), homeX, launchY - 1, homeZ);
+                strikeGroundY(), landingRunway(), runwayFree);
+        if (recalling) {
+            return RouteAutopilot.returnToRunway(flight, situation, params, waypointIndex);
+        }
         RouteAutopilot.Command command = RouteAutopilot.guide(flight, route, waypointIndex, situation, params);
         if (command.waypointIndex > waypointIndex && waypointIndex < route.size()) {
             passDropPoint(type, waypointIndex);
@@ -931,26 +1003,11 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder, LockOn
     }
 
     /**
-     * Ran into terrain or something solid. Warheads go off. Every other unit lands intact as an item only when it
-     * was actually landing (Return's approach, or a flat, slow belly landing); anything else (a wall, a hillside, a
-     * steep or fast touchdown) goes off with the type's blastPower (a gunship's fuel and ammo, the recon
-     * UAV's fuel), or just wrecks it.
+     * Ran into terrain or something solid: it goes off with the type's blastPower (a warhead, or a plane's fuel and
+     * ammo), or just wrecks. Planes only come down intact on a runway, which catches them before they touch anything.
      */
     private void onCollision(DroneType type) {
-        if (type.isArmed() && type.isImpactDetonates()) {
-            detonate(type);
-            return;
-        }
-        // Slow speed alone isn't a landing: a plane cruising at Medium into a hillside must still go up. Only Return's
-        // approach (where the roll-out may clip a bump or block edge) or a flat, slow belly touchdown counts.
-        boolean returnLanding = landingApproach && flight.speed < LANDING_SPEED_FRACTION * type.getMaxSpeed();
-        boolean bellyLanding = onGround && !collidedHorizontally && flight.speed < BELLY_LANDING_SPEED_FRACTION * type.getMaxSpeed()
-                && Math.abs(flight.velocity.y) < BELLY_LANDING_SINK_RATE;
-        if (returnLanding || bellyLanding) {
-            land(type);
-        } else {
-            detonate(type);
-        }
+        detonate(type);
     }
 
     private void detonate(DroneType type) {
@@ -959,17 +1016,6 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder, LockOn
             DroneExplosion.detonate((WorldServer) world, this, getBlameTarget(), posX, posY + height / 2, posZ, type.getBlastPower());
         } else {
             DamageEffects.wreck(this);
-        }
-    }
-
-    /** Comes down intact: drops back as its item, remaining fuel and ammo and all. */
-    private void land(DroneType type) {
-        setDead();
-        ((WorldServer) world).spawnParticle(EnumParticleTypes.CLOUD, posX, posY + 0.1, posZ, 16, width / 2, 0.05, width / 2, 0.02);
-        world.playSound(null, posX, posY, posZ, ModSounds.DRONE_HIT, SoundCategory.NEUTRAL, 1.0F, 0.5F);
-        Item item = ForgeRegistries.ITEMS.getValue(new ResourceLocation(CombatDrones.MOD_ID, type.getId()));
-        if (item != null) {
-            entityDropItem(ItemDrone.withLoadout(ItemDrone.withFuel(new ItemStack(item), fuel), getLoadout()), 0.2F);
         }
     }
 
@@ -1212,14 +1258,16 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder, LockOn
         compound.setTag("Route", RouteCodec.toNbt(route));
         compound.setInteger("WaypointIndex", waypointIndex);
         compound.setDouble("LaunchY", launchY);
-        compound.setDouble("HomeX", homeX);
-        compound.setDouble("HomeZ", homeZ);
         if (homeRunway != null) {
             compound.setTag("HomeRunway", RouteCodec.runwayToNbt(homeRunway));
         }
         compound.setBoolean("TakingOff", takingOff);
         compound.setInteger("TakeoffTicks", takeoffTicks);
         compound.setBoolean("ClimbingOut", climbingOut);
+        compound.setBoolean("Recalling", recalling);
+        if (rollingOutOn != null) {
+            compound.setTag("RollingOutOn", RouteCodec.runwayToNbt(rollingOutOn));
+        }
         compound.setDouble("Fuel", fuel);
         compound.setFloat("Health", health);
         lockCharges.write(compound);
@@ -1245,12 +1293,12 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder, LockOn
         route = RouteCodec.fromNbt(compound.getCompoundTag("Route"), Route.TerminalAction.LOITER);
         waypointIndex = compound.getInteger("WaypointIndex");
         launchY = compound.hasKey("LaunchY") ? compound.getDouble("LaunchY") : posY;
-        homeX = compound.hasKey("HomeX") ? compound.getDouble("HomeX") : Double.NaN;
-        homeZ = compound.hasKey("HomeZ") ? compound.getDouble("HomeZ") : Double.NaN;
         homeRunway = RouteCodec.runwayFromNbt(compound.getCompoundTag("HomeRunway"));
         takingOff = homeRunway != null && compound.getBoolean("TakingOff");
         takeoffTicks = compound.getInteger("TakeoffTicks");
         climbingOut = compound.getBoolean("ClimbingOut");
+        recalling = compound.getBoolean("Recalling");
+        rollingOutOn = RouteCodec.runwayFromNbt(compound.getCompoundTag("RollingOutOn"));
         fuel = compound.getDouble("Fuel");
         setHealth(compound.getFloat("Health"));
         lockCharges.read(compound);
