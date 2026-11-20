@@ -54,7 +54,7 @@ message.combat_drones.drone_not_found=Linked drone not found (destroyed or too f
 message.combat_drones.link_lost=Drone link lost
 
 key.categories.combat_drones=Combat Drones
-key.combat_drones.toggle_fpv=Enter / Exit FPV (also leaves a remote unit)
+key.combat_drones.toggle_fpv=Switch drone/unit camera
 key.combat_drones.flight_mode=Flight Mode (drones: Acro / Angle / Hover; planes: assisted / free)
 key.combat_drones.motors=Toggle Motors
 message.combat_drones.mode_acro=Flight mode: Acro
@@ -69,8 +69,8 @@ key.combat_drones.pitch_forward=Pitch Forward (nose down)
 key.combat_drones.pitch_back=Pitch Back (nose up)
 key.combat_drones.roll_left=Roll Left
 key.combat_drones.roll_right=Roll Right
-key.combat_drones.switch_weapon=Switch Weapon (Gunship)
-key.combat_drones.bomb_sight=Bombsight (Stealth Bomber)
+key.combat_drones.switch_weapon=Switch weapon
+key.combat_drones.bomb_sight=Switch camera view
 key.combat_drones.reload=Reload
 
 tooltip.combat_drones.hold_shift=Hold SHIFT for details

@@ -39,7 +39,7 @@ public final class DroneKeys {
     public static final KeyBinding ROLL_LEFT = new KeyBinding("key.combat_drones.roll_left", Keyboard.KEY_LEFT, CATEGORY);
     public static final KeyBinding ROLL_RIGHT = new KeyBinding("key.combat_drones.roll_right", Keyboard.KEY_RIGHT, CATEGORY);
     /** Gunship gunner seat: cannon / rocket rack / howitzer. */
-    public static final KeyBinding SWITCH_WEAPON = new KeyBinding("key.combat_drones.switch_weapon", Keyboard.KEY_R, CATEGORY);
+    public static final KeyBinding SWITCH_WEAPON = new KeyBinding("key.combat_drones.switch_weapon", Keyboard.KEY_J, CATEGORY);
 
     /** Stealth Bomber: flight view / bombsight. */
     public static final KeyBinding BOMB_SIGHT = new KeyBinding("key.combat_drones.bomb_sight", Keyboard.KEY_B, CATEGORY);
