@@ -5,6 +5,7 @@ import io.github.duckysmacky.combatdrones.client.hud.UiSounds;
 import io.github.duckysmacky.combatdrones.client.hud.Ui;
 import io.github.duckysmacky.combatdrones.client.hud.UiButton;
 import io.github.duckysmacky.combatdrones.item.ItemDrone;
+import io.github.duckysmacky.combatdrones.item.ItemMissionPlanner;
 import io.github.duckysmacky.combatdrones.type.Loadout;
 import io.github.duckysmacky.combatdrones.entity.EntityLaunchRamp;
 import io.github.duckysmacky.combatdrones.entity.EntityRampUnit;
@@ -34,6 +35,7 @@ import net.minecraft.client.resources.I18n;
 import net.minecraft.entity.Entity;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.border.WorldBorder;
+import net.minecraftforge.event.entity.player.PlayerInteractEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.network.FMLNetworkEvent;
@@ -167,6 +169,14 @@ public class GuiMissionPlanner extends GuiScreen {
     /** Entity ID of the last selected unit if it was in flight, else -1. */
     static int lastUnitEntityId() {
         return lastSelected == null ? -1 : lastSelected.entityId;
+    }
+
+    /** Shift+right-click with the planner: take control of the last selected unit, else the first flyable one. */
+    @SubscribeEvent
+    public static void onRightClickItem(PlayerInteractEvent.RightClickItem event) {
+        if (event.getWorld().isRemote && event.getEntityPlayer().isSneaking() && event.getItemStack().getItem() instanceof ItemMissionPlanner) {
+            ModNetwork.CHANNEL.sendToServer(new RemoteRequestPacket(lastUnitEntityId(), true, true));
+        }
     }
 
     @SubscribeEvent

@@ -117,6 +117,27 @@ public final class PlannerServer {
         ModNetwork.CHANNEL.sendTo(packet, player);
     }
 
+    /** Shift+right-click fallback: the first of the player's units in flight that can be flown by hand, or null. */
+    public static EntityRampUnit firstFlyable(EntityPlayerMP player) {
+        for (Entity entity : player.world.loadedEntityList) {
+            if (isFlyable(player, entity)) {
+                return (EntityRampUnit) entity;
+            }
+        }
+        return null;
+    }
+
+    /** {@code entity} is one of the player's ramp units in flight that can be flown by hand. */
+    public static boolean isFlyable(EntityPlayerMP player, Entity entity) {
+        if (!(entity instanceof EntityRampUnit) || entity instanceof EntityCruiseMissile || entity.isDead
+                || !player.getUniqueID().equals(((EntityRampUnit) entity).getOwner())) {
+            return false;
+        }
+        DroneType type = ((EntityRampUnit) entity).getDroneType();
+        return type != null && type.getCategory() == DroneType.Category.RAMP_AUTOPILOT && type.getControlScheme() != null
+                && type.getControlScheme().isFlyable();
+    }
+
     /** A linked ramp's unit, still on the ground. */
     private static PlannerOpenPacket.UnitView rampView(EntityLaunchRamp ramp) {
         DroneType type = ramp.getUnitType();

@@ -169,6 +169,7 @@ item.combat_drones.mission_planner.details.1=Ramps and runways you place are lin
 item.combat_drones.mission_planner.details.2=Right-click the air for your units: Apply a route, Launch, Launch & Fly, re-route, View or Take control.
 item.combat_drones.mission_planner.details.3=Map: drag to pan (or move a waypoint), right-click for the menu, scroll zooms.
 item.combat_drones.mission_planner.details.4=Keep it in hand while viewing or flying a unit remotely.
+item.combat_drones.mission_planner.details.5=Shift+right-click takes control of the last selected unit in flight (else the first one).
 item.combat_drones.launch_ramp.tooltip=Short 3-block launch ramp for loitering munitions
 item.combat_drones.launch_ramp.details.1=Place it on the ground: it's aimed exactly where you look.
 item.combat_drones.launch_ramp.details.2=Right-click with a munition to install it, with 100LL Avgas Fuel to fuel it,
