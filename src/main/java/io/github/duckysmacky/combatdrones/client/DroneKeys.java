@@ -1,6 +1,8 @@
 package io.github.duckysmacky.combatdrones.client;
 
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.settings.KeyBinding;
+import net.minecraftforge.client.settings.IKeyConflictContext;
 import org.lwjgl.input.Keyboard;
 
 /**
@@ -9,6 +11,22 @@ import org.lwjgl.input.Keyboard;
  */
 public final class DroneKeys {
     private static final String CATEGORY = "key.categories.combat_drones";
+
+    /**
+     * Live only while a launcher is in hand. Forge hands a key press to the first active binding on that key, so an
+     * always-active Reload would swallow R for other mods' reload keys.
+     */
+    private static final IKeyConflictContext HOLDING_LAUNCHER = new IKeyConflictContext() {
+        @Override
+        public boolean isActive() {
+            return Minecraft.getMinecraft().currentScreen == null && !LauncherController.held().isEmpty();
+        }
+
+        @Override
+        public boolean conflicts(IKeyConflictContext other) {
+            return other == this;
+        }
+    };
 
     public static final KeyBinding TOGGLE_FPV = new KeyBinding("key.combat_drones.toggle_fpv", Keyboard.KEY_G, CATEGORY);
     /** Cycles Acro, Angle, Hover. */
@@ -26,8 +44,8 @@ public final class DroneKeys {
     /** Stealth Bomber: flight view / bombsight. */
     public static final KeyBinding BOMB_SIGHT = new KeyBinding("key.combat_drones.bomb_sight", Keyboard.KEY_B, CATEGORY);
 
-    /** Stinger: load a missile. Shares R with the gunner's weapon switch (never both at once), so it's read by its key state. */
-    public static final KeyBinding RELOAD = new KeyBinding("key.combat_drones.reload", Keyboard.KEY_R, CATEGORY);
+    /** Stinger and EMP Gun: load a round. Read by its key state, so it works even when another mod's binding takes the press. */
+    public static final KeyBinding RELOAD = new KeyBinding("key.combat_drones.reload", HOLDING_LAUNCHER, Keyboard.KEY_R, CATEGORY);
 
     static final KeyBinding[] ALL = {TOGGLE_FPV, FLIGHT_MODE, MOTORS, PITCH_FORWARD, PITCH_BACK, ROLL_LEFT, ROLL_RIGHT, SWITCH_WEAPON, BOMB_SIGHT, RELOAD};
 

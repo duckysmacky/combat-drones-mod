@@ -71,7 +71,7 @@ key.combat_drones.roll_left=Roll Left
 key.combat_drones.roll_right=Roll Right
 key.combat_drones.switch_weapon=Switch Weapon (Gunship)
 key.combat_drones.bomb_sight=Bombsight (Stealth Bomber)
-key.combat_drones.reload=Reload (Stinger)
+key.combat_drones.reload=Reload
 
 tooltip.combat_drones.hold_shift=Hold SHIFT for details
 tooltip.combat_drones.not_functional=Not functional yet: arrives in a later update.
