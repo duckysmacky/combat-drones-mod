@@ -2,6 +2,83 @@
 
 All notable changes to Combat Drones, newest first.
 
+## v0.5.0
+
+#### Added
+
+- **EMP Gun**
+- **Light and Heavy Runways**
+- **Runway landing**: planes land on runways. Return flies an approach, rolls out and parks the plane. Planes no longer land as items anywhere else.
+- **Mission Planner runway support**: runways show on the map. Right-click one to land there at the end of a route. "Return to runway" sets an airborne plane's route aside and lands it.
+- **Shot-down state**: planes shot to 0 HP go down in a burning, spinning arc with the pilot still aboard, then explode on impact. Drones can use it too if enabled. Tuned in `[state.shot_down]`.
+- **EMPed state**: EMP-disabled vehicles glide down without control but keep their pilot. They fly on when the EMP wears off. Tuned in `[state.emped]`.
+- **Per-vehicle fuel types**: 100LL Avgas Fuel for munitions, Jet A-1 Fuel for light planes, JP-8 Military Grade Fuel for heavy planes and JP-10 Missile Fuel for cruise missiles.
+- Mission Planner units can be selected with the number keys, and the planner remembers the last selected unit.
+- Shift+right-click on the Mission Planner takes control of the selected unit.
+- Recon Drone has a UAV-style lock-on. Hold the left mouse button to lock on.
+- EMP fields now disable runways and launch ramps. You can View and Take control of disabled vehicles.
+
+#### Changed
+
+- **Drones reworked**: Micro Racer, Standard Racer and Long-Range Racer are now the Racer, Standard and Recon Drones. The Recon Drone is a quiet, black long-range scout.
+- Attack Plane and Strike Plane are now the **Spitfire** and **Striker**, with bigger models and hitboxes and lower top speeds. Light munition is slower.
+- Launch ramps link to the Mission Planner when placed.
+- Some keybinds have clearer names: "Switch drone/unit camera", "Switch weapon" and "Switch camera view".
+- Signal loss grows exponentially past half of a drone's range.
+- A drone keeps its last input when its pilot leaves, however they leave, and keeps its flight mode when the pilot takes it back.
+- Recon and DJI drones are quieter.
+- Hand-flown drone settings moved to a `[drone]` config table, with one table per drone type.
+- Some blast and missile config keys were renamed for consistency.
+
+#### Removed
+
+- **Rearm Station**.
+- The generic **Fuel Can**, replaced by the fuel types above.
+
+#### Fixed
+
+- The weapon switch key is now J, since R clashed with reloading. Reload only applies to held launchers.
+
+## v0.4.0
+
+#### Added
+
+- Stealth Bomber, a bomber plane that drops aerial bombs.
+- EMP Field Station, an area EMP device.
+- EMP Blast Gadget, an EMP item.
+- Pilot Detector, which finds players flying drones and planes.
+- Stinger anti-air launcher.
+
+#### Changed
+
+- UAV reworked into tracking dots and charged lock-ons.
+- Recon camera holds its view on the ground and no longer follows targets.
+- Recon settings moved to a new [uav] config section.
+- ignoredTeams is a general setting. It applies to every team check: recon tracking and locks, the Pilot Detector, EMP sparing, and sharing.
+
+#### Fixed
+
+- Lock-ons box now targets through walls instead of steering the camera.
+
+## v0.3.0
+
+#### Added
+
+- Visual and sound feedback when you use drones, launch ramps and missile pads.
+- Custom particles and impact effects.
+- Interaction and UI sounds.
+
+#### Changed
+
+- Visual overhaul: redrawn entity textures and item sprites, more detailed and animated models, and a new mod icon.
+- Per-vehicle camera feeds have their own looks: analog, FLIR, nose camera, recon and seeker.
+- Mission Planner and Missile Tablet restyled.
+- Sound loudness rebalanced.
+- Handling sounds replaced with recordings. Fuel now uses the vanilla bucket pour sound.
+- Gunship close-range engine sound replaced with a new recording.
+- Launch ramp models and hitboxes reworked.
+- Cruise missile no longer shows hover exhaust while arming. The feed shows static until the dive.
+
 ## v0.2.1
 
 #### Added
@@ -10,8 +87,7 @@ All notable changes to Combat Drones, newest first.
 - Munition dive sounds, plus a terminal sound as a munition closes on its target.
 - Bullet whizz sounds as rounds pass close by.
 - Flight sounds for rockets, shells and bombs.
-- Air-burst and indoor explosion sounds.
-- Far-range sounds for the Gunship cannon and howitzer.
+- Air-burst and indoor explosion sounds. Far-range sounds for the Gunship cannon and howitzer.
 - Subtitles for the new munition, bullet and projectile sounds.
 - Client config options maxEngineVoices (default 4) and maxProjectileSounds (default 6). They cap how many engines and projectiles you hear at once, nearest first.
 - CRT overlay on the gunner camera. The analog static setting also controls its strength.
