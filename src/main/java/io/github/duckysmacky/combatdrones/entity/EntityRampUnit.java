@@ -170,6 +170,8 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder, LockOn
     private Vec3d designatedTarget;
     /** Just shot down: world time until which further damage is ignored (not saved: a restart only shortens it). */
     private long graceUntil;
+    /** Ticks left after launch or liftoff in which nothing it touches sets it off (not saved: a restart only ends it). */
+    private int launchGrace;
     /** Ticks left EMP-disabled. */
     private int empTicks;
     private int designateCooldown;
@@ -219,6 +221,7 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder, LockOn
         flight.pitch = -10;
         flight.speed = type.getMaxSpeed() * 0.8;
         rotationYaw = heading;
+        launchGrace = (int) Math.round(ModConfig.launchGraceSeconds * 20);
         syncPresentation();
     }
 
@@ -400,6 +403,9 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder, LockOn
         if (ticksExisted % 20 == 0) {
             runwayFree = checkRunway(type);
         }
+        if (launchGrace > 0) {
+            launchGrace--; // counts from leaving the ramp, or from liftoff after a takeoff roll
+        }
         if (downedFall(type)) {
             return;
         }
@@ -477,7 +483,8 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder, LockOn
         // onGround catches shallow touchdowns, which lose too little movement to count as a crash
         // Only warheads care about entities: a plane that merely clips a player or drone must not blow up
         boolean hitEntity = type.isImpactDetonates() && hitsEntity(swept);
-        if (blocked > CRASH_THRESHOLD || onGround || hitEntity) {
+        // Just launched it may still overlap its ramp (any heading, axis-aligned boxes) or brush the ground or the launcher
+        if (launchGrace <= 0 && (blocked > CRASH_THRESHOLD || onGround || hitEntity)) {
             onCollision(type);
             return;
         }

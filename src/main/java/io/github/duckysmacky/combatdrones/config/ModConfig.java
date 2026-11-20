@@ -96,6 +96,7 @@ public final class ModConfig {
     // [general]
     public static boolean blockDamageEnabled = true;
     public static double droneDamageTakenMultiplier = 1.0;
+    public static double launchGraceSeconds = 1.0;
     public static int maxWaypointsPerRoute = 16;
     public static double maxRouteAltitude = 120.0;
     public static double maxRouteLength = 3000.0;
@@ -474,6 +475,9 @@ public final class ModConfig {
                     "Fuel burn multiplier while boosting.");
             worldBorderCollision = defaults.get("general.worldBorderCollision", worldBorderCollision,
                     "Whether drones and ramp units collide with (and crash into) the world border. Off: they fly through it.");
+            launchGraceSeconds = defaults.number("general.launchGraceSeconds", launchGraceSeconds, 0, 5,
+                    "Seconds after leaving a ramp (or lifting off a runway) during which a ramp unit can't crash or go off on "
+                            + "contact, so the ramp, the ground or people around it can't set it off.");
             droneDamageTakenMultiplier = defaults.number("general.droneDamageTakenMultiplier", droneDamageTakenMultiplier, 0, 10,
                     "Multiplies all damage drones take from attacks (weapons, arrows, melee). Lower = harder to shoot down.");
             pilotHintEnabled = defaults.get("general.pilotHintEnabled", pilotHintEnabled,
