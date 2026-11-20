@@ -380,7 +380,9 @@ public class GuiMissionPlanner extends GuiScreen {
             PlannerOpenPacket.UnitView unit = view.units.get(index);
             String tag = unit.isGrounded() ? I18n.format("gui.combat_drones.planner.on_ramp") + " "
                     : unit.recalling ? I18n.format("gui.combat_drones.planner.returning") + " " : "";
-            String line = tag + fontRenderer.trimStringToWidth(unitName(unit), PANEL_WIDTH - 34 - fontRenderer.getStringWidth(tag)) + " "
+            // Number keys 1..9, 0 pick the first ten rows
+            String prefix = (index < 10 ? (index + 1) % 10 + ". " : "") + tag;
+            String line = prefix + fontRenderer.trimStringToWidth(unitName(unit), PANEL_WIDTH - 34 - fontRenderer.getStringWidth(prefix)) + " "
                     + percent(unit.fuelFraction) + "%";
             int color = index == selectedUnit ? Ui.SELECT : unit.isGrounded() ? Ui.FRIENDLY : Ui.TEXT;
             if (index == selectedUnit) {
@@ -1094,6 +1096,14 @@ public class GuiMissionPlanner extends GuiScreen {
         if (keyCode == Keyboard.KEY_ESCAPE && (menu != null || editingRadius)) {
             menu = null;
             editingRadius = false;
+            return;
+        }
+        if (keyCode >= Keyboard.KEY_1 && keyCode <= Keyboard.KEY_0) {
+            int row = keyCode - Keyboard.KEY_1;
+            if (row < view.units.size()) {
+                UiSounds.play(UiSounds.SELECT);
+                clickUnitList(row);
+            }
             return;
         }
         super.keyTyped(typedChar, keyCode);
