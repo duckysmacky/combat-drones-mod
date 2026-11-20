@@ -134,7 +134,7 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder, LockOn
     /** On the runway's deck: rolling for takeoff (no flight model, no collisions), or flying. */
     private boolean takingOff;
     private int takeoffTicks;
-    /** Just lifted off: climbing straight ahead to {@link RunwayOps#CLIMB_OUT_HEIGHT} before turning onto the route. */
+    /** Just lifted off: climbing straight ahead ({@code runways.climbOutHeight}) before turning onto the route. */
     private boolean climbingOut;
     /** "Return to runway": the route set aside (kept, Apply brings it back) and only landing. */
     private boolean recalling;
@@ -432,7 +432,7 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder, LockOn
             controls = flyBombRun(type, params);
         }
         if (climbingOut && homeRunway != null) {
-            double climbOutY = homeRunway.y + RunwayOps.CLIMB_OUT_HEIGHT;
+            double climbOutY = homeRunway.y + ModConfig.runwayClimbOutHeight;
             climbingOut = posY < climbOutY;
             if (controls == null && climbingOut) {
                 controls = RouteAutopilot.holdCourse(flight, homeRunway.heading, climbOutY + 2, Route.Speed.FAST.fraction, params, fuel > 0);
@@ -489,7 +489,8 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder, LockOn
      */
     private void takeoffRoll(DroneType type) {
         flight.position.set(posX, posY, posZ);
-        boolean airborne = RunwayOps.takeoffRoll(flight, homeRunway, type.getMaxSpeed(), takeoffTicks++);
+        boolean airborne = RunwayOps.takeoffRoll(flight, homeRunway, type.getMaxSpeed(), takeoffTicks++,
+                (int) Math.round(ModConfig.runwaySpoolUpSeconds * 20), ModConfig.runwayLiftoffSpeed);
         fuel = Math.max(0, fuel - DroneSystems.drainPerTick(type.getDrainRatePerTick(), 1));
         setPosition(flight.position.x, flight.position.y, flight.position.z);
         syncPresentation();

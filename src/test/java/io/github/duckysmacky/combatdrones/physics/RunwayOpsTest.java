@@ -25,16 +25,22 @@ class RunwayOpsTest {
         assertEquals(4, HEAVY.along(-20, 296), 1e-9);
     }
 
+    /** Config defaults (runways.spoolUpSeconds 3, liftoffSpeed 0.5, climbOutHeight 8). */
+    static final int SPOOL = 60;
+    static final double LIFTOFF = 0.5;
+    static final double CLIMB_OUT = 8;
+
     @Test
     void spoolsUpThenLiftsOffBeforeTheFarEnd() {
+        for (double liftoff : new double[]{0.45, LIFTOFF, 1.0}) {
         for (Route.Runway runway : new Route.Runway[]{LIGHT, HEAVY}) {
             for (double maxSpeed : SPEEDS) {
                 FixedWingFlight.State state = new FixedWingFlight.State();
                 double seat = RunwayOps.seat(runway);
                 state.position.set(runway.pointX(seat, 0), runway.y, runway.pointZ(seat, 0));
                 int ticks = 0;
-                while (!RunwayOps.takeoffRoll(state, runway, maxSpeed, ticks)) {
-                    if (ticks < RunwayOps.SPOOL_TICKS) {
+                while (!RunwayOps.takeoffRoll(state, runway, maxSpeed, ticks, SPOOL, liftoff)) {
+                    if (ticks < SPOOL) {
                         assertEquals(seat, runway.along(state.position.x, state.position.z), 1e-9, "stands still while spooling");
                     }
                     assertEquals(runway.y, state.position.y, 1e-9);
@@ -45,10 +51,12 @@ class RunwayOpsTest {
                 double along = runway.along(state.position.x, state.position.z);
                 assertTrue(along <= runway.length, "rolled off the end: " + along + " at top speed " + maxSpeed);
                 assertTrue(along > runway.length - 2.5, "lifts off well short: " + along);
-                assertTrue(state.speed >= maxSpeed * RunwayOps.ROTATION_FRACTION - 1e-9);
+                assertTrue(state.speed >= maxSpeed * liftoff - 1e-9);
                 assertTrue(state.pitch < 0, "nose up at lift-off");
                 assertEquals(runway.heading, state.heading, 1e-9);
+                assertTrue(ticks >= SPOOL, "lifted off while still spooling up");
             }
+        }
         }
     }
 
@@ -60,15 +68,15 @@ class RunwayOpsTest {
         double seat = RunwayOps.seat(HEAVY);
         state.position.set(HEAVY.pointX(seat, 0), HEAVY.y, HEAVY.pointZ(seat, 0));
         int ticks = 0;
-        while (!RunwayOps.takeoffRoll(state, HEAVY, params.maxSpeed(), ticks++)) {
+        while (!RunwayOps.takeoffRoll(state, HEAVY, params.maxSpeed(), ticks++, SPOOL, LIFTOFF)) {
             assertTrue(ticks < 400);
         }
         for (int tick = 0; tick < 100; tick++) {
-            FixedWingFlight.step(state, RouteAutopilot.holdCourse(state, HEAVY.heading, HEAVY.y + RunwayOps.CLIMB_OUT_HEIGHT + 2,
+            FixedWingFlight.step(state, RouteAutopilot.holdCourse(state, HEAVY.heading, HEAVY.y + CLIMB_OUT + 2,
                     Route.Speed.FAST.fraction, params, true), params);
             assertTrue(state.position.y >= HEAVY.y - 1e-9, "sank into the ground");
         }
-        assertTrue(state.position.y > HEAVY.y + RunwayOps.CLIMB_OUT_HEIGHT - 1, "didn't climb out: " + state.position.y);
+        assertTrue(state.position.y > HEAVY.y + CLIMB_OUT - 1, "didn't climb out: " + state.position.y);
     }
 
     /** Strike Plane, Attack Plane, Gunship, Stealth Bomber, Recon UAV. */

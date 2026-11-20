@@ -31,6 +31,7 @@ import java.util.Map;
  * <ul>
  *   <li>{@code [general]}: global server balance knobs.</li>
  *   <li>{@code [uav]}: recon UAV tracking dots and lock-ons (server).</li>
+ *   <li>{@code [runways]}: planes taking off from a runway (server).</li>
  *   <li>{@code [<id>]}: a hand-flown drone type's own table (shrapnel, grenade extras, lock-on), one for each such type
  *       that detonates on impact or carries a sensor (server).</li>
  *   <li>{@code [pilot_detector]}: the Pilot Detector scanner (server).</li>
@@ -100,6 +101,9 @@ public final class ModConfig {
     public static double maxCarpetLength = 256.0;
     public static double minLaunchFuel = 0.25;
     public static double lowFuelFraction = 0.15;
+    public static double runwaySpoolUpSeconds = 3.0;
+    public static double runwayLiftoffSpeed = 0.5;
+    public static double runwayClimbOutHeight = 8.0;
     public static double maxMarkDistance = 256.0;
 
     public static double designateRange = 512.0;
@@ -463,6 +467,14 @@ public final class ModConfig {
                     "Scoreboard teams (case-insensitive) whose members aren't teammates: recon UAVs track and lock them, the Pilot "
                             + "Detector finds them, EMPs that spare teammates still hit them, and nothing is shared. For free-for-all games "
                             + "that put everyone on one team.");
+
+            runwaySpoolUpSeconds = defaults.number("runways.spoolUpSeconds", runwaySpoolUpSeconds, 0, 30,
+                    "How long a plane runs its engine up on the spot before its takeoff roll, in seconds.");
+            runwayLiftoffSpeed = defaults.number("runways.liftoffSpeed", runwayLiftoffSpeed, 0.45, 1,
+                    "Speed a plane lifts off at, as a share of its top speed (it stalls under 0.4). The roll is sized to reach it "
+                            + "1 block before the runway's far end, so higher means a harder, faster takeoff run.");
+            runwayClimbOutHeight = defaults.number("runways.climbOutHeight", runwayClimbOutHeight, 2, 64,
+                    "How high over the runway a plane climbs straight ahead before it turns onto its route, in blocks.");
 
             trackingDotsEnabled = defaults.get("uav.trackingDotsEnabled", trackingDotsEnabled,
                     "Enemies a flying recon UAV can see get a red dot above them, visible through walls to its owner (and teammates, "
