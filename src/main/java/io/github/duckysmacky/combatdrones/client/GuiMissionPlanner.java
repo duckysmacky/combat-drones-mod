@@ -1,5 +1,6 @@
 package io.github.duckysmacky.combatdrones.client;
 
+import io.github.duckysmacky.combatdrones.CombatDrones;
 import io.github.duckysmacky.combatdrones.client.hud.UiSounds;
 import io.github.duckysmacky.combatdrones.client.hud.Ui;
 import io.github.duckysmacky.combatdrones.client.hud.UiButton;
@@ -33,6 +34,10 @@ import net.minecraft.client.resources.I18n;
 import net.minecraft.entity.Entity;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.border.WorldBorder;
+import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import net.minecraftforge.fml.common.network.FMLNetworkEvent;
+import net.minecraftforge.fml.relauncher.Side;
 import org.lwjgl.input.Keyboard;
 import org.lwjgl.input.Mouse;
 import org.lwjgl.opengl.GL11;
@@ -51,6 +56,7 @@ import java.util.Locale;
  * a context menu (add a waypoint, or set a waypoint's height, speed, final action, loiter radius, or remove it); the
  * wheel zooms. The side list selects waypoints for reordering.
  */
+@Mod.EventBusSubscriber(modid = CombatDrones.MOD_ID, value = Side.CLIENT)
 public class GuiMissionPlanner extends GuiScreen {
     private static final int PANEL_WIDTH = 140;
     private static final int MARGIN = 8;
@@ -96,6 +102,12 @@ public class GuiMissionPlanner extends GuiScreen {
     private static final double CARPET_STEP = 16;
     /** A carpet's strip on the map is this many blocks wide per point of blast power, each side of the line. */
     private static final double BLAST_REACH = 1.5;
+
+    /**
+     * The unit selected when the planner was last open, picked again on the next open. Matched by entity or ramp ID,
+     * so a unit remembered on its ramp isn't found again once it has launched (it gets a new entity).
+     */
+    private static PlannerOpenPacket.UnitView lastSelected;
 
     private PlannerOpenPacket view;
     /** Index into view.units of the unit being edited. */
@@ -143,7 +155,23 @@ public class GuiMissionPlanner extends GuiScreen {
 
     public GuiMissionPlanner(PlannerOpenPacket view) {
         this.view = view;
-        selectUnit(Math.max(0, indexOf(view.selectId)));
+        int index = indexOf(view.selectId);
+        for (int candidate = 0; index < 0 && candidate < view.units.size(); candidate++) {
+            if (view.units.get(candidate).sameUnit(lastSelected)) {
+                index = candidate;
+            }
+        }
+        selectUnit(Math.max(0, index));
+    }
+
+    /** Entity ID of the last selected unit if it was in flight, else -1. */
+    static int lastUnitEntityId() {
+        return lastSelected == null ? -1 : lastSelected.entityId;
+    }
+
+    @SubscribeEvent
+    public static void onDisconnect(FMLNetworkEvent.ClientDisconnectionFromServerEvent event) {
+        lastSelected = null;
     }
 
     /** Index of the unit in flight with entity ID {@code id}, or on the ramp with that ID; -1 if none. */
@@ -175,6 +203,7 @@ public class GuiMissionPlanner extends GuiScreen {
             // Periodic refresh of the unit being viewed: keep the map position and selection
             loadRoute();
         }
+        lastSelected = currentUnit();
     }
 
     private void selectUnit(int index) {
@@ -182,6 +211,7 @@ public class GuiMissionPlanner extends GuiScreen {
         selectedWaypoint = -1;
         loadRoute();
         PlannerOpenPacket.UnitView unit = currentUnit();
+        lastSelected = unit;
         if (unit != null) {
             centerX = unit.x;
             centerZ = unit.z;
