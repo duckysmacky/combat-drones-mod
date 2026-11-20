@@ -14,6 +14,7 @@ import io.github.duckysmacky.combatdrones.physics.LockOnAttempt;
 import io.github.duckysmacky.combatdrones.type.DroneType;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLiving;
+import net.minecraft.entity.EntityTracker;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.nbt.NBTTagCompound;
@@ -271,6 +272,7 @@ public final class RemoteSessions {
         if (player.hasDisconnected()) {
             return; // logging out: they're saved at home, nobody left to tell
         }
+        resyncTracked(player);
         ModNetwork.CHANNEL.sendTo(new RemoteSessionPacket(-1, false, false, 0, 0, 0), player);
         if (message != null) {
             player.sendStatusMessage(new TextComponentTranslation(message), true);
@@ -298,6 +300,18 @@ public final class RemoteSessions {
      */
     private static void retrackAfterTeleport(EntityPlayerMP player) {
         RETRACK_UNTIL.put(player.getUniqueID(), player.server.getTickCounter() + RETRACK_WINDOW_TICKS);
+    }
+
+    /**
+     * The other half of the same quirk: the client can come back holding stale copies of entities the server still
+     * counts as tracked (no longer in their chunk's entity list, so never drawn), and the server never resends them.
+     * Drop every copy and resend: what's in view right away (re-adding in the same tick cancels the queued destroy and
+     * the spawn replaces the old copy), the rest as its chunk arrives during the retrack window.
+     */
+    private static void resyncTracked(EntityPlayerMP player) {
+        EntityTracker tracker = player.getServerWorld().getEntityTracker();
+        tracker.removePlayerFromTrackers(player);
+        tracker.updateVisibility(player);
     }
 
     @SubscribeEvent
