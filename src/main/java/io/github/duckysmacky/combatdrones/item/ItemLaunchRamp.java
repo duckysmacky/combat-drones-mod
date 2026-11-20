@@ -38,6 +38,7 @@ public class ItemLaunchRamp extends ItemWithTooltip {
         }
         double x = pos.getX() + hitX;
         double z = pos.getZ() + hitZ;
+        EntityLaunchRamp placed;
         if (kind.isRunway()) {
             EnumFacing heading = player.getHorizontalFacing();
             List<BlockPos> cells = EntityRunway.footprint(kind, pos.up(), heading);
@@ -50,10 +51,12 @@ public class ItemLaunchRamp extends ItemWithTooltip {
             BlockPos last = cells.get(cells.size() - 1);
             x = (first.getX() + last.getX()) / 2.0 + 0.5;
             z = (first.getZ() + last.getZ()) / 2.0 + 0.5;
-            world.spawnEntity(new EntityRunway(world, kind, x, pos.getY() + 1, z, heading, player));
+            placed = new EntityRunway(world, kind, x, pos.getY() + 1, z, heading);
         } else {
-            world.spawnEntity(new EntityLaunchRamp(world, kind, x, pos.getY() + 1, z, player.rotationYaw));
+            placed = new EntityLaunchRamp(world, kind, x, pos.getY() + 1, z, player.rotationYaw);
         }
+        placed.placedBy(player); // owned and linked to the placer's Mission Planner, no extra click needed
+        world.spawnEntity(placed);
         world.playSound(null, x, pos.getY() + 1, z, ModSounds.RAMP_PLACE, SoundCategory.PLAYERS, 1.0F, 1.0F);
         if (!player.capabilities.isCreativeMode) {
             player.getHeldItem(hand).shrink(1);

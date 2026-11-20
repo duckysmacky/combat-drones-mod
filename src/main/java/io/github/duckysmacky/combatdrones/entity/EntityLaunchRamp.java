@@ -226,17 +226,19 @@ public class EntityLaunchRamp extends Entity implements ChunkAnchor.Holder {
         return player.getUniqueID().equals(owner);
     }
 
-    /** Linked to its owner's Mission Planner, with a unit on it (a runway stays linked while its plane is out). */
+    /** Linked to its owner's Mission Planner: from placement on, whether or not a unit is aboard. */
     public boolean isLinked() {
-        return linked && (isLoaded() || getKind().isRunway());
+        return linked;
+    }
+
+    /** Server, on placement: it belongs to {@code player} and is linked to their Mission Planner straight away. */
+    public void placedBy(EntityPlayer player) {
+        owner = player.getUniqueID();
+        linked = true;
     }
 
     /** Server: links the ramp to {@code player}'s Mission Planner. Returns false (with a message) if they can't. */
     public boolean link(EntityPlayer player) {
-        if (!isLoaded() && !getKind().isRunway()) {
-            refuse(player, "message.combat_drones.ramp.empty");
-            return false;
-        }
         if (!isOwnedBy(player)) {
             refuse(player, "message.combat_drones.ramp.not_owner");
             return false;
@@ -320,12 +322,13 @@ public class EntityLaunchRamp extends Entity implements ChunkAnchor.Holder {
             refuse(player, "message.combat_drones.ramp.occupied");
             return;
         }
-        if (owner != null && !isOwnedBy(player)) { // a runway belongs to whoever placed it
+        if (owner != null && !isOwnedBy(player)) { // it belongs to whoever placed it
             refuse(player, "message.combat_drones.ramp.not_owner");
             return;
         }
         dataManager.set(UNIT_TYPE, type.getId());
-        owner = player.getUniqueID();
+        owner = player.getUniqueID(); // claims an ownerless one (placed before ramps were owned)
+        linked = true;
         setFuel(Math.min(ItemDrone.getFuel(stack), type.getBatteryOrFuelCapacity()));
         loadout = ItemDrone.getLoadout(stack).clampTo(type);
         route = Route.empty(Route.TerminalAction.LOITER);
@@ -503,13 +506,9 @@ public class EntityLaunchRamp extends Entity implements ChunkAnchor.Holder {
         return unit;
     }
 
-    /** Empties it. A runway keeps its owner and link: it stays its owner's, on their map, for the plane to come back. */
+    /** Empties it. It keeps its owner and link: still theirs and on their map for the next unit (or a plane coming back). */
     protected void clearUnit() {
         dataManager.set(UNIT_TYPE, "");
-        if (!getKind().isRunway()) {
-            owner = null;
-            linked = false;
-        }
         setFuel(0);
         loadout = new Loadout();
         route = Route.empty(Route.TerminalAction.LOITER);

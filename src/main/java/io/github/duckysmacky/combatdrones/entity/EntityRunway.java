@@ -6,7 +6,6 @@ import io.github.duckysmacky.combatdrones.physics.RunwayOps;
 import io.github.duckysmacky.combatdrones.type.DroneType;
 import net.minecraft.block.Block;
 import net.minecraft.block.state.IBlockState;
-import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.SoundCategory;
 import net.minecraft.util.math.AxisAlignedBB;
@@ -41,9 +40,8 @@ public class EntityRunway extends EntityLaunchRamp {
         super(world);
     }
 
-    public EntityRunway(World world, Kind kind, double x, double y, double z, EnumFacing facing, EntityPlayer placer) {
+    public EntityRunway(World world, Kind kind, double x, double y, double z, EnumFacing facing) {
         super(world, kind, x, y, z, facing.getHorizontalAngle());
-        owner = placer.getUniqueID();
         setPosition(x, y, z);
     }
 
