@@ -168,6 +168,8 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder, LockOn
     /** A point picked from the camera (click-designate scheme): overrides the route with a strike. */
     @Nullable
     private Vec3d designatedTarget;
+    /** Just shot down: world time until which further damage is ignored (not saved: a restart only shortens it). */
+    private long graceUntil;
     /** Ticks left EMP-disabled. */
     private int empTicks;
     private int designateCooldown;
@@ -1138,7 +1140,7 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder, LockOn
 
     @Override
     public boolean attackEntityFrom(DamageSource source, float amount) {
-        if (isEntityInvulnerable(source) || isDead) {
+        if (isEntityInvulnerable(source) || isDead || (isShotDown() && world.getTotalWorldTime() < graceUntil)) {
             return false;
         }
         if (!world.isRemote) {
@@ -1183,6 +1185,7 @@ public class EntityRampUnit extends Entity implements ChunkAnchor.Holder, LockOn
         setState(VehicleState.SHOT_DOWN);
         empTicks = 0;
         setHealth((float) ModConfig.shotDownFallingHP);
+        graceUntil = world.getTotalWorldTime() + Math.round(ModConfig.shotDownGraceSeconds * 20);
         bombRun = 0;
         designatedTarget = null;
         dataManager.set(STRIKING, false);

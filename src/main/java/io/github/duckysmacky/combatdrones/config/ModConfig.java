@@ -158,6 +158,7 @@ public final class ModConfig {
     public static boolean shotDownDrones = false;
     public static boolean shotDownMunitions = false;
     public static double shotDownFallingHP = 40.0;
+    public static double shotDownGraceSeconds = 0.5;
     public static double shotDownDrag = 0.08;
     public static double shotDownFallAcceleration = 4.0;
     public static double shotDownMaxFallSpeed = 25.0;
@@ -560,6 +561,9 @@ public final class ModConfig {
                     "The same for loitering munitions. Off: their warhead goes off on the spot.");
             shotDownFallingHP = defaults.number("state.shot_down.fallingHP", shotDownFallingHP, 1, 1000,
                     "Health a vehicle going down has left. Shot to 0 again, it blows up in the air before it reaches the ground.");
+            shotDownGraceSeconds = defaults.number("state.shot_down.graceSeconds", shotDownGraceSeconds, 0, 5,
+                    "Seconds a vehicle that just went down ignores further damage, so the blast or the rest of a salvo that downed it "
+                            + "doesn't finish it off in the same moment.");
             shotDownDrag = defaults.number("state.shot_down.drag", shotDownDrag, 0, 0.99,
                     "Share of its forward speed a vehicle going down loses per second. Higher = a shorter, steeper arc.");
             shotDownFallAcceleration = defaults.number("state.shot_down.fallAcceleration", shotDownFallAcceleration, 0.5, 40,

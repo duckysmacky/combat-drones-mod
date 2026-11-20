@@ -109,6 +109,8 @@ public class EntityHandFlownDrone extends Entity implements ChunkAnchor.Holder, 
     @Nullable
     private EntityPlayerMP pilot;
     private final ArrayDeque<InputFrame> inputQueue = new ArrayDeque<>();
+    /** Just shot down: world time until which further damage is ignored (not saved: a restart only shortens it). */
+    private long graceUntil;
     /** Ticks left EMP-disabled. */
     private int empTicks;
     private HandFlownFlight.Input lastInput = HandFlownFlight.Input.MOTORS_OFF;
@@ -831,7 +833,7 @@ public class EntityHandFlownDrone extends Entity implements ChunkAnchor.Holder, 
 
     @Override
     public boolean attackEntityFrom(DamageSource source, float amount) {
-        if (isEntityInvulnerable(source) || isDead) {
+        if (isEntityInvulnerable(source) || isDead || (isShotDown() && world.getTotalWorldTime() < graceUntil)) {
             return false;
         }
         if (!world.isRemote) {
@@ -878,6 +880,7 @@ public class EntityHandFlownDrone extends Entity implements ChunkAnchor.Holder, 
         setState(VehicleState.SHOT_DOWN);
         empTicks = 0;
         setHealth((float) ModConfig.shotDownFallingHP);
+        graceUntil = world.getTotalWorldTime() + Math.round(ModConfig.shotDownGraceSeconds * 20);
         DamageEffects.goingDown(this);
     }
 
