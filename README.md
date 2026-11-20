@@ -64,7 +64,7 @@ However you leave a drone (exit, fly out of range, take off the goggles), it kee
 
 1. Place a **Munition Ramp** (loitering munitions) or a **Plane Ramp** (planes and the Recon UAV), then right-click it
    with the unit.
-2. Fuel the unit with a **Fuel Can** and load ammo by right-clicking the ramp with it.
+2. Fuel the unit with its fuel (**100LL Avgas Fuel** for munitions, **Jet A-1 Fuel** for light planes, **JP-8 Military Grade Fuel** for heavy planes) and load ammo by right-clicking the ramp with them.
 3. Right-click the ramp with a **Mission Planner** to link it. From then on you can plan and launch from anywhere.
 4. Open the planner (right-click air), plan a route on the map and press **Launch**. Some units also offer
    **Launch & Fly**.
@@ -85,7 +85,7 @@ their fuel and ammo still explode if they crash or are shot down. They only surv
 
 ### Cruise Missile
 
-1. Place a **Missile Launch Pad**, load a **Cruise Missile** and fuel it.
+1. Place a **Missile Launch Pad**, load a **Cruise Missile** and fuel it with **JP-10 Missile Fuel**.
 2. Link a **Missile Control Tablet** to the pad, open the tablet and press **LAUNCH**.
 3. The missile climbs out of sight and waits on standby until its fuel runs out.
 4. Press **SELECT TARGET** and click a point on the map. You take over high above that point and steer the dive.

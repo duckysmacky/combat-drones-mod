@@ -18,6 +18,7 @@ import io.github.duckysmacky.combatdrones.item.ItemDrone;
 import io.github.duckysmacky.combatdrones.item.ItemEmpBlast;
 import io.github.duckysmacky.combatdrones.item.ItemEmpGun;
 import io.github.duckysmacky.combatdrones.item.ItemEmpStation;
+import io.github.duckysmacky.combatdrones.item.ItemFuel;
 import io.github.duckysmacky.combatdrones.item.ItemGoggles;
 import io.github.duckysmacky.combatdrones.item.ItemLaunchRamp;
 import io.github.duckysmacky.combatdrones.item.ItemMissilePad;
@@ -32,6 +33,7 @@ import io.github.duckysmacky.combatdrones.type.BatteryPack;
 import io.github.duckysmacky.combatdrones.type.BombType;
 import io.github.duckysmacky.combatdrones.type.DroneType;
 import io.github.duckysmacky.combatdrones.type.DroneTypes;
+import io.github.duckysmacky.combatdrones.type.FuelType;
 import io.github.duckysmacky.combatdrones.type.RocketType;
 import net.minecraft.block.Block;
 import net.minecraft.creativetab.CreativeTabs;
@@ -52,9 +54,12 @@ import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.fml.relauncher.SideOnly;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 
 /** Registers every item and block. Placeholder plain items until each one gets behaviour. */
 @Mod.EventBusSubscriber(modid = CombatDrones.MOD_ID)
@@ -82,6 +87,15 @@ public final class ModContent {
      * Creative tab position: FPV gear (0+), hand-flown drones (100+), batteries and payloads (200+), ramp gear (400+),
      * ramp units (500+), their ammo (600+), anti-drone gear (700+), anything else (800).
      */
+    @SafeVarargs
+    private static List<Item> concat(Collection<Item>... parts) {
+        List<Item> all = new ArrayList<>();
+        for (Collection<Item> part : parts) {
+            all.addAll(part);
+        }
+        return all;
+    }
+
     private static int tabRank(ItemStack stack) {
         Item item = stack.getItem();
         if (item instanceof ItemDrone) {
@@ -94,7 +108,7 @@ public final class ModContent {
         List<List<Item>> groups = Arrays.asList(
                 Arrays.asList(fpvRemote, fpvGoggles),
                 Arrays.asList(lightBattery, standardBattery, heavyBattery, fragGrenade, bombLight, bomb, bombHeavy),
-                Arrays.asList(launchRamp, lightRunway, heavyRunway, missionPlanner, fuelCan, missilePad, missileTablet),
+                concat(Arrays.asList(launchRamp, lightRunway, heavyRunway, missionPlanner), fuels.values(), Arrays.asList(missilePad, missileTablet)),
                 Arrays.asList(rocket, rocketHeavy, rifleRounds, cannonShell, howitzerShell, aerialBombSmall, aerialBombMedium, aerialBombLarge),
                 Arrays.asList(pilotDetector, empStation, empBlast, stinger, stingerMissile, empGun, empCell));
         for (int group = 0; group < groups.size(); group++) {
@@ -122,7 +136,7 @@ public final class ModContent {
     public static Item lightBattery;
     public static Item standardBattery;
     public static Item heavyBattery;
-    public static Item fuelCan;
+    public static final Map<FuelType, Item> fuels = new EnumMap<>(FuelType.class);
     public static Item fpvRemote;
     public static Item fpvGoggles;
     public static Item missionPlanner;
@@ -162,7 +176,9 @@ public final class ModContent {
         lightBattery = register(event, named(new ItemBattery(BatteryPack.LIGHT), BatteryPack.LIGHT.itemName()));
         standardBattery = register(event, named(new ItemBattery(BatteryPack.STANDARD), BatteryPack.STANDARD.itemName()));
         heavyBattery = register(event, named(new ItemBattery(BatteryPack.HEAVY), BatteryPack.HEAVY.itemName()));
-        fuelCan = register(event, simpleItem("fuel_can").setMaxStackSize(16));
+        for (FuelType fuel : FuelType.values()) {
+            fuels.put(fuel, register(event, named(new ItemFuel(fuel), fuel.itemName())));
+        }
         fragGrenade = register(event, simpleItem("frag_grenade").setMaxStackSize(16));
         bombLight = register(event, named(new ItemBomb(BombType.LIGHT, 64), BombType.LIGHT.itemName()));
         bomb = register(event, named(new ItemBomb(BombType.MEDIUM, 32), BombType.MEDIUM.itemName()));
@@ -205,9 +221,9 @@ public final class ModContent {
     /**
      * Renamed items carry over: the Missile Control Tablet was briefly the Strike Laptop (link and all), and the
      * Strike and Attack Planes were the two Gunship Planes (fuel and ammo kept), the FPV drones were the three racers.
-     * Retired items (the Rearm Station, the Plane Ramp) just disappear.
+     * Retired items (the Rearm Station, the Plane Ramp, the universal Fuel Can) just disappear.
      */
-    private static final List<String> RETIRED_ITEMS = Arrays.asList("rearm_station", "plane_ramp");
+    private static final List<String> RETIRED_ITEMS = Arrays.asList("rearm_station", "plane_ramp", "fuel_can");
 
     @SubscribeEvent
     public static void remapRenamedItems(RegistryEvent.MissingMappings<Item> event) {

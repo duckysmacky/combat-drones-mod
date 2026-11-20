@@ -8,6 +8,7 @@ import io.github.duckysmacky.combatdrones.entity.EntityHandFlownDrone;
 import io.github.duckysmacky.combatdrones.type.AerialBombType;
 import io.github.duckysmacky.combatdrones.type.BombType;
 import io.github.duckysmacky.combatdrones.type.DroneType;
+import io.github.duckysmacky.combatdrones.type.FuelType;
 import io.github.duckysmacky.combatdrones.type.DroneTypes;
 import io.github.duckysmacky.combatdrones.type.Loadout;
 import io.github.duckysmacky.combatdrones.type.RocketType;
@@ -125,7 +126,8 @@ public class ItemDrone extends Item {
         if (!handFlown) {
             double fuel = getFuel(stack);
             tooltip.add(TextFormatting.YELLOW + I18n.format("tooltip.combat_drones.drone.fuel",
-                    Math.round(Math.min(1, fuel / type.getBatteryOrFuelCapacity()) * 100)));
+                    Math.round(Math.min(1, fuel / type.getBatteryOrFuelCapacity()) * 100),
+                    I18n.format("item.combat_drones." + FuelType.forUnit(type).itemName() + ".name")));
             Loadout loadout = getLoadout(stack);
             for (int station = 0; station < Loadout.STATIONS; station++) {
                 if (type.getWeapon(station) != DroneType.WeaponType.NONE) {

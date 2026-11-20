@@ -6,11 +6,13 @@ import io.github.duckysmacky.combatdrones.ModContent;
 import io.github.duckysmacky.combatdrones.ModSounds;
 import io.github.duckysmacky.combatdrones.config.ModConfig;
 import io.github.duckysmacky.combatdrones.item.ItemDrone;
+import io.github.duckysmacky.combatdrones.item.ItemFuel;
 import io.github.duckysmacky.combatdrones.network.EffectPacket;
 import io.github.duckysmacky.combatdrones.network.PlannerServer;
 import io.github.duckysmacky.combatdrones.network.RouteCodec;
 import io.github.duckysmacky.combatdrones.physics.Route;
 import io.github.duckysmacky.combatdrones.type.DroneType;
+import io.github.duckysmacky.combatdrones.type.FuelType;
 import io.github.duckysmacky.combatdrones.type.DroneTypes;
 import io.github.duckysmacky.combatdrones.type.Loadout;
 import io.github.duckysmacky.combatdrones.type.AerialBombType;
@@ -278,7 +280,7 @@ public class EntityLaunchRamp extends Entity implements ChunkAnchor.Holder {
     public boolean processInitialInteract(EntityPlayer player, EnumHand hand) {
         ItemStack stack = player.getHeldItem(hand);
         if (world.isRemote) {
-            boolean handled = stack.getItem() instanceof ItemDrone || stack.getItem() == ModContent.fuelCan || ammoWeapon(stack) != null
+            boolean handled = stack.getItem() instanceof ItemDrone || stack.getItem() instanceof ItemFuel || ammoWeapon(stack) != null
                     || stack.getItem() == ModContent.missionPlanner || (stack.isEmpty() && player.isSneaking());
             if (handled) {
                 player.swingArm(hand);
@@ -287,7 +289,7 @@ public class EntityLaunchRamp extends Entity implements ChunkAnchor.Holder {
         }
         if (stack.getItem() instanceof ItemDrone) {
             install(player, stack);
-        } else if (stack.getItem() == ModContent.fuelCan) {
+        } else if (stack.getItem() instanceof ItemFuel) {
             refuel(player, stack);
         } else if (ammoWeapon(stack) != null) {
             loadAmmo(player, stack);
@@ -339,11 +341,17 @@ public class EntityLaunchRamp extends Entity implements ChunkAnchor.Holder {
         status(player, "message.combat_drones.ramp.installed");
     }
 
-    /** One Fuel Can fills the tank completely. */
+    /** One item of the unit's own fuel fills the tank completely. */
     private void refuel(EntityPlayer player, ItemStack stack) {
         DroneType type = getUnitType();
         if (type == null) {
             refuse(player, "message.combat_drones.ramp.empty");
+            return;
+        }
+        FuelType needed = FuelType.forUnit(type);
+        if (((ItemFuel) stack.getItem()).getFuelType() != needed) {
+            refuse(player, "message.combat_drones.ramp.wrong_fuel",
+                    new TextComponentTranslation("item." + CombatDrones.MOD_ID + "." + needed.itemName() + ".name"));
             return;
         }
         if (getFuelFraction() >= 1) {
@@ -546,13 +554,13 @@ public class EntityLaunchRamp extends Entity implements ChunkAnchor.Holder {
     }
 
     /** A refusal: the message, and a tick only the player who tried hears. */
-    private static void refuse(EntityPlayer player, String key) {
-        status(player, key);
+    private static void refuse(EntityPlayer player, String key, Object... args) {
+        status(player, key, args);
         Feedback.deny(player);
     }
 
-    private static void status(EntityPlayer player, String key) {
-        player.sendStatusMessage(new TextComponentTranslation(key), true);
+    private static void status(EntityPlayer player, String key, Object... args) {
+        player.sendStatusMessage(new TextComponentTranslation(key, args), true);
     }
 
     @Override

@@ -5,8 +5,10 @@ import io.github.duckysmacky.combatdrones.CombatDrones;
 import io.github.duckysmacky.combatdrones.ModContent;
 import io.github.duckysmacky.combatdrones.ModSounds;
 import io.github.duckysmacky.combatdrones.item.ItemDrone;
+import io.github.duckysmacky.combatdrones.item.ItemFuel;
 import io.github.duckysmacky.combatdrones.item.ItemMissileTablet;
 import io.github.duckysmacky.combatdrones.type.DroneType;
+import io.github.duckysmacky.combatdrones.type.FuelType;
 import io.github.duckysmacky.combatdrones.type.DroneTypes;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.player.EntityPlayer;
@@ -108,13 +110,13 @@ public class EntityMissilePad extends Entity {
         ItemStack stack = player.getHeldItem(hand);
         Item item = stack.getItem();
         if (world.isRemote) {
-            boolean used = item instanceof ItemDrone || item == ModContent.fuelCan || item == ModContent.missileTablet || (stack.isEmpty() && player.isSneaking());
+            boolean used = item instanceof ItemDrone || item instanceof ItemFuel || item == ModContent.missileTablet || (stack.isEmpty() && player.isSneaking());
             if (used) {
                 player.swingArm(hand);
             }
             return used;
         }
-        boolean handled = item instanceof ItemDrone || item == ModContent.fuelCan || item == ModContent.missileTablet
+        boolean handled = item instanceof ItemDrone || item instanceof ItemFuel || item == ModContent.missileTablet
                 || (stack.isEmpty() && player.isSneaking() && isLoaded());
         if (!handled) {
             return false;
@@ -123,7 +125,7 @@ public class EntityMissilePad extends Entity {
             refuse(player, "message.combat_drones.pad.not_owner");
         } else if (item instanceof ItemDrone) {
             load(player, stack);
-        } else if (item == ModContent.fuelCan) {
+        } else if (item instanceof ItemFuel) {
             refuel(player, stack);
         } else if (item == ModContent.missileTablet) {
             ItemMissileTablet.link(stack, this);
@@ -155,11 +157,17 @@ public class EntityMissilePad extends Entity {
         status(player, "message.combat_drones.pad.loaded");
     }
 
-    /** One Fuel Can fills the tank completely. */
+    /** One item of the unit's own fuel fills the tank completely. */
     private void refuel(EntityPlayer player, ItemStack stack) {
         DroneType type = getMissileType();
         if (type == null) {
             refuse(player, "message.combat_drones.pad.empty");
+            return;
+        }
+        FuelType needed = FuelType.forUnit(type);
+        if (((ItemFuel) stack.getItem()).getFuelType() != needed) {
+            refuse(player, "message.combat_drones.ramp.wrong_fuel",
+                    new TextComponentTranslation("item." + CombatDrones.MOD_ID + "." + needed.itemName() + ".name"));
             return;
         }
         if (getFuelFraction() >= 1) {
@@ -232,13 +240,13 @@ public class EntityMissilePad extends Entity {
     }
 
     /** A refusal: the message, and a tick only the player who tried hears. */
-    private static void refuse(EntityPlayer player, String key) {
-        status(player, key);
+    private static void refuse(EntityPlayer player, String key, Object... args) {
+        status(player, key, args);
         Feedback.deny(player);
     }
 
-    private static void status(EntityPlayer player, String key) {
-        player.sendStatusMessage(new TextComponentTranslation(key), true);
+    private static void status(EntityPlayer player, String key, Object... args) {
+        player.sendStatusMessage(new TextComponentTranslation(key, args), true);
     }
 
     @Override
