@@ -5,7 +5,8 @@
 ![Version](https://img.shields.io/badge/version-0.5.0-4C8DFF)
 
 Combat Drones is a Minecraft 1.12.2 Forge mod for PvP. It adds FPV kamikaze drones, bomb-dropping quadcopters,
-loitering munitions, armed planes, a recon UAV and a cruise missile. You fly them yourself or send them along
+loitering munitions, armed planes, a stealth bomber, a recon UAV and a cruise missile, plus the gear to counter them:
+a pilot detector, EMP devices and a Stinger anti-air launcher. You fly the vehicles yourself or send them along
 planned routes. Everything is loud, can be shot down and runs on the server, so it works on multiplayer servers.
 
 Inspired by the [FPV Drones](https://www.curseforge.com/minecraft/mc-mods/fpvdrones) mod for Minecraft 1.20.1.
@@ -17,16 +18,22 @@ Inspired by the [FPV Drones](https://www.curseforge.com/minecraft/mc-mods/fpvdro
 
 ## Features
 
-- **11 vehicles** in three families: hand-flown multirotors, ramp-launched fixed-wing units and a vertically
-  launched cruise missile.
+- **12 vehicles** in three families: hand-flown multirotors, fixed-wing units launched from ramps and runways, and a
+  vertically launched cruise missile.
 - **First-person piloting** through FPV goggles with an analog-style HUD, signal range and battery drain.
-- **Mission Planner**: a tactical map to plan waypoint routes, launch from linked ramps anywhere, re-route units in
-  flight, watch through their cameras or take control.
+- **Mission Planner**: a tactical map to plan waypoint routes, launch from your linked ramps and runways anywhere,
+  land planes on runways, re-route units in flight, watch through their cameras or take control.
+- **Runways** for planes: they spool up and roll out for takeoff, and autopilot flies the approach and lands them,
+  ready to refuel and rearm.
 - **Recon and target locking**: the UAV spots enemies for you and your team, and a locked target stays tracked even
   out of sight.
 - **Weapons**: grenades, drop bombs, rockets, machine guns, an autocannon, a 105 mm howitzer and aerial bombs.
+- **Fuel types**: every kind of vehicle runs on its own fuel.
 - **Counterplay**: every vehicle can be shot down and can be heard from far away. Remote pilots leave their body
-  behind, and it gives off radio static.
+  behind, and it gives off radio static. Fight back with the **Pilot Detector**, EMP devices (**EMP Field Station**,
+  **EMP Blast Gadget**, **EMP Gun**) and the **Stinger** launcher.
+- **Shot-down and EMPed states**: a plane shot to 0 HP falls burning with its pilot aboard, and an EMPed vehicle
+  glides down without control, then flies on if the EMP wears off.
 - **Server-friendly**: every stat is set in one config file and can be reloaded in game. It works with vanilla
   scoreboard teams for friendly fire and intel sharing.
 
@@ -60,28 +67,39 @@ While you fly, your body stays where you were standing and can still be hit, and
 static. FPV drones explode on any impact. Past half of its range the camera feed fills with more and more static.
 However you leave a drone (exit, fly out of range, take off the goggles), it keeps going on your last input. Taking it back picks up in the same flight mode.
 
-### Ramp-launched units
+### Ramp and runway launched units
 
-1. Place a **Munition Ramp** (loitering munitions) or a **Plane Ramp** (planes and the Recon UAV), then right-click it
-   with the unit.
-2. Fuel the unit with its fuel (**100LL Avgas Fuel** for munitions, **Jet A-1 Fuel** for light planes, **JP-8 Military Grade Fuel** for heavy planes) and load ammo by right-clicking the ramp with them.
-3. Right-click the ramp with a **Mission Planner** to link it. From then on you can plan and launch from anywhere.
+1. Place a **Munition Ramp** (loitering munitions), a **Light Runway** (Striker, Spitfire, Recon UAV) or a
+   **Heavy Runway** (Gunship, Stealth Bomber, and light planes too), then right-click it with the unit. Runways are
+   big flat strips (2 x 6 and 3 x 10 blocks) and need solid, clear ground.
+2. Fuel the unit with its fuel (**100LL Avgas Fuel** for munitions, **Jet A-1 Fuel** for light planes, **JP-8 Military
+   Grade Fuel** for heavy planes) and load ammo by right-clicking the ramp or runway with them.
+3. Ramps and runways link to your **Mission Planner** when you place them. From then on you can plan and launch from
+   anywhere. Right-click one with the planner to open it with the unit selected.
 4. Open the planner (right-click air), plan a route on the map and press **Launch**. Some units also offer
    **Launch & Fly**.
+
+Planes spool up for a few seconds, roll down the runway and climb out before turning onto their route.
 
 You choose what a unit does at the end of its route:
 
 - Loitering munitions: **Loiter**, **Dive** on the last waypoint, or **Destroy** a target marked on the map or in the
   world.
-- Planes: **Loiter** or **Return** to land at the ramp.
+- Planes: **Loiter** or **Land on runway** (right-click a runway on the map and pick **Land here**, or use **Return
+  to runway** in flight). The autopilot flies the approach, rolls out and parks the plane, ready to refuel, rearm
+  and launch again.
+- Recon UAV: **Loiter**, **Loop** or **Land on runway**.
 
 The **Stealth Bomber** can also bomb on its route without you: right-click the planner map for **Add drop point here**,
 or right-click a waypoint and set **Drop** to *Single* (one bomb) or *Carpet* (a strip of bombs of the length you
 choose). The map shows where the bombs should land.
-- Recon UAV: **Loiter**, **Loop** or **Return**.
+
+In the planner, the number keys select units from the list. **Shift+right-click** with the planner takes control of
+your last selected unit if it is flying.
 
 Once a unit is in the air, you can **View** through its camera or **Take control**. Planes have no warhead, but
-their fuel and ammo still explode if they crash or are shot down. They only survive a proper landing.
+their fuel and ammo still explode if they crash. They only survive a proper landing on a runway. A plane shot down
+doesn't explode on the spot: it falls in a burning spiral with its pilot aboard and explodes on impact.
 
 ### Cruise Missile
 
@@ -93,6 +111,26 @@ their fuel and ammo still explode if they crash or are shot down. They only surv
 
 Everyone near the target hears a siren and gets an inbound warning. The missile is very tough, but it can be shot
 down on the pad, during the climb and in the dive.
+
+### Counter-drone gear
+
+| Item | What it does |
+|---|---|
+| Pilot Detector | Right-click to scan nearby. Enemy pilots flying remotely get a red dot over their body for a while, even through walls. Recharges between uses |
+| EMP Field Station | A placed device. Right-click it to switch on an EMP field (24 blocks) around it. It drains its charge while on and recharges while off. Sneak + right-click picks it up |
+| EMP Blast Gadget | Hand-held. Right-click, and after a short build-up an EMP field grows around you (18 blocks). Recharges slowly |
+| EMP Gun + EMP Cell | Shoulder-fired. Hold left-click to charge, release to fire an orb that flies straight, so lead your target. Its EMP field (12 blocks) travels with the orb or bursts where it lands. Right-click to aim |
+| Stinger + Stinger Missile | Shoulder-fired anti-air launcher. Hold right-click to scope, keep an aircraft in the circle until it locks, then left-click to fire a homing missile |
+
+An EMP field acts on every vehicle that is flying inside it, and spares your own (or your team's, depending on the
+config). By default it disables them: the vehicle loses control and its motors cut out. It glides down, and flies
+on when the EMP wears off, but hitting anything on the way down destroys it. A pilot keeps their view, so they can
+be ready to catch it. Ramps and runways inside the field are knocked out for a while: nothing launches or lands. A
+field can also be set to destroy vehicles outright. Units sitting on a ramp or runway, and missiles on their pad, are
+untouched.
+
+The Stinger only locks flying aircraft, never players or mobs. It downs anything up to the Striker in one hit, while
+bigger planes and the cruise missile take two or three. Reload both launchers with **R** while holding them.
 
 ## Controls
 
@@ -131,9 +169,25 @@ All mod keys can be rebound under Controls -> Combat Drones.
 | H | Assisted / free flight |
 | LMB | Fire, or strike the point under the crosshair |
 | Space | Boost (munitions) |
-| R | Switch weapon (Gunship) |
+| J | Switch weapon (Gunship) |
 | B | Bombsight / flight view (Stealth Bomber) |
 | G / Esc | Return to your body |
+
+**Hand-held launchers** (Stinger, EMP Gun)
+
+| Key | Action |
+|---|---|
+| RMB (hold) | Aim through the scope |
+| LMB | Stinger: fire at a lock. EMP Gun: hold to charge, release to fire |
+| R | Reload (only while holding a launcher) |
+
+**Mission Planner**
+
+| Key | Action |
+|---|---|
+| Right-click air | Open the planner |
+| Shift + right-click | Take control of your last selected unit |
+| 1-9, 0 | Select a unit from the list |
 
 ## For server owners
 
@@ -144,6 +198,10 @@ All mod keys can be rebound under Controls -> Combat Drones.
 - Recon sightings and locks are shared with the owner's scoreboard team by default (`reconIntelForAllies`,
   `activeLockForAllies`). Teams listed in `ignoredTeams` (default `ffa`) don't share anything.
 - Drones fly through the world border unless `worldBorderCollision = true`.
+- Shot-down and EMPed behaviour is set per vehicle kind in `[state.shot_down]` and `[state.emped]`. The counter-drone
+  gear has its own sections (`[pilot_detector]`, `[emp_station]`, `[emp_blast]`, `[emp_gun]`, `[stinger]`), where
+  `onContact` (`disable` or `destroy`) and `spares` (`none`, `owner` or `team`) decide what an EMP does and whose
+  vehicles it leaves alone. Runway takeoff is tuned in `[runways]`.
 
 ## Installation
 
