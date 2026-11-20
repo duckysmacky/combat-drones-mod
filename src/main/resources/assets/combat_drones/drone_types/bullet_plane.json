@@ -1,8 +1,8 @@
 {
-  // Attack Plane: small, fast machine-gun fixed-wing for hunting other aircraft, ramp-launched and routed like a loitering munition,
+  // Spitfire: fast machine-gun fixed-wing for hunting other aircraft, ramp-launched and routed like a loitering munition,
   // flown manually via the Mission Planner's "Take control". A hard crash or being shot down sets off its fuel and ammo (blastPower, weaker than a warhead); high rate of fire Rifle Rounds, no splash; payloadCapacity = belt size in rounds.
   "category": "RAMP_AUTOPILOT",
-  "maxSpeed": 1.4,
+  "maxSpeed": 1.1,
   "acceleration": 0.09,
   "batteryOrFuelCapacity": 4800,
   "drainRatePerTick": 1.0,
@@ -10,8 +10,8 @@
   "payloadCapacity": 600,
   "maxHP": 70,
   // Collision box in blocks: the fuselage core, not the wingtips or props
-  "hitboxWidth": 1.2,
-  "hitboxHeight": 0.5,
+  "hitboxWidth": 1.58,
+  "hitboxHeight": 0.66,
   "defaultCruiseAltitude": 40,
   "agility": 1.8,
   "controlScheme": "STICK",

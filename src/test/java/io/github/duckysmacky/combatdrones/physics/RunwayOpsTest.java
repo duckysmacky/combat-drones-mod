@@ -13,8 +13,8 @@ class RunwayOpsTest {
     /** Heavy Runway running north (yaw 180 = -Z). */
     static final Route.Runway HEAVY = new Route.Runway(new UUID(3, 4), -20, 70, 300, 180, 10, 3);
 
-    /** Strike Plane, Attack Plane, Gunship, Stealth Bomber, Recon UAV top speeds. */
-    static final double[] SPEEDS = {0.9, 1.4, 0.7, 0.72, 0.8};
+    /** Striker, Spitfire, Gunship, Stealth Bomber, Recon UAV top speeds. */
+    static final double[] SPEEDS = {0.8, 1.1, 0.7, 0.72, 0.8};
 
     @Test
     void runwayCoordinates() {
@@ -79,7 +79,7 @@ class RunwayOpsTest {
         assertTrue(state.position.y > HEAVY.y + CLIMB_OUT - 1, "didn't climb out: " + state.position.y);
     }
 
-    /** Strike Plane, Attack Plane, Gunship, Stealth Bomber, Recon UAV. */
+    /** Striker, Spitfire, Gunship, Stealth Bomber, Recon UAV. */
     static final FixedWingFlight.Params[] PLANES = {
             new FixedWingFlight.Params(0.9, 0.05, 1.15, 1.25), new FixedWingFlight.Params(1.4, 0.09, 1.8),
             new FixedWingFlight.Params(0.7, 0.035, 0.6), new FixedWingFlight.Params(0.72, 0.036, 0.5), new FixedWingFlight.Params(0.8, 0.05, 1.2)};

@@ -1,8 +1,8 @@
 {
-  // Strike Plane: small rocket-armed fixed-wing, ramp-launched and routed like a loitering munition,
+  // Striker: rocket-armed fixed-wing, ramp-launched and routed like a loitering munition,
   // flown manually via the Mission Planner's "Take control". A hard crash or being shot down sets off its fuel and ammo (blastPower, weaker than a warhead); low rate of fire explosive Rockets; payloadCapacity = rocket bay units (64 Rockets or 24 Heavy Rockets, see [rockets.*] bayUnits).
   "category": "RAMP_AUTOPILOT",
-  "maxSpeed": 0.9,
+  "maxSpeed": 0.8,
   "acceleration": 0.05,
   "batteryOrFuelCapacity": 6000,
   "drainRatePerTick": 1.0,
@@ -10,8 +10,8 @@
   "payloadCapacity": 192,
   "maxHP": 100,
   // Collision box in blocks: the fuselage core, not the wingtips or props
-  "hitboxWidth": 1.6,
-  "hitboxHeight": 0.7,
+  "hitboxWidth": 1.8,
+  "hitboxHeight": 0.79,
   "defaultCruiseAltitude": 40,
   "agility": 1.15,
   // Pitch rate multiplier on top of agility: pulls up out of a rocket run quickly

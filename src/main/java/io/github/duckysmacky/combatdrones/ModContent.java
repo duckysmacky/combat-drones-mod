@@ -81,7 +81,7 @@ public final class ModContent {
 
     /** Hand-flown, then ramp-launched drones in this order; types not listed go last in their group. */
     private static final List<String> DRONE_TAB_ORDER = Arrays.asList("racer_drone", "standard_drone", "recon_drone", "dji_drone",
-            "loitering_light", "loitering_heavy", "strike_plane", "attack_plane", "gunship", "stealth_bomber", "recon_uav", "cruise_missile");
+            "loitering_light", "loitering_heavy", "rocket_plane", "bullet_plane", "gunship", "stealth_bomber", "recon_uav", "cruise_missile");
 
     /**
      * Creative tab position: FPV gear (0+), hand-flown drones (100+), batteries and payloads (200+), ramp gear (400+),
@@ -219,8 +219,9 @@ public final class ModContent {
     }
 
     /**
-     * Renamed items carry over: the Missile Control Tablet was briefly the Strike Laptop (link and all), and the
-     * Strike and Attack Planes were the two Gunship Planes (fuel and ammo kept), the FPV drones were the three racers.
+     * Renamed items carry over: the Missile Control Tablet was briefly the Strike Laptop (link and all), the Striker
+     * and Spitfire were the Strike and Attack Planes and before that the two Gunship Planes (fuel and ammo kept), the
+     * FPV drones were the three racers.
      * Retired items (the Rearm Station, the Plane Ramp, the universal Fuel Can) just disappear.
      */
     private static final List<String> RETIRED_ITEMS = Arrays.asList("rearm_station", "plane_ramp", "fuel_can");

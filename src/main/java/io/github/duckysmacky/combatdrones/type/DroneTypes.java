@@ -28,8 +28,10 @@ public final class DroneTypes {
     private static final Map<String, String> RENAMED = new HashMap<>();
 
     static {
-        RENAMED.put("gunship_rocket", "strike_plane");
-        RENAMED.put("gunship_gun", "attack_plane");
+        RENAMED.put("gunship_rocket", "rocket_plane");
+        RENAMED.put("gunship_gun", "bullet_plane");
+        RENAMED.put("strike_plane", "rocket_plane");
+        RENAMED.put("attack_plane", "bullet_plane");
         RENAMED.put("racer_micro", "racer_drone");
         RENAMED.put("racer_standard", "standard_drone");
         RENAMED.put("racer_longrange", "recon_drone");

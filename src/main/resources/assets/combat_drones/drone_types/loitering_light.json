@@ -2,7 +2,7 @@
   // Light Loitering Munition: fast, small warhead, a guided rocket. "Take control" is point-and-strike: click a spot on the feed and it dives there.
   // Fuel in units; full-throttle endurance = capacity / drain ticks.
   "category": "RAMP_AUTOPILOT",
-  "maxSpeed": 1.8,
+  "maxSpeed": 1.2,
   "acceleration": 0.2,
   "batteryOrFuelCapacity": 3600,
   "drainRatePerTick": 1.0,

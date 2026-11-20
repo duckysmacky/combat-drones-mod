@@ -52,7 +52,7 @@ public final class ModConfig {
     public static final String FILE_NAME = CombatDrones.MOD_ID + ".toml";
     /** Keys from older versions, removed from existing files so they don't look like live settings. */
     private static final String[] RETIRED_KEYS = {"general.bombBlastPower", "missiles.missilePreparingSeconds", "missiles.inboundDelaySeconds",
-            "drones.gunship_rocket", "drones.gunship_gun", "weapons.rocketBlastPower",
+            "drones.gunship_rocket", "drones.gunship_gun", "drones.strike_plane", "drones.attack_plane", "weapons.rocketBlastPower",
             // The racers were renamed and retuned: old tables are dropped, not carried over
             "drones.racer_micro", "drones.racer_standard", "drones.racer_longrange",
             // Recon settings moved to [uav]
@@ -569,7 +569,7 @@ public final class ModConfig {
                             + "0 = no blast, just a wreck.");
 
             shotDownPlanes = defaults.get("state.shot_down.planes", shotDownPlanes,
-                    "Planes (Strike and Attack Plane, Gunship, Stealth Bomber, Recon UAV) shot to 0 HP go down burning instead of "
+                    "Planes (Striker, Spitfire, Gunship, Stealth Bomber, Recon UAV) shot to 0 HP go down burning instead of "
                             + "exploding at once. Off: they explode on the spot.");
             shotDownDrones = defaults.get("state.shot_down.drones", shotDownDrones,
                     "The same for hand-flown drones (FPV and DJI). Off: they explode (or wreck) on the spot.");
@@ -667,7 +667,7 @@ public final class ModConfig {
                     "Whoever flies, watches or owns an aircraft being locked gets a warning while the lock builds and holds.");
 
             roundsPerRifleItem = (int) defaults.number("weapons.roundsPerRifleItem", roundsPerRifleItem, 1, 256,
-                    "Gun rounds one Rifle Rounds item loads into an Attack Plane's belt.");
+                    "Gun rounds one Rifle Rounds item loads into a Spitfire's belt.");
             rocketSpeed = defaults.number("weapons.rocketSpeed", rocketSpeed, 0.5, 10, "Rocket speed on top of the plane's own, in blocks/tick.");
             rocketCooldownTicks = (int) defaults.number("weapons.rocketCooldownTicks", rocketCooldownTicks, 1, 200, "Ticks between rockets while the trigger is held.");
             cannonDamage = defaults.number("weapons.cannonDamage", cannonDamage, 0, 40,

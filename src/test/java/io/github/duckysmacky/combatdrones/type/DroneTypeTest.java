@@ -72,7 +72,7 @@ class DroneTypeTest {
     @Test
     void bundledTypesHaveTheirKind() throws IOException {
         Path types = Paths.get("src/main/resources/assets/combat_drones/drone_types");
-        String[][] expected = {{"strike_plane", "PLANE"}, {"attack_plane", "PLANE"}, {"gunship", "PLANE"}, {"stealth_bomber", "PLANE"},
+        String[][] expected = {{"rocket_plane", "PLANE"}, {"bullet_plane", "PLANE"}, {"gunship", "PLANE"}, {"stealth_bomber", "PLANE"},
                 {"recon_uav", "PLANE"}, {"loitering_light", "MUNITION"}, {"loitering_heavy", "MUNITION"}, {"racer_drone", "DRONE"},
                 {"dji_drone", "DRONE"}, {"cruise_missile", "MISSILE"}};
         for (String[] entry : expected) {
@@ -97,7 +97,7 @@ class DroneTypeTest {
     /** The big planes need the Heavy Runway; everything else that lands fits the Light one. */
     @Test
     void bundledHeavyRunwayTypes() throws IOException {
-        for (String id : new String[]{"gunship", "stealth_bomber", "strike_plane", "attack_plane", "recon_uav"}) {
+        for (String id : new String[]{"gunship", "stealth_bomber", "rocket_plane", "bullet_plane", "recon_uav"}) {
             try (Reader reader = Files.newBufferedReader(Paths.get("src/main/resources/assets/combat_drones/drone_types/" + id + ".json"))) {
                 assertEquals(id.equals("gunship") || id.equals("stealth_bomber"), DroneType.parse(id, reader).isHeavyRunway(), id);
             }

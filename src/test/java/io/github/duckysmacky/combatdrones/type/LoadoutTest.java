@@ -9,7 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class LoadoutTest {
-    private static final DroneType STRIKE_PLANE = DroneType.parse("strike_plane", new StringReader("{"
+    private static final DroneType ROCKET_PLANE = DroneType.parse("rocket_plane", new StringReader("{"
             + "\"category\": \"RAMP_AUTOPILOT\", \"maxSpeed\": 0.9, \"acceleration\": 0.05, \"batteryOrFuelCapacity\": 6000,"
             + "\"drainRatePerTick\": 1, \"maxHP\": 100, \"defaultCruiseAltitude\": 40, \"controlScheme\": \"STICK\","
             + "\"weaponType\": \"ROCKET_POD\", \"payloadCapacity\": 192}"));
@@ -17,10 +17,10 @@ class LoadoutTest {
     @Test
     void rocketPodCapacityDependsOnTheLoadedSize() {
         Loadout loadout = new Loadout();
-        assertEquals(64, loadout.capacity(STRIKE_PLANE, 0));
+        assertEquals(64, loadout.capacity(ROCKET_PLANE, 0));
         loadout.setRocketKind(RocketType.HEAVY);
-        assertEquals(24, loadout.capacity(STRIKE_PLANE, 0));
-        assertEquals(0, loadout.capacity(STRIKE_PLANE, 1), "no secondary weapon");
+        assertEquals(24, loadout.capacity(ROCKET_PLANE, 0));
+        assertEquals(0, loadout.capacity(ROCKET_PLANE, 1), "no secondary weapon");
     }
 
     @Test
@@ -70,7 +70,7 @@ class LoadoutTest {
         loadout.setRocketKind(RocketType.HEAVY);
         loadout.setAmmo(0, 30);
         loadout.setAmmo(1, 5);
-        loadout.clampTo(STRIKE_PLANE);
+        loadout.clampTo(ROCKET_PLANE);
         assertEquals(24, loadout.getAmmo(0));
         assertEquals(0, loadout.getAmmo(1));
     }

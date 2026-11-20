@@ -40,8 +40,8 @@ Inspired by the [FPV Drones](https://www.curseforge.com/minecraft/mc-mods/fpvdro
 | DJI Drone | Camera quadcopter | Stable and easy to fly. Drops bombs from above |
 | Light Loitering Munition | Ramp-launched munition | Fast guided rocket: click a point on its camera and it strikes there |
 | Heavy Loitering Munition | Ramp-launched munition | Slower, bigger warhead, flown by hand |
-| Strike Plane | Armed plane | Ground attack with rockets |
-| Attack Plane | Armed plane | Fast machine-gun plane for hunting other aircraft |
+| Striker | Armed plane | Ground attack with rockets |
+| Spitfire | Armed plane | Fast machine-gun plane for hunting other aircraft |
 | Gunship | Armed plane | Huge, slow and loud. Circles overhead while you man the cannon, rockets and howitzer |
 | Stealth Bomber | Armed plane | Flying wing that drops bombs through a bombsight, or by itself along a planned bombing run |
 | Recon UAV | Unarmed plane | Long-endurance scout that marks enemies on your map |

@@ -20,8 +20,8 @@ class FuelTypeTest {
     void bundledTypesBurnTheirClassFuel() throws IOException {
         assertEquals(FuelType.AVGAS, fuelOf("loitering_light"));
         assertEquals(FuelType.AVGAS, fuelOf("loitering_heavy"));
-        assertEquals(FuelType.JET_A1, fuelOf("attack_plane"));
-        assertEquals(FuelType.JET_A1, fuelOf("strike_plane"));
+        assertEquals(FuelType.JET_A1, fuelOf("bullet_plane"));
+        assertEquals(FuelType.JET_A1, fuelOf("rocket_plane"));
         assertEquals(FuelType.JET_A1, fuelOf("recon_uav"));
         assertEquals(FuelType.JP8, fuelOf("gunship"));
         assertEquals(FuelType.JP8, fuelOf("stealth_bomber"));

@@ -249,7 +249,7 @@ class RouteAutopilotTest {
     }
 
     /** Light loitering munition stats (loitering_light.json). */
-    private static final FixedWingFlight.Params LIGHT_MUNITION = new FixedWingFlight.Params(1.8, 0.2, 2.75);
+    private static final FixedWingFlight.Params LIGHT_MUNITION = new FixedWingFlight.Params(1.2, 0.2, 2.75);
 
     /**
      * Pursues a designated point from {@code (0, ORIGIN_Y + 40, 0)} heading +Z at speed 1.5 until it reaches the

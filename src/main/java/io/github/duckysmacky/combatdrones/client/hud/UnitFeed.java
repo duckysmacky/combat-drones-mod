@@ -148,7 +148,7 @@ public final class UnitFeed {
         }
     }
 
-    /** Strike and Attack Planes: head-up display in green over a clear picture. */
+    /** Striker and Spitfire: head-up display in green over a clear picture. */
     private static void flight(ScaledResolution resolution, EntityRampUnit unit, DroneType type, int centerX, int centerY, int left, int right,
                                int top, int bottom, String mode, double heading, double altitude, double speed, String fuelText, int fuelColor,
                                String healthText, int healthColor, double pitch, double roll) {

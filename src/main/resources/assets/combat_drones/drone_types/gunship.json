@@ -27,7 +27,7 @@
   // Rocket rack, switched to in flight: bay units (32 Rockets or 12 Heavy Rockets), one size at a time like a rocket pod
   "secondaryWeapon": "ROCKET_POD",
   "secondaryCapacity": 96,
-  // Slower rocket fire than the Strike Plane's pods (0 would use [weapons] rocketCooldownTicks)
+  // Slower rocket fire than the Striker's pods (0 would use [weapons] rocketCooldownTicks)
   "rocketCooldownTicks": 40,
   // 105 mm howitzer: few, slow, huge shells
   "tertiaryWeapon": "HOWITZER",

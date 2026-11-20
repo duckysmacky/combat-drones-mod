@@ -16,7 +16,7 @@ public enum Feed {
     SEEKER("seeker"),
     /** Heavy munition: a cheap, noisy nose camera with a bare OSD. */
     NOSECAM("nosecam"),
-    /** Strike and Attack Planes: a green head-up display over a clear picture. */
+    /** Striker and Spitfire: a green head-up display over a clear picture. */
     FLIGHT(null),
     /** Stealth Bomber from the cockpit: the planes' head-up display plus the bay. */
     BOMBER(null),
