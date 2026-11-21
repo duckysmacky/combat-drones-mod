@@ -144,7 +144,7 @@ public final class HudOverlay {
     }
 
     /**
-     * A recon UAV is after this player: a blinking LOCK-ON WARNING with a filling bar while a lock-on builds, then a
+     * A Recon UAV or Recon Drone is after this player: a blinking LOCK-ON WARNING with a filling bar while a lock-on builds, then a
      * steady TRACKED banner with the time left while it holds. The same for a Stinger after the player's aircraft,
      * with a MISSILE LOCK banner.
      */
@@ -163,8 +163,9 @@ public final class HudOverlay {
             title = I18n.format(building > 0 ? "hud.combat_drones.lock_warning" : "hud.combat_drones.missile_lock");
             sub = I18n.format(building > 0 ? "hud.combat_drones.missile_warning.sub" : "hud.combat_drones.missile_lock.sub");
         } else {
-            title = I18n.format(building > 0 ? "hud.combat_drones.lock_warning" : "hud.combat_drones.lock_tracked");
-            sub = building > 0 ? I18n.format("hud.combat_drones.lock_warning.sub")
+            String drone = ClientIntel.isReconDroneWarning() ? ".recon_drone" : "";
+            title = I18n.format(building > 0 ? "hud.combat_drones.lock_warning" : "hud.combat_drones.lock_tracked" + drone);
+            sub = building > 0 ? I18n.format("hud.combat_drones.lock_warning.sub" + drone)
                     : I18n.format("hud.combat_drones.lock_tracked.sub", Widgets.clock(lockedMillis));
         }
         int halfWidth = Math.max(Ui.width(title), Ui.width(sub) / 2) + 14;

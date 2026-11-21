@@ -514,7 +514,7 @@ public final class RemoteSessions {
             LockOnAttempt.Result result = session.lockOn.tick(onTarget, session.trigger);
             if (result == LockOnAttempt.Result.LOCKED) {
                 carrier.spendLockCharge();
-                ReconIntel.lock(owner, target, unit.getUniqueID(), settings);
+                ReconIntel.lock(owner, target, unit.getUniqueID(), warnSource(unit), settings);
                 session.lockedShowTicks = LOCKED_SHOW_TICKS;
                 session.needsRelease = true;
                 session.player.sendStatusMessage(new TextComponentTranslation("message.combat_drones.recon.locked", target.getName()), true);
@@ -572,12 +572,17 @@ public final class RemoteSessions {
         Entity target = session.lockOn.isRunning() && settings.lockOnWarning ? unit.world.getEntityByID(session.lockOn.getTarget()) : null;
         EntityPlayerMP warned = target == null ? null : ReconIntel.warneeOf(target);
         if (session.warned != null && session.warned != warned && !session.warned.hasDisconnected()) {
-            ModNetwork.CHANNEL.sendTo(new LockWarningPacket(false, 0), session.warned);
+            ModNetwork.CHANNEL.sendTo(new LockWarningPacket(false, 0, warnSource(unit)), session.warned);
         }
         if (warned != null && (warned != session.warned || unit.ticksExisted % WARNING_INTERVAL_TICKS == 0)) {
-            ModNetwork.CHANNEL.sendTo(new LockWarningPacket(false, Math.max(0.01F, (float) session.lockOn.getProgress())), warned);
+            ModNetwork.CHANNEL.sendTo(new LockWarningPacket(false, Math.max(0.01F, (float) session.lockOn.getProgress()), warnSource(unit)), warned);
         }
         session.warned = warned;
+    }
+
+    /** Which vehicle the target's banner names: a hand-flown Recon Drone or a Recon UAV. */
+    private static int warnSource(Entity unit) {
+        return unit instanceof EntityHandFlownDrone ? LockWarningPacket.RECON_DRONE : LockWarningPacket.UAV;
     }
 
     /** The enemy closest to the crosshair that a lock-on could start on (not one this owner already has), or null. */

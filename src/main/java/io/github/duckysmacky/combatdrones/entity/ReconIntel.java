@@ -105,13 +105,16 @@ public final class ReconIntel {
         /** The source's lockOnForAllies and lockedWarning when it locked on. */
         final boolean forAllies;
         final boolean warn;
+        /** What kind of vehicle the source is, for the target's banner ({@code LockWarningPacket.UAV} or {@code RECON_DRONE}). */
+        final int warnSource;
 
-        LockOn(Mark mark, long until, UUID source, boolean forAllies, boolean warn) {
+        LockOn(Mark mark, long until, UUID source, boolean forAllies, boolean warn, int warnSource) {
             this.mark = mark;
             this.until = until;
             this.source = source;
             this.forAllies = forAllies;
             this.warn = warn;
+            this.warnSource = warnSource;
         }
     }
 
@@ -200,8 +203,9 @@ public final class ReconIntel {
     }
 
     /** A lock-on by {@code source} (a recon vehicle): the target is followed live for lockOnDurationSeconds. */
-    static void lock(UUID owner, Entity target, UUID source, LockOnSettings settings) {
-        addLockOn(owner, new LockOn(Mark.of(target), clock() + settings.durationTicks(), source, settings.lockOnForAllies, settings.lockedWarning));
+    static void lock(UUID owner, Entity target, UUID source, int warnSource, LockOnSettings settings) {
+        addLockOn(owner, new LockOn(Mark.of(target), clock() + settings.durationTicks(), source, settings.lockOnForAllies, settings.lockedWarning,
+                warnSource));
     }
 
     static void addLockOn(UUID owner, LockOn lockOn) {
@@ -232,17 +236,18 @@ public final class ReconIntel {
         return count;
     }
 
-    /** Ticks left on the longest lock-on with a banner (lockedWarning) anyone has on {@code player} (or their stand-in body), or 0. */
-    private static long lockedTicksLeft(UUID player, long now) {
-        long left = 0;
+    /** The longest-running lock-on with a banner (lockedWarning) anyone has on {@code player} (or their stand-in body), or null. */
+    @Nullable
+    private static LockOn longestLockOn(UUID player, long now) {
+        LockOn longest = null;
         for (Map<UUID, LockOn> owned : LOCK_ONS.values()) {
             for (LockOn lockOn : owned.values()) {
-                if (lockOn.warn && player.equals(lockOn.mark.warnee)) {
-                    left = Math.max(left, lockOn.until - now);
+                if (lockOn.warn && lockOn.until > now && player.equals(lockOn.mark.warnee) && (longest == null || lockOn.until > longest.until)) {
+                    longest = lockOn;
                 }
             }
         }
-        return left;
+        return longest;
     }
 
     /** The player to warn about a lock-on building on {@code target}: the target itself, or a stand-in body's pilot. */
@@ -258,7 +263,8 @@ public final class ReconIntel {
 
     /** Tells each locked-on player how long it has left, when that changes (a new lock-on, or the last one ending). */
     private static void warnLocked(EntityPlayerMP player, long now) {
-        long until = now + lockedTicksLeft(player.getUniqueID(), now);
+        LockOn longest = longestLockOn(player.getUniqueID(), now);
+        long until = longest == null ? now : longest.until;
         Long told = WARNED_UNTIL.get(player.getUniqueID());
         if (until > now ? told == null || told != until : told != null) {
             if (until > now) {
@@ -266,7 +272,8 @@ public final class ReconIntel {
             } else {
                 WARNED_UNTIL.remove(player.getUniqueID());
             }
-            ModNetwork.CHANNEL.sendTo(new LockWarningPacket(true, (until - now) / 20.0F), player);
+            ModNetwork.CHANNEL.sendTo(new LockWarningPacket(true, (until - now) / 20.0F,
+                    longest == null ? LockWarningPacket.UAV : longest.warnSource), player);
         }
     }
 

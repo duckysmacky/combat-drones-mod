@@ -41,7 +41,7 @@ public final class ClientIntel {
     private static final long WARNING_TIMEOUT_MILLIS = 600;
     /** When the lock-on on this player runs out (ms), or 0. */
     private static long lockedUntil;
-    /** What the warning is about: a UAV after this player, or a Stinger after their aircraft ({@code LockWarningPacket.*}). */
+    /** What the warning is about: a UAV or Recon Drone after this player, or a Stinger after their aircraft ({@code LockWarningPacket.*}). */
     private static int warningSource;
     /** Pilots found by Pilot Detector scans (own or a teammate's), each until its time runs out (ms). */
     private static final List<IntelPacket.Entry> detections = new ArrayList<>();
@@ -144,6 +144,11 @@ public final class ClientIntel {
     /** True when the warning up now is a Stinger's on this player's aircraft rather than a UAV's on them. */
     public static boolean isStingerWarning() {
         return warningSource == LockWarningPacket.STINGER;
+    }
+
+    /** True when the warning up now is a hand-flown Recon Drone's rather than a Recon UAV's. */
+    public static boolean isReconDroneWarning() {
+        return warningSource == LockWarningPacket.RECON_DRONE;
     }
 
     /** Milliseconds left on the lock-on on this player, or 0. */
