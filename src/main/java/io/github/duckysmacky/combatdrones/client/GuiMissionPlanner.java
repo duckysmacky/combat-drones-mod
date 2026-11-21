@@ -19,7 +19,6 @@ import io.github.duckysmacky.combatdrones.network.RemoteRequestPacket;
 import io.github.duckysmacky.combatdrones.physics.BombBallistics;
 import io.github.duckysmacky.combatdrones.physics.Route;
 import io.github.duckysmacky.combatdrones.physics.RouteAutopilot;
-import io.github.duckysmacky.combatdrones.physics.RouteValidator;
 import io.github.duckysmacky.combatdrones.type.AerialBombType;
 import io.github.duckysmacky.combatdrones.type.DroneType;
 import io.github.duckysmacky.combatdrones.type.DroneTypes;
@@ -453,7 +452,7 @@ public class GuiMissionPlanner extends GuiScreen {
             String line = String.format(Locale.ROOT, "#%d  %d, %d  ↑%d %s", index + 1, Math.round(waypoint.x), Math.round(waypoint.z),
                     Math.round(waypoint.altitude), waypoint.speed.name().charAt(0))
                     + (waypoint.dropLength > 0 ? " C" + Math.round(waypoint.dropLength) : waypoint.isDrop() ? " B" : "");
-            boolean badAltitude = waypoint.altitude < RouteValidator.MIN_ALTITUDE || waypoint.altitude > view.maxAltitude;
+            boolean badAltitude = waypoint.altitude < view.minAltitude || waypoint.altitude > view.maxAltitude;
             int color = index == selectedWaypoint ? Ui.SELECT : badAltitude ? WARNING : Ui.TEXT;
             if (index == selectedWaypoint) {
                 Ui.rect(MARGIN - 3, y - 2, MARGIN + PANEL_WIDTH + 3, y + ROW - 2, 0x50FBE678);
@@ -1115,8 +1114,8 @@ public class GuiMissionPlanner extends GuiScreen {
         Route.Waypoint last = waypoints.get(waypoints.size() - 1);
         double distance = Math.hypot(toWorldX(mouseX) - last.x, toWorldZ(mouseY) - last.z);
         DroneType type = currentType();
-        double min = Math.max(Route.MIN_LOITER_RADIUS, type == null ? 0 : type.getMinLoiterRadius());
-        return Math.max(min, Math.min(Route.MAX_LOITER_RADIUS, Math.round(distance)));
+        double min = Math.max(view.minLoiterRadius, type == null ? 0 : type.getMinLoiterRadius());
+        return Math.max(min, Math.min(view.maxLoiterRadius, Math.round(distance)));
     }
 
     private void clampToLoiterMinimums() {
@@ -1124,7 +1123,7 @@ public class GuiMissionPlanner extends GuiScreen {
         if (type == null) {
             return;
         }
-        Route clamped = currentRoute().withLoiterMinimums(type.getMinLoiterAltitude(), type.getMinLoiterRadius());
+        Route clamped = currentRoute().withLoiterMinimums(type.getMinLoiterAltitude(), Math.max(view.minLoiterRadius, type.getMinLoiterRadius()));
         waypoints.clear();
         waypoints.addAll(clamped.getWaypoints());
         loiterRadius = clamped.getLoiterRadius();
@@ -1322,7 +1321,7 @@ public class GuiMissionPlanner extends GuiScreen {
             return;
         }
         Route.Waypoint old = waypoints.get(selectedWaypoint);
-        double altitude = Math.max(RouteValidator.MIN_ALTITUDE, Math.min(view.maxAltitude, old.altitude + delta));
+        double altitude = Math.max(view.minAltitude, Math.min(view.maxAltitude, old.altitude + delta));
         waypoints.set(selectedWaypoint, old.withAltitude(altitude));
         dirty = true;
     }

@@ -12,7 +12,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 class RouteValidatorTest {
-    private static final RouteValidator.Limits LIMITS = new RouteValidator.Limits(3, 100, 500);
+    private static final RouteValidator.Limits LIMITS = new RouteValidator.Limits(3, 5, 100, 500, 12, 160);
     private static final Set<TerminalAction> MUNITION = RouteValidator.allowedTerminals(true, false);
 
     private static String validate(TerminalAction terminal, Waypoint... waypoints) {
@@ -52,6 +52,17 @@ class RouteValidatorTest {
     void loiterRadiusMustBeSensible() {
         Route tight = new Route(Collections.singletonList(new Waypoint(10, 10, 30)), TerminalAction.LOITER, 4);
         assertEquals("message.combat_drones.route.loiter_radius", RouteValidator.validate(tight, 0, 0, LIMITS, MUNITION));
+        Route wide = new Route(Collections.singletonList(new Waypoint(10, 10, 30)), TerminalAction.LOITER, 200);
+        assertEquals("message.combat_drones.route.loiter_radius", RouteValidator.validate(wide, 0, 0, LIMITS, MUNITION));
+        // The bounds come from the limits (config), not constants
+        RouteValidator.Limits roomy = new RouteValidator.Limits(3, 1, 100, 500, 2, 300);
+        assertNull(RouteValidator.validate(tight, 0, 0, roomy, MUNITION));
+        assertNull(RouteValidator.validate(wide, 0, 0, roomy, MUNITION));
+        assertNull(validateWith(roomy, new Waypoint(10, 10, 2)));
+    }
+
+    private static String validateWith(RouteValidator.Limits limits, Waypoint waypoint) {
+        return RouteValidator.validate(new Route(Collections.singletonList(waypoint), TerminalAction.LOITER), 0, 0, limits, MUNITION);
     }
 
     @Test

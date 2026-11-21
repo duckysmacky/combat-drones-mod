@@ -28,8 +28,6 @@ public final class Route {
     }
 
     public static final double DEFAULT_LOITER_RADIUS = 24.0;
-    public static final double MIN_LOITER_RADIUS = 12.0;
-    public static final double MAX_LOITER_RADIUS = 160.0;
     /** {@link Waypoint#dropLength} of a waypoint that drops nothing. */
     public static final double NO_DROP = -1;
 

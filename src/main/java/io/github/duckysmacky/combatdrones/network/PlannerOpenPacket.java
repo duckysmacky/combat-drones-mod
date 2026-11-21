@@ -141,7 +141,10 @@ public class PlannerOpenPacket implements IMessage {
     public final List<UnitView> units = new ArrayList<>();
     public final List<RunwayView> runways = new ArrayList<>();
     public int maxWaypoints = ModConfig.maxWaypointsPerRoute;
+    public double minAltitude = ModConfig.minRouteAltitude;
     public double maxAltitude = ModConfig.maxRouteAltitude;
+    public double minLoiterRadius = ModConfig.minLoiterRadius;
+    public double maxLoiterRadius = ModConfig.maxLoiterRadius;
     public double maxLength = ModConfig.maxRouteLength;
     public double minLaunchFuel = ModConfig.minLaunchFuel;
     public double maxCarpetLength = ModConfig.maxCarpetLength;
@@ -150,7 +153,10 @@ public class PlannerOpenPacket implements IMessage {
     public void toBytes(ByteBuf buf) {
         buf.writeInt(selectId);
         buf.writeInt(maxWaypoints);
+        buf.writeDouble(minAltitude);
         buf.writeDouble(maxAltitude);
+        buf.writeDouble(minLoiterRadius);
+        buf.writeDouble(maxLoiterRadius);
         buf.writeDouble(maxLength);
         buf.writeDouble(minLaunchFuel);
         buf.writeDouble(maxCarpetLength);
@@ -168,7 +174,10 @@ public class PlannerOpenPacket implements IMessage {
     public void fromBytes(ByteBuf buf) {
         selectId = buf.readInt();
         maxWaypoints = buf.readInt();
+        minAltitude = buf.readDouble();
         maxAltitude = buf.readDouble();
+        minLoiterRadius = buf.readDouble();
+        maxLoiterRadius = buf.readDouble();
         maxLength = buf.readDouble();
         minLaunchFuel = buf.readDouble();
         maxCarpetLength = buf.readDouble();

@@ -5,18 +5,22 @@ import java.util.Set;
 
 /** Server-side checks for a submitted route. Returns a translation key describing the problem, or null if valid. */
 public final class RouteValidator {
-    /** Lowest waypoint altitude above the launch point; below this a plane would scrape the ramp's surroundings. */
-    public static final double MIN_ALTITUDE = 5;
-
     public static final class Limits {
         final int maxWaypoints;
+        /** Waypoint altitude bounds, blocks above the launch point. */
+        final double minAltitude;
         final double maxAltitude;
         final double maxLength;
+        final double minLoiterRadius;
+        final double maxLoiterRadius;
 
-        public Limits(int maxWaypoints, double maxAltitude, double maxLength) {
+        public Limits(int maxWaypoints, double minAltitude, double maxAltitude, double maxLength, double minLoiterRadius, double maxLoiterRadius) {
             this.maxWaypoints = maxWaypoints;
+            this.minAltitude = minAltitude;
             this.maxAltitude = maxAltitude;
             this.maxLength = maxLength;
+            this.minLoiterRadius = minLoiterRadius;
+            this.maxLoiterRadius = maxLoiterRadius;
         }
     }
 
@@ -46,14 +50,14 @@ public final class RouteValidator {
             if (!Double.isFinite(waypoint.x) || !Double.isFinite(waypoint.z) || !Double.isFinite(waypoint.altitude)) {
                 return "message.combat_drones.route.invalid";
             }
-            if (waypoint.altitude < MIN_ALTITUDE || waypoint.altitude > limits.maxAltitude) {
+            if (waypoint.altitude < limits.minAltitude || waypoint.altitude > limits.maxAltitude) {
                 return "message.combat_drones.route.altitude";
             }
         }
         if (route.length(startX, startZ) > limits.maxLength) {
             return "message.combat_drones.route.too_long";
         }
-        if (!(route.getLoiterRadius() >= Route.MIN_LOITER_RADIUS && route.getLoiterRadius() <= Route.MAX_LOITER_RADIUS)) {
+        if (!(route.getLoiterRadius() >= limits.minLoiterRadius && route.getLoiterRadius() <= limits.maxLoiterRadius)) {
             return "message.combat_drones.route.loiter_radius";
         }
         if (route.getTerminal() == null || !allowedTerminals.contains(route.getTerminal())) {

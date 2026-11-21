@@ -98,7 +98,10 @@ public final class ModConfig {
     public static double droneDamageTakenMultiplier = 1.0;
     public static double launchGraceSeconds = 1.0;
     public static int maxWaypointsPerRoute = 16;
+    public static double minRouteAltitude = 5.0;
     public static double maxRouteAltitude = 120.0;
+    public static double minLoiterRadius = 12.0;
+    public static double maxLoiterRadius = 160.0;
     public static double maxRouteLength = 3000.0;
     public static double maxCarpetLength = 256.0;
     public static double minLaunchFuel = 0.25;
@@ -427,7 +430,7 @@ public final class ModConfig {
     }
 
     public static RouteValidator.Limits routeLimits() {
-        return new RouteValidator.Limits(maxWaypointsPerRoute, maxRouteAltitude, maxRouteLength);
+        return new RouteValidator.Limits(maxWaypointsPerRoute, minRouteAltitude, maxRouteAltitude, maxRouteLength, minLoiterRadius, maxLoiterRadius);
     }
 
     /** Must run after {@link DroneTypes#load}, since the drone tables default to the bundled types. */
@@ -457,6 +460,14 @@ public final class ModConfig {
                     "Most waypoints a Mission Planner route may have.");
             maxRouteAltitude = defaults.number("general.maxRouteAltitude", maxRouteAltitude, 10, 250,
                     "Highest waypoint altitude, in blocks above the launch ramp.");
+            minRouteAltitude = Math.min(maxRouteAltitude, defaults.number("general.minRouteAltitude", minRouteAltitude, 0, 250,
+                    "Lowest waypoint altitude, in blocks above the launch ramp (at most maxRouteAltitude). A unit type's "
+                            + "minLoiterAltitude raises its orbit further."));
+            minLoiterRadius = defaults.number("general.minLoiterRadius", minLoiterRadius, 1, 512,
+                    "Tightest loiter radius, in blocks. A unit type's minLoiterRadius can raise it for that type, never lower it.");
+            maxLoiterRadius = Math.max(minLoiterRadius, defaults.number("general.maxLoiterRadius", maxLoiterRadius, 1, 512,
+                    "Widest loiter radius, in blocks (at least minLoiterRadius). Keep it above every unit type's minLoiterRadius, "
+                            + "or that type's orbiting routes are refused."));
             maxRouteLength = defaults.number("general.maxRouteLength", maxRouteLength, 100, 20000,
                     "Longest total route (from the ramp through every waypoint), in blocks.");
             maxCarpetLength = defaults.number("general.maxCarpetLength", maxCarpetLength, 16, 2000,

@@ -253,13 +253,13 @@ public final class PlannerServer {
 
     /**
      * A submitted route made fit for the unit, the way the planner shows it: target on the ground, orbit at the type's
-     * minimums, drop points only for a bomb bay and no longer than the carpet limit, the runway to land on checked.
+     * (and the global) minimums, drop points only for a bomb bay and no longer than the carpet limit, the runway to land on checked.
      * Never a reason to reject.
      */
     private static Route prepare(EntityPlayer player, DroneType type, Route route) {
         boolean bomber = type.stationOf(DroneType.WeaponType.BOMB_BAY) >= 0;
         return resolveRunway(player, type, resolveTarget(player.world, route))
-                .withLoiterMinimums(type.getMinLoiterAltitude(), type.getMinLoiterRadius())
+                .withLoiterMinimums(type.getMinLoiterAltitude(), Math.max(ModConfig.minLoiterRadius, type.getMinLoiterRadius()))
                 .withDropLimit(bomber ? ModConfig.maxCarpetLength : Route.NO_DROP);
     }
 
