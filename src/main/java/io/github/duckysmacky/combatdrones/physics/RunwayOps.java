@@ -69,6 +69,13 @@ public final class RunwayOps {
     /** On final: within this much of the runway heading, and this close to the centreline (widening further out). */
     static final double ESTABLISHED_HEADING_DEG = 30.0;
     static final double ESTABLISHED_CROSS = 4.0;
+    /**
+     * On final only while it can still get down: at most this many blocks over the deck per block before the threshold,
+     * plus a fixed margin. Higher, diving for the runway only brings it over the deck too high and fast, so it goes
+     * round instead and comes in from the fix at the approach height.
+     */
+    static final double ESTABLISHED_DESCENT = 0.25;
+    static final double ESTABLISHED_HEIGHT = 4.0;
     /** Share of the runway it may still touch down on; floating past it means a go-around. */
     static final double TOUCHDOWN_ZONE = 0.6;
     /** Captured onto the deck from at most this high over it, this far off its heading and this fast. */
@@ -102,7 +109,8 @@ public final class RunwayOps {
         double headingError = Math.abs(FixedWingFlight.wrap(state.heading - runway.heading));
         boolean inZone = along >= -FINAL_LENGTH * 1.5 && along <= runway.length * TOUCHDOWN_ZONE;
         boolean established = inZone && headingError < ESTABLISHED_HEADING_DEG
-                && Math.abs(cross) < ESTABLISHED_CROSS + Math.max(0, -along) * 0.15;
+                && Math.abs(cross) < ESTABLISHED_CROSS + Math.max(0, -along) * 0.15
+                && state.position.y - runway.y <= Math.max(0, -along) * ESTABLISHED_DESCENT + ESTABLISHED_HEIGHT;
         if (established) {
             double heading = runway.heading + FixedWingFlight.clamp(-cross * INTERCEPT_GAIN, FINAL_MAX_CORRECTION_DEG);
             // On the slope the autopilot's height-error pitch alone would sit high: aim under it by the glide angle's worth

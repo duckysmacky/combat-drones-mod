@@ -131,6 +131,39 @@ class RunwayOpsTest {
         }
     }
 
+    /**
+     * Coming back from cruise height at full speed (a bomber after its run), a plane never dives for the runway from
+     * too high: it lands without floating over the deck and going round.
+     */
+    @Test
+    void comesDownFromCruiseHeightWithoutGoingRound() {
+        double[][] starts = {{0, -300}, {0, 300}, {300, 0}, {-300, 0}, {200, 200}, {-150, 40}, {20, 10}};
+        for (FixedWingFlight.Params params : PLANES) {
+            for (double height : new double[]{80, 120}) {
+                for (double[] start : starts) {
+                    for (double heading : new double[]{0, 90, 180, -90}) {
+                        FixedWingFlight.State state = new FixedWingFlight.State();
+                        state.position.set(HEAVY.x + start[0], HEAVY.y + height, HEAVY.z + start[1]);
+                        state.heading = heading;
+                        state.speed = params.maxSpeed();
+                        String from = "from " + start[0] + "," + start[1] + " at " + height + " heading " + heading + ", top speed " + params.maxSpeed();
+                        boolean onFinal = false;
+                        boolean landed = false;
+                        for (int tick = 0; tick < 6000 && !landed; tick++) {
+                            RouteAutopilot.Command command = RouteAutopilot.returnToRunway(state, situation(HEAVY, true), params, 0);
+                            FixedWingFlight.step(state, command.controls, params);
+                            boolean land = command.phase == RouteAutopilot.Phase.LAND;
+                            assertTrue(land || !onFinal || HEAVY.along(state.position.x, state.position.z) < 0, "went round over the deck " + from);
+                            onFinal = land;
+                            landed = land && RunwayOps.captured(state, HEAVY, params.maxSpeed());
+                        }
+                        assertTrue(landed, "never landed " + from);
+                    }
+                }
+            }
+        }
+    }
+
     @Test
     void circlesARunwayItCantUseYet() {
         FixedWingFlight.Params params = PLANES[0];
