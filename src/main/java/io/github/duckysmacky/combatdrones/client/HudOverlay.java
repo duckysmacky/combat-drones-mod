@@ -140,7 +140,10 @@ public final class HudOverlay {
             drawStrikeAlert(resolution);
             top += 38;
         }
-        drawLockAlert(resolution, top);
+        if (drawLockAlert(resolution, top)) {
+            top += 38;
+        }
+        drawScannedAlert(resolution, top);
     }
 
     /**
@@ -148,13 +151,12 @@ public final class HudOverlay {
      * steady TRACKED banner with the time left while it holds. The same for a Stinger after the player's aircraft,
      * with a MISSILE LOCK banner.
      */
-    private static void drawLockAlert(ScaledResolution resolution, int top) {
+    private static boolean drawLockAlert(ScaledResolution resolution, int top) {
         float building = ClientIntel.getWarningProgress();
         long lockedMillis = ClientIntel.getLockedMillisLeft();
         if (building <= 0 && lockedMillis <= 0) {
-            return;
+            return false;
         }
-        int centerX = resolution.getScaledWidth() / 2;
         boolean bright = Ui.blink(building > 0 ? 4 : 1);
         String title;
         String sub;
@@ -168,13 +170,29 @@ public final class HudOverlay {
             sub = building > 0 ? I18n.format("hud.combat_drones.lock_warning.sub" + drone)
                     : I18n.format("hud.combat_drones.lock_tracked.sub", Widgets.clock(lockedMillis));
         }
+        drawAlert(resolution, top, title, sub, bright, building);
+        return true;
+    }
+
+    /** A Pilot Detector found this player's stand-in body: a steady banner with the time its dot has left. */
+    private static void drawScannedAlert(ScaledResolution resolution, int top) {
+        long scannedMillis = ClientIntel.getScannedMillisLeft();
+        if (scannedMillis > 0) {
+            drawAlert(resolution, top, I18n.format("hud.combat_drones.detector_scanned"),
+                    I18n.format("hud.combat_drones.detector_scanned.sub", Widgets.clock(scannedMillis)), Ui.blink(1), 0);
+        }
+    }
+
+    /** A red warning banner at {@code top}, with a filling bar under it while {@code progress} is above 0. */
+    private static void drawAlert(ScaledResolution resolution, int top, String title, String sub, boolean bright, float progress) {
+        int centerX = resolution.getScaledWidth() / 2;
         int halfWidth = Math.max(Ui.width(title), Ui.width(sub) / 2) + 14;
         Ui.rect(centerX - halfWidth, top, centerX + halfWidth, top + 34, bright ? 0xF08A1F20 : 0xF05E1418);
         Ui.frame(centerX - halfWidth, top, halfWidth * 2, 34);
         Ui.textScaled(title, centerX, top + 5, 2, bright ? Ui.TEXT : 0xFFEE7A5E);
         Ui.textCentered(sub, centerX, top + 23, Ui.TEXT);
-        if (building > 0) {
-            Ui.bar(centerX - halfWidth + 3, top + 31, halfWidth * 2 - 6, 2, building, Ui.WARN);
+        if (progress > 0) {
+            Ui.bar(centerX - halfWidth + 3, top + 31, halfWidth * 2 - 6, 2, progress, Ui.WARN);
         }
     }
 

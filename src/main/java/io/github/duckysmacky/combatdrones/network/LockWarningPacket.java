@@ -16,6 +16,8 @@ public class LockWarningPacket implements IMessage {
     public static final int UAV = 0;
     public static final int STINGER = 1;
     public static final int RECON_DRONE = 2;
+    /** A Pilot Detector found the player's stand-in body: always {@code locked}, {@code value} = seconds its dot lasts. */
+    public static final int DETECTOR = 3;
 
     private boolean locked;
     private float value;

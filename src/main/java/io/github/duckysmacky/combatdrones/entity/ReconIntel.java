@@ -252,7 +252,7 @@ public final class ReconIntel {
 
     /** The player to warn about a lock-on building on {@code target}: the target itself, or a stand-in body's pilot. */
     @Nullable
-    static EntityPlayerMP warneeOf(Entity target) {
+    public static EntityPlayerMP warneeOf(Entity target) {
         if (target instanceof EntityPlayerMP) {
             return (EntityPlayerMP) target;
         }

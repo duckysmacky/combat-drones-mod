@@ -3,10 +3,12 @@ package io.github.duckysmacky.combatdrones.item;
 import io.github.duckysmacky.combatdrones.ModSounds;
 import io.github.duckysmacky.combatdrones.config.ModConfig;
 import io.github.duckysmacky.combatdrones.entity.EntityPilotBody;
+import io.github.duckysmacky.combatdrones.entity.ReconIntel;
 import io.github.duckysmacky.combatdrones.entity.Teams;
 import io.github.duckysmacky.combatdrones.network.DetectorPacket;
 import io.github.duckysmacky.combatdrones.network.EffectPacket;
 import io.github.duckysmacky.combatdrones.network.IntelPacket;
+import io.github.duckysmacky.combatdrones.network.LockWarningPacket;
 import io.github.duckysmacky.combatdrones.network.ModNetwork;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.EntityPlayerMP;
@@ -19,13 +21,15 @@ import net.minecraft.util.text.TextComponentTranslation;
 import net.minecraft.world.World;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 /**
  * Pilot Detector: right-click sends out a pulse that finds every enemy flying something remotely (their stand-in body)
  * within range and puts a red dot over the body for a while, seen through walls by the scanner (and teammates with
- * dotsForAllies). Everyone near hears the ping and sees the pulse.
+ * dotsForAllies). Everyone near hears the ping and sees the pulse; each pilot found gets a SCANNED banner.
  */
 public class ItemPilotDetector extends ItemCharged {
     @Override
@@ -60,6 +64,13 @@ public class ItemPilotDetector extends ItemCharged {
         }
         int ticks = (int) Math.round(ModConfig.detectorDotSeconds * 20);
         if (!found.isEmpty()) {
+            Set<EntityPlayerMP> warned = new HashSet<>();
+            for (EntityPilotBody body : bodies) {
+                EntityPlayerMP pilot = ReconIntel.warneeOf(body);
+                if (pilot != null && warned.add(pilot)) {
+                    ModNetwork.CHANNEL.sendTo(new LockWarningPacket(true, ticks / 20.0F, LockWarningPacket.DETECTOR), pilot);
+                }
+            }
             ModNetwork.CHANNEL.sendTo(new DetectorPacket(found, ticks, true), player);
             if (ModConfig.detectorDotsForAllies) {
                 for (EntityPlayer other : world.playerEntities) {

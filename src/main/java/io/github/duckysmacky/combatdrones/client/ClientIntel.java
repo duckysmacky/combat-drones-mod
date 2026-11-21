@@ -43,6 +43,8 @@ public final class ClientIntel {
     private static long lockedUntil;
     /** What the warning is about: a UAV or Recon Drone after this player, or a Stinger after their aircraft ({@code LockWarningPacket.*}). */
     private static int warningSource;
+    /** When the Pilot Detector dot on this player's stand-in body runs out (ms), or 0. Apart from lock-ons, so neither clears the other. */
+    private static long scannedUntil;
     /** Pilots found by Pilot Detector scans (own or a teammate's), each until its time runs out (ms). */
     private static final List<IntelPacket.Entry> detections = new ArrayList<>();
     private static final List<Long> detectionsUntil = new ArrayList<>();
@@ -122,6 +124,10 @@ public final class ClientIntel {
     /** From the server: a lock-on on this player is building ({@code locked} false) or holds ({@code locked} true). */
     static void setWarning(boolean locked, float value, int source) {
         long now = Minecraft.getSystemTime();
+        if (source == LockWarningPacket.DETECTOR) {
+            scannedUntil = value > 0 ? Math.max(scannedUntil, now + (long) (value * 1000)) : 0;
+            return;
+        }
         if (value > 0) {
             warningSource = source;
         }
@@ -154,6 +160,11 @@ public final class ClientIntel {
     /** Milliseconds left on the lock-on on this player, or 0. */
     public static long getLockedMillisLeft() {
         return Math.max(0, lockedUntil - Minecraft.getSystemTime());
+    }
+
+    /** Milliseconds left on the Pilot Detector dot on this player's stand-in body, or 0. */
+    public static long getScannedMillisLeft() {
+        return Math.max(0, scannedUntil - Minecraft.getSystemTime());
     }
 
     /** A new camera session: no attempt carried over from the last one. */
@@ -191,6 +202,7 @@ public final class ClientIntel {
     @SubscribeEvent
     public static void onDisconnect(FMLNetworkEvent.ClientDisconnectionFromServerEvent event) {
         marks = Collections.emptyList();
+        scannedUntil = 0;
         detections.clear();
         detectionsUntil.clear();
         lockProgress = 0;
