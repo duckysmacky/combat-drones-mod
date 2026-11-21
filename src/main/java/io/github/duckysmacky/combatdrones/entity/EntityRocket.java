@@ -1,5 +1,7 @@
 package io.github.duckysmacky.combatdrones.entity;
 
+import io.github.duckysmacky.combatdrones.config.ModConfig;
+import io.github.duckysmacky.combatdrones.physics.DownedFall;
 import io.github.duckysmacky.combatdrones.physics.MissileGuidance;
 import io.github.duckysmacky.combatdrones.type.RocketType;
 import net.minecraft.entity.Entity;
@@ -15,6 +17,7 @@ import net.minecraft.world.World;
 import net.minecraft.world.WorldServer;
 
 import javax.annotation.Nullable;
+import javax.vecmath.Vector3d;
 import java.util.UUID;
 
 /**
@@ -24,7 +27,9 @@ import java.util.UUID;
  * doesn't change it.
  *
  * <p>A Stinger missile is the same thing given a target ({@link #home}): it steers after it ({@link MissileGuidance}),
- * goes off when it passes close by, and its direct damage only counts against aircraft.
+ * goes off when it passes close by, and its direct damage only counts against aircraft. EMP fields knock it out
+ * ({@link Emp}): disabled, it stops homing for good and falls ({@code [state.emped]}) until its warhead goes off on
+ * whatever it hits, with no direct damage.
  */
 public class EntityRocket extends Entity {
     private static final int LIFETIME_TICKS = 100;
@@ -63,6 +68,8 @@ public class EntityRocket extends Entity {
     }
 
     private static final DataParameter<Integer> KIND = EntityDataManager.createKey(EntityRocket.class, DataSerializers.VARINT);
+    /** A Stinger missile knocked out by an EMP: no motor, no guidance. Synced for the trail and the arcs. */
+    private static final DataParameter<Boolean> EMPED = EntityDataManager.createKey(EntityRocket.class, DataSerializers.BOOLEAN);
 
     /** The plane that fired it (never hit by its own rocket); only known until a reload. */
     @Nullable
@@ -118,6 +125,28 @@ public class EntityRocket extends Entity {
     @Override
     protected void entityInit() {
         dataManager.register(KIND, 0);
+        dataManager.register(EMPED, false);
+    }
+
+    /** Who fired it (credited with its hits), or null. */
+    @Nullable
+    public UUID getOwner() {
+        return owner;
+    }
+
+    public boolean isEmpDisabled() {
+        return dataManager.get(EMPED);
+    }
+
+    /** Server: knocked out by an EMP for good: it stops homing and falls until it hits something. */
+    public void empDisable() {
+        target = null;
+        dataManager.set(EMPED, true);
+    }
+
+    /** Server: set off by an EMP where it is, with its own warhead. */
+    public void empDestroy() {
+        explode(new Vec3d(posX, posY, posZ));
     }
 
     public Kind getKind() {
@@ -129,14 +158,29 @@ public class EntityRocket extends Entity {
         super.onUpdate();
         Vec3d from = new Vec3d(posX, posY, posZ);
         Vec3d to = from.add(motionX, motionY, motionZ);
+        boolean emped = isEmpDisabled();
         if (world.isRemote) {
-            if (getKind().hasRocketMotor()) {
+            if (emped) {
+                if (rand.nextInt(3) == 0) {
+                    Emp.crackle(this);
+                }
+            } else if (getKind().hasRocketMotor()) {
                 Exhaust.rocketTrail(this);
             } else {
                 Exhaust.shellTracer(this);
             }
             setPosition(to.x, to.y, to.z);
             return;
+        }
+        if (emped) {
+            Vector3d velocity = new Vector3d(motionX, motionY, motionZ);
+            DownedFall.Attitude attitude = DownedFall.step(velocity, rotationYaw, 0, ModConfig.empedFall());
+            motionX = velocity.x;
+            motionY = velocity.y;
+            motionZ = velocity.z;
+            rotationYaw = (float) attitude.heading;
+            rotationPitch = (float) attitude.pitch;
+            to = from.add(motionX, motionY, motionZ);
         }
         Entity chased = getTarget();
         if (chased != null) {
@@ -163,7 +207,7 @@ public class EntityRocket extends Entity {
         if (hit != null) {
             boolean stinger = getKind() == Kind.STINGER;
             // A Stinger's warhead is for airframes: anyone else it runs into only gets the blast
-            if (hit.entityHit != null && directDamage > 0 && (!stinger || Emp.isVehicle(hit.entityHit))) {
+            if (hit.entityHit != null && directDamage > 0 && !emped && (!stinger || Emp.isVehicle(hit.entityHit))) {
                 if (hit.entityHit instanceof EntityLivingBase) {
                     hit.entityHit.hurtResistantTime = 0; // the blast right after must still land
                 }
@@ -174,7 +218,8 @@ public class EntityRocket extends Entity {
             return;
         }
         setPosition(to.x, to.y, to.z);
-        if (++age >= lifetime) {
+        // A knocked-out missile has no motor to burn out: it falls until it hits something
+        if (++age >= lifetime && !emped) {
             explode(to);
         }
     }
@@ -199,6 +244,7 @@ public class EntityRocket extends Entity {
         compound.setInteger("Kind", getKind().ordinal());
         compound.setFloat("BlastPower", blastPower);
         compound.setFloat("DirectDamage", directDamage);
+        compound.setBoolean("Emped", isEmpDisabled());
     }
 
     @Override
@@ -210,5 +256,6 @@ public class EntityRocket extends Entity {
         // Rockets saved before blast power was stored with them were all light ones
         blastPower = compound.hasKey("BlastPower") ? compound.getFloat("BlastPower") : (float) RocketType.LIGHT.getBlastPower();
         directDamage = compound.getFloat("DirectDamage");
+        dataManager.set(EMPED, compound.getBoolean("Emped"));
     }
 }

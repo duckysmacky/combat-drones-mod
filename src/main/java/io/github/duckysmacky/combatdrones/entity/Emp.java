@@ -8,12 +8,15 @@ import io.github.duckysmacky.combatdrones.physics.FieldContact;
 import io.github.duckysmacky.combatdrones.type.DroneType;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLivingBase;
+import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
 import net.minecraft.world.WorldServer;
 
 import javax.annotation.Nullable;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -22,7 +25,8 @@ import java.util.UUID;
  * the sphere is either destroyed with a small blast (no warhead, bombs or fuel going off) or disabled for a while
  * (motors off, gliding down out of control, see {@code [state.emped]}), per the field's {@link Rules}. A kind that
  * {@code [state.emped]} leaves out is destroyed instead. A hand-flown drone sitting on the ground isn't flying and is
- * left alone.
+ * left alone. A Stinger missile is hit when it touches the field or its shooter does: destroyed, its warhead goes off
+ * where it is; disabled, it stops homing and falls for good.
  */
 public final class Emp {
     private Emp() {
@@ -58,10 +62,20 @@ public final class Emp {
     /** Server, every tick a field is up. */
     public static void fry(World world, Vec3d centre, double radius, @Nullable UUID fieldOwner, Rules rules) {
         AxisAlignedBB reach = new AxisAlignedBB(centre.x, centre.y, centre.z, centre.x, centre.y, centre.z).grow(radius + 4);
-        for (Entity entity : world.getEntitiesWithinAABB(Entity.class, reach, entity -> entity != null && !entity.isDead && (isVehicle(entity) || entity instanceof EntityLaunchRamp))) {
+        List<UUID> shooters = new ArrayList<>();
+        for (Entity entity : world.getEntitiesWithinAABB(Entity.class, reach, entity -> entity != null && !entity.isDead
+                && (isVehicle(entity) || entity instanceof EntityLaunchRamp || isStingerMissile(entity) || entity instanceof EntityPlayer))) {
             AxisAlignedBB box = entity.getEntityBoundingBox();
             if (!FieldContact.touches(centre.x, centre.y, centre.z, radius, box.minX, box.minY, box.minZ, box.maxX, box.maxY, box.maxZ)
                     || spared(fieldOwner, ownerOf(entity), rules.spares)) {
+                continue;
+            }
+            if (entity instanceof EntityPlayer) {
+                shooters.add(entity.getUniqueID());
+                continue;
+            }
+            if (entity instanceof EntityRocket) {
+                zapMissile((EntityRocket) entity, rules);
                 continue;
             }
             if (entity instanceof EntityLaunchRamp) {
@@ -97,6 +111,29 @@ public final class Emp {
                 }
             }
         }
+        // A shooter in the field: their Stinger missiles in flight go with them, wherever they are
+        if (!shooters.isEmpty()) {
+            for (EntityRocket missile : world.getEntities(EntityRocket.class, entity -> isStingerMissile(entity) && !entity.isDead
+                    && shooters.contains(((EntityRocket) entity).getOwner()))) {
+                zapMissile(missile, rules);
+            }
+        }
+    }
+
+    /** A Stinger missile the field (or its shooter's) reached: set off where it is, or knocked out for good. */
+    private static void zapMissile(EntityRocket missile, Rules rules) {
+        if (!rules.disable || !missile.isEmpDisabled()) {
+            EffectPacket.empZap(missile.world, missile.getPositionVector(), 1.0F);
+        }
+        if (rules.disable) {
+            missile.empDisable();
+        } else {
+            missile.empDestroy();
+        }
+    }
+
+    private static boolean isStingerMissile(@Nullable Entity entity) {
+        return entity instanceof EntityRocket && ((EntityRocket) entity).getKind() == EntityRocket.Kind.STINGER;
     }
 
     /** Server: a vehicle gone to an EMP, already removed: a small blast, or with none, a wreck. */
@@ -128,6 +165,12 @@ public final class Emp {
     static UUID ownerOf(Entity entity) {
         if (entity instanceof EntityLaunchRamp) {
             return ((EntityLaunchRamp) entity).getOwner();
+        }
+        if (entity instanceof EntityRocket) {
+            return ((EntityRocket) entity).getOwner();
+        }
+        if (entity instanceof EntityPlayer) {
+            return entity.getUniqueID();
         }
         return entity instanceof EntityRampUnit ? ((EntityRampUnit) entity).getOwner() : ((EntityHandFlownDrone) entity).getOwner();
     }

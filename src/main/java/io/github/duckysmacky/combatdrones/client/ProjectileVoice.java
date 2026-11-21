@@ -66,7 +66,8 @@ final class ProjectileVoice extends EngineVoice {
 
     @Override
     boolean isRunning() {
-        return !projectile.isDead;
+        // A Stinger missile knocked out by an EMP has lost its motor
+        return !projectile.isDead && !(projectile instanceof EntityRocket && ((EntityRocket) projectile).isEmpDisabled());
     }
 
     @Override
