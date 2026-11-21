@@ -133,6 +133,7 @@ public final class ModConfig {
     public static double detectorReloadSeconds = 30.0;
     public static double detectorDotSeconds = 15.0;
     public static boolean detectorDotsForAllies = false;
+    public static double detectorPingIntervalSeconds = 0.0;
 
     // [emp_station]
     public static double stationRadius = 24.0;
@@ -529,6 +530,8 @@ public final class ModConfig {
                     "How long a found pilot keeps the red dot over their body, in seconds. It follows the body and shows through walls.");
             detectorDotsForAllies = defaults.get("pilot_detector.dotsForAllies", detectorDotsForAllies,
                     "The scanning player's vanilla scoreboard teammates (see general.ignoredTeams) also see the dots. Off: only the scanner.");
+            detectorPingIntervalSeconds = defaults.number("pilot_detector.pingIntervalSeconds", detectorPingIntervalSeconds, 0, 60,
+                    "How often a scan's dots update, in seconds. Between updates a dot stays where its body was. 0 = live.");
 
             stationRadius = defaults.number("emp_station.radius", stationRadius, 1, 32,
                     "Radius of the station's EMP field, in blocks. Drones, units and missiles flying into it are knocked out as if shot down.");

@@ -13,23 +13,27 @@ import java.util.List;
 
 /**
  * Server to a player: pilots a Pilot Detector scan found (their stand-in bodies), each to wear a tracking dot for
- * {@code ticks}. Added to whatever dots from earlier scans are still up.
+ * {@code ticks}. Added to whatever dots from earlier scans are still up. With a ping interval, sent again at each ping
+ * with fresh positions.
  */
 public class DetectorPacket implements IMessage {
     private static final int MAX_ENTRIES = 64;
 
     private List<IntelPacket.Entry> found = Collections.emptyList();
     private int ticks;
-    /** This player ran the scan (rather than a teammate's scan being shared). */
+    /** This player ran the scan (rather than a teammate's scan being shared, or a later ping of it). */
     private boolean own;
+    /** Dots follow the bodies on the client; otherwise they stay at these positions until the next ping. */
+    private boolean live;
 
     public DetectorPacket() {
     }
 
-    public DetectorPacket(List<IntelPacket.Entry> found, int ticks, boolean own) {
+    public DetectorPacket(List<IntelPacket.Entry> found, int ticks, boolean own, boolean live) {
         this.found = found;
         this.ticks = ticks;
         this.own = own;
+        this.live = live;
     }
 
     public List<IntelPacket.Entry> getFound() {
@@ -48,10 +52,11 @@ public class DetectorPacket implements IMessage {
     public void fromBytes(ByteBuf buf) {
         ticks = buf.readInt();
         own = buf.readBoolean();
+        live = buf.readBoolean();
         int count = Math.min(buf.readUnsignedByte(), MAX_ENTRIES);
         found = new ArrayList<>(count);
         for (int index = 0; index < count; index++) {
-            found.add(new IntelPacket.Entry(buf.readDouble(), buf.readDouble(), buf.readDouble(), buf.readInt(), "", false, true, true, ticks));
+            found.add(new IntelPacket.Entry(buf.readDouble(), buf.readDouble(), buf.readDouble(), buf.readInt(), "", false, true, live, ticks));
         }
     }
 
@@ -59,6 +64,7 @@ public class DetectorPacket implements IMessage {
     public void toBytes(ByteBuf buf) {
         buf.writeInt(ticks);
         buf.writeBoolean(own);
+        buf.writeBoolean(live);
         int count = Math.min(found.size(), MAX_ENTRIES);
         buf.writeByte(count);
         for (IntelPacket.Entry entry : found.subList(0, count)) {
