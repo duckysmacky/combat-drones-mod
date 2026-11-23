@@ -2,7 +2,8 @@
 
 ![Platform](https://img.shields.io/badge/platform-Forge-E04E14)
 ![Minecraft](https://img.shields.io/badge/minecraft-1.12.2-62B47A)
-![Version](https://img.shields.io/badge/version-0.5.2-4C8DFF)
+[![Version](https://img.shields.io/github/v/release/duckysmacky/combat-drones-mod?include_prereleases&label=version)](https://github.com/duckysmacky/combat-drones-mod/releases)
+[![Downloads](https://img.shields.io/github/downloads/duckysmacky/combat-drones-mod/total?label=downloads)](https://github.com/duckysmacky/combat-drones-mod/releases)
 
 Combat Drones is a Minecraft 1.12.2 Forge mod for PvP. It adds FPV kamikaze drones, bomb-dropping quadcopters,
 loitering munitions, armed planes, a stealth bomber, a recon UAV and a cruise missile, plus the gear to counter them:
