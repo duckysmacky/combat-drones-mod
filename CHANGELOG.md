@@ -2,6 +2,27 @@
 
 All notable changes to Combat Drones, newest first.
 
+## v0.5.2
+
+#### Added
+
+- Pilot Detector warning: when a Pilot Detector scans you, a "SCANNED BY PILOT DETECTOR" banner shows on screen. Your body is visible through walls while the scan lasts.
+- Pilot Detector ping interval: set how often a scan's dots update with pingIntervalSeconds in [pilot_detector]. The default keeps them live.
+- EMP fields knock out Stinger missiles: a Stinger caught in an EMP field stops homing and falls. It detonates on whatever it hits, with no direct damage.
+- Global Mission Planner limits: set the lowest route altitude and the minimum and maximum loiter radius in [general]. Per-vehicle limits still apply on top.
+
+#### Fixed
+
+- Planes too high on final no longer dive onto a runway. They go around and come back in from the approach height.
+- Recon Drone lock-on banners now name the Recon Drone instead of UAV
+
+## v0.5.1
+
+#### Fixed
+
+- Ramp-launched units no longer crash or explode against their ramp, the ground or nearby people right after launch. A short launch grace (1 second by default, set with general.launchGraceSeconds) covers the first moments after leaving a ramp or lifting off a runway.
+- Entities that were not drawn after leaving a remote view now show again.
+
 ## v0.5.0
 
 #### Added
