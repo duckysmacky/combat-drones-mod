@@ -6,6 +6,9 @@ Agent-only context lives in `.context/` (gitignored). **Read `.context/README.md
 spec, architecture, roadmap, dev notes and open issues. The spec there is the source of truth for names, stats and
 behaviour.
 
+Player-facing docs live in the GitHub wiki (local clone at `wiki/`, gitignored, pushed to
+`combat-drones-mod.wiki.git`). `README.md` stays a landing page: pitch, vehicle list, install and links to the wiki, with screenshots in `assets/media/`.
+
 ## Identity
 
 | | |
